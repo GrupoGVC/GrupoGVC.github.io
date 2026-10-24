@@ -1,0 +1,49 @@
+# Publica o apps-script/ no Google Apps Script sempre que ele muda no branch main.
+# Precisa de três segredos do repositório (Settings > Secrets and variables > Actions):
+#   CLASPRC_JSON              conteúdo do arquivo .clasprc.json gerado por "npx @google/clasp@2.4.2 login"
+#   APPS_SCRIPT_ID            ID do script (Apps Script > Configurações do projeto > ID do script)
+#   APPS_SCRIPT_DEPLOYMENT_ID ID da implementação da Aplicação Web (o trecho AKfycb... do endereço /exec)
+# Sem os segredos, o workflow só avisa e não publica nada.
+name: Publicar Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/**']
+  workflow_dispatch:
+
+concurrency:
+  group: apps-script
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      CLASPRC: ${{ secrets.CLASPRC_JSON }}
+      SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+      DEPLOYMENT_ID: ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar segredos
+        run: |
+          if [ -z "$CLASPRC" ] || [ -z "$SCRIPT_ID" ] || [ -z "$DEPLOYMENT_ID" ]; then
+            echo "::warning::Segredos do Apps Script não configurados. Nada foi publicado."
+            echo "PULAR=1" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: env.PULAR != '1'
+        with:
+          node-version: 20
+
+      - name: Enviar código e atualizar a implementação
+        if: env.PULAR != '1'
+        working-directory: apps-script
+        run: |
+          printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > .clasp.json
+          npx -y @google/clasp@2.4.2 push --force
+          npx -y @google/clasp@2.4.2 deploy --deploymentId "$DEPLOYMENT_ID" --description "GitHub ${GITHUB_SHA::7}"
+          rm -f "$HOME/.clasprc.json"
