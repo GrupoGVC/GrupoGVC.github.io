@@ -15,7 +15,18 @@
   };
   const NIVEIS = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 
-  function ler() { try { return JSON.parse(localStorage.getItem(CHAVE) || '{}') || {}; } catch (e) { return {}; } }
+  function ler() {
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem(CHAVE) || '{}') || {}; } catch (e) {}
+    // Quem já estava conectado no Controle de Destinação antigo (mesma API, mesmo token) entra direto.
+    if (!s.token) {
+      try {
+        const antiga = JSON.parse(localStorage.getItem('cd-auth') || '{}') || {};
+        if (antiga.token) { s.token = antiga.token; localStorage.setItem(CHAVE, JSON.stringify(s)); localStorage.removeItem('cd-auth'); }
+      } catch (e) {}
+    }
+    return s;
+  }
   function gravar(s) { try { localStorage.setItem(CHAVE, JSON.stringify(s)); } catch (e) {} }
   function apiUrl() { return (window.CONFIG || {}).API_URL || ''; }
 
