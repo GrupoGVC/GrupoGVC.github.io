@@ -403,17 +403,9 @@ function dados_(mes, u) {
   const janela = [];
   for (let i = 0; i < MESES_JANELA; i++) janela.push(addMes_(mes, -i));
 
-  const precos = {};
-  ler_('Precos').forEach(function (r) {
-    const d = String(r.destinador || '').trim(); const res = String(r.residuo || '').trim().toUpperCase();
-    if (!d || !res || r.preco === '') return;
-    (precos[d] = precos[d] || {})[res] = num_(r.preco);
-  });
-  const destinadores = ler_('Destinadores').filter(function (r) { return r.id; }).map(function (r) {
-    const id = String(r.id).trim();
-    return { id: id, nome: String(r.nome || id), tipo: String(r.tipo).toLowerCase() === 'receita' ? 'receita' : 'custo',
-             ativo: r.ativo !== false && String(r.ativo).toUpperCase() !== 'FALSE', precos: precos[id] || {} };
-  });
+  let destinadores, fonteDestinadores = 'mapa';
+  try { destinadores = destinadoresDoMapa_(); }
+  catch (e) { destinadores = destinadoresDaPlanilha_(); fonteDestinadores = 'controle'; }
 
   const locacao = {};
   ler_('Locacao').forEach(function (r) {
@@ -423,7 +415,7 @@ function dados_(mes, u) {
   });
 
   return { ok: true, usuario: { email: u.email, nome: u.nome, nivel: u.nivel }, mes: mes, ultimoMes: ultimo,
-           destinadores: destinadores, lancamentos: lanc.filter(function (l) { return janela.indexOf(l.mes) >= 0; }), locacao: locacao };
+           destinadores: destinadores, fonteDestinadores: fonteDestinadores, lancamentos: lanc.filter(function (l) { return janela.indexOf(l.mes) >= 0; }), locacao: locacao };
 }
 
 function normLanc_(r) {
@@ -511,7 +503,71 @@ function salvarLocacao_(mes, veiculos, u) {
   return { ok: true };
 }
 
+/* ---------- destinadores e preços: vêm do Mapa Operacional ----------
+ * Desde 24/10/2026 a fonte é o cadastro do Mapa (tipos destinador/reciclador, aba ResiduosCadastro).
+ * As abas Destinadores e Precos desta planilha ficam como histórico e só servem para dar nome
+ * a destinadores antigos que não existem no Mapa (aparecem inativos) ou de reserva se o Mapa falhar. */
+// Nomes do catálogo do Mapa que no Controle sempre foram outro nome (mantém o histórico de lançamentos igual).
+const RESIDUO_MAPA_PARA_CONTROLE = {
+  'PAPEL / PAPELÃO': 'PAPELÃO', 'METAL / SUCATA': 'METAL', 'CLASSE I – PERIGOSO': 'PERIGOSO', 'ELETRÔNICO (REEE)': 'ELETRÔNICO'
+};
+function residuoControle_(nome) {
+  const k = String(nome || '').trim().toUpperCase();
+  return RESIDUO_MAPA_PARA_CONTROLE[k] || k;
+}
+// id no Controle: cadastros importados do Controle têm id "cd-<id antigo>" no Mapa; os lançamentos antigos usam o id antigo.
+function idControleDoMapa_(id) { id = String(id); return id.indexOf('cd-') === 0 ? id.slice(3) : id; }
+
+function destinadoresDoMapa_() {
+  const pontos = MAPA.listar().pontos.filter(function (p) {
+    return p.tipos.indexOf('destinador') !== -1 || p.tipos.indexOf('reciclador') !== -1;
+  });
+  const vistos = {};
+  const lista = pontos.map(function (p) {
+    const rec = p.tipos.indexOf('reciclador') !== -1, des = p.tipos.indexOf('destinador') !== -1;
+    const precos = {}, naturezas = {};
+    (p.residuos || []).forEach(function (r) {
+      if (p.precos[r] == null || p.precos[r] === '') return;
+      const k = residuoControle_(r);
+      precos[k] = num_(p.precos[r]);
+      naturezas[k] = p.naturezas[r] || (rec && !des ? 'receita' : 'custo');
+    });
+    const nats = Object.keys(naturezas).map(function (k) { return naturezas[k]; });
+    // Só reciclador → receita; só destinador → custo; os dois → receita se todos os resíduos com preço forem receita.
+    const tipo = rec && !des ? 'receita' : (des && !rec ? 'custo' : (nats.length && nats.every(function (n) { return n === 'receita'; }) ? 'receita' : 'custo'));
+    const id = idControleDoMapa_(p.id);
+    vistos[id] = true;
+    return { id: id, mapaId: p.id, nome: String(p.nome || p.razaoSocial || id), tipo: tipo, ativo: true, precos: precos, naturezas: naturezas,
+             cidade: [p.cidade, p.uf].filter(function (x) { return x; }).join('/') };
+  });
+  // Destinadores antigos (só na planilha do Controle): ficam inativos, só para o histórico mostrar o nome.
+  destinadoresDaPlanilha_().forEach(function (d) {
+    if (vistos[d.id]) return;
+    d.ativo = false; d.precos = {}; d.foraDoMapa = true;
+    lista.push(d);
+  });
+  return lista;
+}
+function destinadoresDaPlanilha_() {
+  const precos = {};
+  ler_('Precos').forEach(function (r) {
+    const d = String(r.destinador || '').trim(); const res = String(r.residuo || '').trim().toUpperCase();
+    if (!d || !res || r.preco === '') return;
+    (precos[d] = precos[d] || {})[res] = num_(r.preco);
+  });
+  return ler_('Destinadores').filter(function (r) { return r.id; }).map(function (r) {
+    const id = String(r.id).trim();
+    return { id: id, nome: String(r.nome || id), tipo: String(r.tipo).toLowerCase() === 'receita' ? 'receita' : 'custo',
+             ativo: r.ativo !== false && String(r.ativo).toUpperCase() !== 'FALSE', precos: precos[id] || {} };
+  });
+}
+
+// Desativado: destinadores e preços são editados no Mapa Operacional. Mantido para não quebrar telas antigas abertas.
 function salvarDestinador_(d, u) {
+  return { ok: false, erro: 'dados_invalidos',
+    mensagem: 'Destinadores, resíduos e preços agora são cadastrados no Mapa Operacional. Edite o cadastro por lá.' };
+}
+function salvarDestinadorAntigo_(d, u) {
   if (!d || !d.id || !d.nome) return { ok: false, erro: 'dados_invalidos', mensagem: 'Destinador sem nome.' };
   const sh = aba_('Destinadores'); const idx = acharLinha_(sh, d.id);
   const linha = [d.id, d.nome, d.tipo === 'receita' ? 'receita' : 'custo', d.ativo !== false];
