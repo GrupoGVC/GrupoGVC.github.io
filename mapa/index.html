@@ -1122,6 +1122,10 @@ header {
   padding-right: 16px;
 }
 
+.sem-local-badge {
+  display: inline-block; font-size: 0.62rem; font-weight: 600; white-space: nowrap;
+  padding: 1px 6px; border-radius: 8px; background: #fff3e0; color: #b45309; vertical-align: middle;
+}
 .item-tipo-badge {
   font-family: var(--font-mono);
   font-size: 0.55rem;
@@ -4941,7 +4945,7 @@ function renderStops() {
 
 // ─── PICKER MODAL ─────────────────────────────────────────
 function getAllOptions() {
-  const pinOpts = points.map(p => ({
+  const pinOpts = points.filter(temLocal).map(p => ({
     label: TIPOS[p.tipo].icon + ' ' + p.nome + (p.cat ? ' — ' + p.cat : ''),
     name: p.nome, lat: p.lat, lng: p.lng, pin: true,
   }));
@@ -5952,6 +5956,15 @@ async function buscarCNPJ() {
 }
 
 // ─── NORMALIZAÇÃO (dados antigos, do navegador ou da planilha → formato atual) ───
+// Cadastro sem localização (ex.: importado do Controle de Destinação): fica na lista e na
+// tela Cadastros, mas não aparece no mapa até alguém marcar o local.
+function temLocal(p) {
+  if (!p) return false;
+  const ok = v => v !== '' && v !== null && v !== undefined && Number.isFinite(Number(v));
+  return ok(p.lat) && ok(p.lng);
+}
+function gmapsDe(p) { return temLocal(p) ? `https://maps.google.com/?q=${p.lat},${p.lng}` : ''; }
+
 function normalizarPonto(p) {
   if (!p || typeof p !== 'object') return p;
   const json = (v, padrao) => { if (typeof v !== 'string') return v; try { return v ? JSON.parse(v) : padrao; } catch(e) { return padrao; } };
@@ -5978,6 +5991,8 @@ function normalizarPonto(p) {
   if (!p.naturezas || typeof p.naturezas !== 'object' || Array.isArray(p.naturezas)) p.naturezas = {};
   const perm = naturezasPermitidas(p.tipos);
   if (perm.length === 1) p.residuos.forEach(r => { if (!p.naturezas[r]) p.naturezas[r] = perm[0]; });
+  if (temLocal(p)) { p.lat = Number(p.lat); p.lng = Number(p.lng); }
+  else { p.lat = ''; p.lng = ''; p.gmaps = ''; }
   return p;
 }
 
@@ -6049,7 +6064,11 @@ function openModal(id, draft) {
   // "Mover no mapa" só faz sentido editando um local já salvo;
   // "Marcar no mapa" só faz sentido num cadastro novo que ainda não tem localização.
   const moveBtn = document.getElementById('btn-move-loc');
-  if (moveBtn) moveBtn.style.display = id ? 'flex' : 'none';
+  if (moveBtn) {
+    moveBtn.style.display = id ? 'flex' : 'none';
+    const semLocal = id && !temLocal(points.find(x => x.id === id));
+    moveBtn.textContent = semLocal ? '📍 Marcar no mapa' : '📍 Mover no mapa';
+  }
   const markNewBtn = document.getElementById('btn-mark-new-loc');
   if (markNewBtn) markNewBtn.style.display = (!id && modalNewLat === null) ? 'flex' : 'none';
 
@@ -6153,8 +6172,9 @@ function savePoint() {
     residuos:     residuosSalvar,
     precos:       precosSalvar,
     naturezas:    naturezasSalvar,
-    gmaps:        `https://maps.google.com/?q=${lat},${lng}`,
+    gmaps:        '',
   });
+  p.gmaps = gmapsDe(p);
 
   if (editingId) {
     points = points.map(x => x.id === editingId ? p : x);
@@ -6169,7 +6189,7 @@ function savePoint() {
   renderList();
   renderHeaderStats();
   sheetsUpsertSilent(p);
-  if (modalNewLat !== null) {
+  if (modalNewLat !== null && temLocal(p)) {
     map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 14), { duration: 1 });
     setTimeout(() => leafletLayers[p.id]?.marker.openPopup(), 1100);
   }
@@ -6261,6 +6281,7 @@ function buildPopupHTML(p) {
 }
 
 function addLeafletPoint(p) {
+  if (!temLocal(p)) return; // sem localização: não vai para o mapa
   const marker = L.marker([p.lat, p.lng], { icon: makeIcon(p.tipo) });
   marker.bindPopup(buildPopupHTML(p), {
     maxWidth: 320, minWidth: 220, className: 'gvc-popup',
@@ -6296,6 +6317,11 @@ function flyToPoint(id) {
   const p = points.find(x => x.id === id);
   if (!p) return;
   setAppView('mapa'); // caso tenha sido chamado a partir da tela "Cadastros"
+  if (!temLocal(p)) {
+    // Ainda sem localização: abre o cadastro para marcar o local
+    openModal(id);
+    return;
+  }
   setMode('view');
   map.flyTo([p.lat, p.lng], 13, { duration: 1.2 });
   setTimeout(() => leafletLayers[id]?.marker.openPopup(), 1300);
@@ -6341,6 +6367,7 @@ function renderList() {
           <div class="item-tipo-badge" style="background:${t.color}22;color:${t.color}" title="${tiposDe(p).map(x => TIPOS[x].label).join(' + ')}">${t.label.split(' ')[0].toUpperCase()}${extraIcons ? ' +' + extraIcons : ''}</div>
         </div>
         ${p.cat ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:3px;padding-left:30px">${p.cat}</div>` : ''}
+        ${temLocal(p) ? '' : `<div style="padding-left:30px;margin-bottom:3px"><span class="sem-local-badge" title="Sem localização no mapa: clique para abrir o cadastro e marcar o local">📍 Sem localização</span></div>`}
         ${(p.telefones||[]).length || p.contatoNome ? `<div style="font-size:0.68rem;color:var(--text-muted);padding-left:30px">${p.contatoNome ? p.contatoNome+' · ' : ''}${(p.telefones||[])[0] || ''}</div>` : ''}
         ${topTags.length ? `<div class="item-tags" style="padding-left:30px;margin-top:5px">${topTags.map(r=>{ const n = naturezaDoResiduo(p, r); return `<span class="tag${n ? ' ' + n.cls : ''}" ${n ? `title="${n.label} por kg"` : ''}>${tagTxt(r)}</span>`; }).join('')}${p.residuos.length > 2 ? `<span class="tag">+${p.residuos.length-2}</span>` : ''}</div>` : ''}
       </div>
@@ -6368,6 +6395,7 @@ const CAD_COLUNAS = [
   { key: 'contato',      label: 'Contato',      valores: p => [p.contatoNome || ''] },
   { key: 'telefone',     label: 'Telefone',     valores: p => p.telefones || [] },
   { key: 'cidade',       label: 'Cidade/UF',    valores: p => [[p.cidade, p.uf].filter(Boolean).join('/')] },
+  { key: 'local',        label: 'Localização',  valores: p => [temLocal(p) ? 'Marcada' : 'Sem localização'] },
   { key: 'residuos',     label: 'Resíduos',     valores: p => p.residuos || [] },
   { key: 'equipamentos', label: 'Equipamentos', valores: p => p.equipamentos || [] },
 ];
@@ -6465,12 +6493,13 @@ function renderCadastrosTable() {
         <td>${esc(p.contatoNome) || '—'}${(p.emails || []).length ? `<div class="cad-sub">${esc(p.emails[0])}${p.emails.length > 1 ? ` +${p.emails.length - 1}` : ''}</div>` : ''}</td>
         <td>${(p.telefones || []).length ? (p.telefones || []).map(esc).join('<br>') : '—'}</td>
         <td>${esc(cidadeUf) || '—'}</td>
+        <td>${temLocal(p) ? '<span class="cad-sub">✓ Marcada</span>' : '<span class="sem-local-badge">📍 Sem localização</span>'}</td>
         <td><div class="cad-tags">${resTags || '—'}</div></td>
         <td><div class="cad-tags">${eqTags || '—'}</div></td>
         <td>
           <div class="cad-row-actions">
             <button class="cad-action-btn" onclick="openModal('${p.id}')" title="${somenteLeitura ? 'Ver cadastro' : 'Editar cadastro'}">${somenteLeitura ? '👁 Ver' : '✏ Editar'}</button>
-            <button class="cad-action-btn" onclick="flyToPoint('${p.id}')" title="Ver no mapa">📍 Ver no mapa</button>
+            <button class="cad-action-btn" onclick="flyToPoint('${p.id}')" title="${temLocal(p) ? 'Ver no mapa' : 'Abrir o cadastro para marcar o local'}">📍 ${temLocal(p) ? 'Ver no mapa' : 'Marcar local'}</button>
             <button class="cad-action-btn danger so-editor" onclick="deletePoint('${p.id}')" title="Excluir">🗑</button>
           </div>
         </td>
@@ -6658,7 +6687,7 @@ function onGeocoderInput(val) {
     .map(c => ({ label: '🏙 ' + c.n, name: c.n, lat: c.lat, lng: c.lng, zoom: 11 }));
 
   const pinMatches = points
-    .filter(p => (p.nome + ' ' + (p.cat||'')).toLowerCase().includes(q))
+    .filter(p => temLocal(p) && (p.nome + ' ' + (p.cat||'')).toLowerCase().includes(q))
     .slice(0, 3)
     .map(p => ({ label: TIPOS[p.tipo].icon + ' ' + p.nome, name: p.nome, lat: p.lat, lng: p.lng, zoom: 14, pin: true }));
 
@@ -6817,7 +6846,8 @@ function confirmMoveLocation(latlng) {
 
   points[idx].lat = latlng.lat;
   points[idx].lng = latlng.lng;
-  points[idx].gmaps = `https://maps.google.com/?q=${latlng.lat},${latlng.lng}`;
+  points[idx].gmaps = gmapsDe(points[idx]);
+  const idMovido = movingPointId;
 
   // Rebuild marker
   removeLeafletPoint(movingPointId);
@@ -6829,7 +6859,7 @@ function confirmMoveLocation(latlng) {
 
   // Fly to new location and open popup
   map.flyTo([latlng.lat, latlng.lng], Math.max(map.getZoom(), 14), { duration: 0.8 });
-  setTimeout(() => leafletLayers[movingPointId]?.marker.openPopup(), 900);
+  setTimeout(() => leafletLayers[idMovido]?.marker.openPopup(), 900);
 
   cancelMoveLocation();
 }
@@ -6935,7 +6965,7 @@ function onModalLocInput(val) {
     .filter(c => c.n.toLowerCase().includes(q)).slice(0, 5)
     .map(c => ({ label: '🏙 ' + c.n, name: c.n, lat: c.lat, lng: c.lng, zoom: 12 }));
   const pinMatches = points
-    .filter(p => (p.nome + ' ' + (p.cat||'')).toLowerCase().includes(q) && p.id !== editingId)
+    .filter(p => temLocal(p) && (p.nome + ' ' + (p.cat||'')).toLowerCase().includes(q) && p.id !== editingId)
     .slice(0, 2)
     .map(p => ({ label: TIPOS[p.tipo].icon + ' ' + p.nome, name: p.nome, lat: p.lat, lng: p.lng, zoom: 14 }));
 
@@ -7044,9 +7074,9 @@ function getExportRows() {
                        const n = naturezaDoResiduo(p, r);
                        return `${r}: ${fmtBRL(precosDoPonto(p)[r])}${n ? ' (' + n.label.toLowerCase() + ')' : ''}`;
                      }).join('; '),
-    'Latitude':      p.lat,
-    'Longitude':     p.lng,
-    'Google Maps':   `https://maps.google.com/?q=${p.lat},${p.lng}`,
+    'Latitude':      temLocal(p) ? p.lat : '',
+    'Longitude':     temLocal(p) ? p.lng : '',
+    'Google Maps':   gmapsDe(p),
   }));
 }
 
@@ -7727,7 +7757,7 @@ async function runSheetsBootstrapSync() {
     setSyncStatus('ok');
     if (primeiraCarga && points.length) {
       primeiraCarga = false;
-      const g = L.featureGroup(points.filter(pontoVisivel).map(p => L.marker([p.lat, p.lng])));
+      const g = L.featureGroup(points.filter(p => pontoVisivel(p) && temLocal(p)).map(p => L.marker([p.lat, p.lng])));
       if (g.getLayers().length) map.fitBounds(g.getBounds().pad(0.2), { maxZoom: 12 });
     }
     return true;
