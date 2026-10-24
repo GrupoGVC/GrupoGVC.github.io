@@ -7800,7 +7800,20 @@ function aplicarUsuarioPortal(u) {
   Portal.aoAtualizarUsuario = aplicarUsuarioPortal;
   await runSheetsBootstrapSync();
   startSheetsBackgroundJobs();
+  abrirCadastroDaUrl();
 })();
+
+// ?abrir=<id>: vindo do Controle de Destinação ("Editar no Mapa"), abre direto o cadastro.
+function abrirCadastroDaUrl() {
+  let id = null;
+  try { id = new URLSearchParams(location.search).get('abrir'); } catch(e) {}
+  if (!id) return;
+  try { history.replaceState(null, '', location.pathname); } catch(e) {}
+  const p = points.find(x => x.id === id);
+  if (!p) { alert('Esse cadastro não foi encontrado no Mapa Operacional.'); return; }
+  if (temLocal(p)) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 13));
+  openModal(id);
+}
 
 
 
