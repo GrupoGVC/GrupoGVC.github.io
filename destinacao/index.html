@@ -149,6 +149,11 @@ td input,td select{padding:5px 8px;font-size:13px}
 .dest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
 .dest-card h3{margin:0;font:700 15px var(--f-body)}
 .price-row{display:grid;grid-template-columns:1fr 100px 32px;gap:6px}
+.price-list{display:flex;flex-direction:column}
+.price-ro{display:flex;justify-content:space-between;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+.price-ro:last-child{border-bottom:0}
+.dest-card a.btn,.panel-h a.btn{text-decoration:none}
+.price-ro b{font-variant-numeric:tabular-nums;white-space:nowrap}.price-ro small{font-weight:400;color:var(--ink-2);margin-left:2px}
 .notice{padding:14px 16px;border-radius:var(--r);background:var(--sunken);border:1px dashed var(--line);color:var(--ink-2)}
 .confirm{display:inline-flex;gap:6px;align-items:center;font-size:12.5px}
 .kpis{}@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -276,6 +281,7 @@ const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agos
 const RESIDUOS=['NÃO RECICLÁVEL','PERIGOSO','RESÍDUO DE SAÚDE','DOMICILIAR','RESÍDUO TRITURÁVEL','ENTULHO','RCC','MADEIRA','CINZAS','ELETRÔNICO','PAPELÃO','PLÁSTICO','METAL','VIDRO','ÓLEO'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const R=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const RP=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:5});
 const R0=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
 const N=(v,d=0)=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const T=kg=>N((+kg||0)/1000,1)+' t';
@@ -486,7 +492,7 @@ function lancFiltrados(){
     .sort((a,b)=>(a.data||'9999').localeCompare(b.data||'9999')||nomeDe(a.destinador).localeCompare(nomeDe(b.destinador)));
 }
 function destOptions(sel,blank){const ds=Object.entries(S.dest).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
-  return (blank?`<option value="">${blank}</option>`:'')+['custo','receita'].map(t=>`<optgroup label="${t==='custo'?'Destinação (custo)':'Recicláveis (receita)'}">${ds.filter(([,d])=>d.tipo===t).map(([id,d])=>`<option value="${esc(id)}" ${id===sel?'selected':''}>${esc(d.nome)}</option>`).join('')}</optgroup>`).join('')}
+  return (blank?`<option value="">${blank}</option>`:'')+['custo','receita'].map(t=>`<optgroup label="${t==='custo'?'Destinação (custo)':'Recicláveis (receita)'}">${ds.filter(([id,d])=>d.tipo===t&&(d.ativo!==false||id===sel)).map(([id,d])=>`<option value="${esc(id)}" ${id===sel?'selected':''}>${esc(d.nome)}</option>`).join('')}</optgroup>`).join('')}
 
 function renderLanc(){
   const e=S.edit||{};const isEdit=!!e._id;
@@ -626,25 +632,26 @@ function renderFrota(){
 }
 
 /* ---------- destinadores ---------- */
+// Só para consulta: destinadores, resíduos e preços vêm dos cadastros de destinador/reciclador do Mapa Operacional.
 function renderDest(){
-  const a=agg(S.lanc,S.loc);const ds=Object.entries(S.dest).sort((x,y)=>(a.byDest[y[0]]?.v||0)-(a.byDest[x[0]]?.v||0)||x[1].nome.localeCompare(y[1].nome));
-  $('#main').innerHTML=`<section class="panel"><div class="panel-h"><div><h2>Destinadores e tabela de preços</h2><p class="sub">O preço daqui preenche o lançamento automaticamente. Destinador de custo: a Retec paga. De receita: o comprador paga pelo reciclável.</p></div>
-    ${S.readOnly?'':'<button class="btn pri" id="d-new">+ Destinador</button>'}</div>
-    <div class="dest-grid">${ds.map(([id,d])=>{const m=a.byDest[id];return `<div class="dest-card" data-id="${esc(id)}">
+  const a=agg(S.lanc,S.loc);
+  const ds=Object.entries(S.dest).filter(([id,d])=>d.ativo!==false||a.byDest[id])
+    .sort((x,y)=>(a.byDest[y[0]]?.v||0)-(a.byDest[x[0]]?.v||0)||x[1].nome.localeCompare(y[1].nome));
+  const temMapa=!!(window.Portal&&Portal.nivel('mapa'));
+  const podeMapa=!!(window.Portal&&Portal.podeEditar('mapa'));
+  const linkMapa=d=>temMapa&&d.mapaId?`<a class="btn sm" href="../mapa/?abrir=${encodeURIComponent(d.mapaId)}" title="Abrir este cadastro no Mapa Operacional">${podeMapa?'Editar no Mapa':'Ver no Mapa'} ↗</a>`:'';
+  const nat=(d,r)=>{const n=(d.naturezas||{})[r];return n&&n!==d.tipo?` <span class="pill ${n}" style="font-size:10.5px">${n==='receita'?'Receita':'Custo'}</span>`:''};
+  $('#main').innerHTML=`<section class="panel"><div class="panel-h"><div><h2>Destinadores e tabela de preços</h2><p class="sub">Vem dos cadastros de destinador e reciclador do Mapa Operacional. O preço daqui preenche o lançamento automaticamente. Destinador de custo: a Retec paga. De receita: o comprador paga pelo reciclável.</p></div>
+    ${temMapa?`<a class="btn pri" href="../mapa/">Abrir o Mapa Operacional ↗</a>`:''}</div>
+    ${S.fonteDest==='controle'?'<div class="notice" style="margin-bottom:12px">Não consegui ler o Mapa Operacional agora; mostrando a última tabela guardada no Controle.</div>':''}
+    <div class="notice" style="margin-bottom:12px">Esta tela é só para consulta. Para incluir um destinador ou reciclador, ou mudar resíduos e preços, edite o cadastro no Mapa Operacional${temMapa?'':' (peça acesso ao administrador do portal)'}. A mudança vale para os próximos lançamentos; os antigos mantêm o preço da época.</div>
+    <div class="dest-grid">${ds.map(([id,d])=>{const m=a.byDest[id];const pr=Object.entries(d.precos||{}).sort((x,y)=>x[0].localeCompare(y[0]));return `<div class="dest-card" data-id="${esc(id)}">
       <div class="row" style="justify-content:space-between"><h3>${esc(d.nome)}</h3><span class="pill ${d.tipo}">${d.tipo==='receita'?'Receita':'Custo'}</span></div>
-      <div class="sub" style="margin:0">${m?`${esc(mesLbl(S.mes))}: ${R(m.v)} · ${N(m.kg)} kg · ${m.n} lançamento(s)`:'Sem lançamentos no mês'}</div>
-      <div style="display:flex;flex-direction:column;gap:6px">${Object.entries(d.precos||{}).map(([r,p])=>`<div class="price-row"><input value="${esc(r)}" data-pr="res" aria-label="Resíduo"><input type="number" step="any" value="${esc(p)}" data-pr="p" aria-label="Preço por kg" style="text-align:right"><button class="btn sm" data-prm aria-label="Remover preço">×</button></div>`).join('')||'<div class="empty" style="padding:4px 0">Sem preços cadastrados</div>'}</div>
-      ${S.readOnly?'':`<div class="row"><button class="btn sm" data-padd>+ Preço</button><select data-tipo aria-label="Tipo" style="width:auto"><option value="custo" ${d.tipo==='custo'?'selected':''}>Custo</option><option value="receita" ${d.tipo==='receita'?'selected':''}>Receita</option></select><button class="btn sm pri" data-dsave style="margin-left:auto">Salvar</button></div>`}
+      <div class="sub" style="margin:0">${d.cidade?esc(d.cidade)+' · ':''}${m?`${esc(mesLbl(S.mes))}: ${R(m.v)} · ${N(m.kg)} kg · ${m.n} lançamento(s)`:'Sem lançamentos no mês'}</div>
+      ${d.foraDoMapa?'<div class="hint warn">Não está mais no Mapa Operacional: aparece aqui só por causa dos lançamentos do mês.</div>':''}
+      <div class="price-list">${pr.map(([r,p])=>`<div class="price-ro"><span>${esc(r)}${nat(d,r)}</span><b>${RP(p)}<small>/kg</small></b></div>`).join('')||'<div class="empty" style="padding:4px 0">Sem preços cadastrados</div>'}</div>
+      ${linkMapa(d)?`<div class="row" style="justify-content:flex-end">${linkMapa(d)}</div>`:''}
     </div>`}).join('')}</div></section>`;
-  document.querySelectorAll('.dest-card').forEach(card=>{const id=card.dataset.id;
-    card.querySelectorAll('[data-prm]').forEach(b=>b.onclick=()=>b.parentElement.remove());
-    const pa=card.querySelector('[data-padd]');if(pa)pa.onclick=()=>{const box=card.children[2];const e=box.querySelector('.empty');if(e)e.remove();const r=document.createElement('div');r.className='price-row';r.innerHTML='<input data-pr="res" list="dl-res-all" placeholder="Resíduo" aria-label="Resíduo"><input type="number" step="any" data-pr="p" placeholder="R$/kg" style="text-align:right" aria-label="Preço"><button class="btn sm" data-prm aria-label="Remover">×</button>';box.appendChild(r);r.querySelector('[data-prm]').onclick=()=>r.remove();r.querySelector('input').focus()};
-    const sv=card.querySelector('[data-dsave]');if(sv)sv.onclick=async()=>{const precos={};card.querySelectorAll('.price-row').forEach(r=>{const k=r.querySelector('[data-pr="res"]').value.trim().toUpperCase();const p=r.querySelector('[data-pr="p"]').value;if(k&&p!=='')precos[k]=+p});
-      const nd={...S.dest[id],id,precos,tipo:card.querySelector('[data-tipo]').value};try{await api('salvarDestinador',{dest:nd});S.dest[id]=nd;recompute();render();toast('Tabela de '+S.dest[id].nome+' salva')}catch(e){falha(e)}}});
-  if($('#d-new'))$('#d-new').onclick=()=>{const p=$('#d-new').parentElement;p.innerHTML=`<form class="row" id="d-form"><input id="d-nome" placeholder="Nome do destinador" style="width:220px" required><select id="d-tipo" style="width:auto"><option value="custo">Custo</option><option value="receita">Receita</option></select><button class="btn pri">Criar</button></form>`;$('#d-nome').focus();
-    $('#d-form').onsubmit=async e=>{e.preventDefault();const nome=$('#d-nome').value.trim();const id=nome.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-      if(!id||S.dest[id]){toast('Esse destinador já existe');return}const nd={id,nome,tipo:$('#d-tipo').value,precos:{},ativo:true};try{await api('salvarDestinador',{dest:nd});S.dest[id]=nd;render();toast(nome+' criado')}catch(er){falha(er)}}};
-  if(!$('#dl-res-all')){const dl=document.createElement('datalist');dl.id='dl-res-all';dl.innerHTML=RESIDUOS.map(r=>`<option value="${r}">`).join('');document.body.appendChild(dl)}
 }
 
 /* ---------- conferência ---------- */
@@ -709,7 +716,7 @@ async function carregar(silencioso){
     if(!S.mes)S.mes=j.mes;
     S.usuario=j.usuario;S.cfg.usuario=j.usuario;salvarCfg();
     S.readOnly=j.usuario.nivel==='leitor';
-    S.dest={};(j.destinadores||[]).forEach(d=>S.dest[d.id]=d);
+    S.dest={};(j.destinadores||[]).forEach(d=>S.dest[d.id]=d);S.fonteDest=j.fonteDestinadores||'';
     S.all=(j.lancamentos||[]).map(l=>({_id:l.id,...l}));
     S.locs=j.locacao||{};
     S.ready=true;mostrarUsuario();recompute();
