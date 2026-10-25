@@ -39,15 +39,46 @@
     location.replace(RAIZ + (q.toString() ? '?' + q : ''));
   }
 
-  async function api(acao, dados) {
-    if (!apiUrl()) throw { erro: 'config', mensagem: 'O endereço da API não está configurado (config.js).' };
+  const espera = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  // Uma chamada à API. O Google às vezes redireciona o POST e o corpo se perde no caminho
+  // (acontece com mais de uma conta Google no navegador): o servidor responde "sem_corpo"
+  // ou, em versões antigas, "nao_autenticado" sem ter recebido o token.
+  async function chamar(acao, dados) {
     let r;
     try {
-      r = await fetch(apiUrl(), { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      r = await fetch(apiUrl(), { method: 'POST', redirect: 'follow', cache: 'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(Object.assign({ acao: acao, token: ler().token || '' }, dados || {})) });
-    } catch (e) { throw { erro: 'rede', mensagem: 'Sem conexão com o servidor. Verifique a internet.' }; }
-    let j;
-    try { j = await r.json(); } catch (e) { throw { erro: 'resposta', mensagem: 'O servidor respondeu algo inesperado. Tente de novo.' }; }
+    } catch (e) { return { ok: false, erro: 'rede', mensagem: 'Sem conexão com o servidor. Verifique a internet.' }; }
+    try { return await r.json(); }
+    catch (e) { return { ok: false, erro: 'resposta', mensagem: 'O servidor respondeu algo inesperado. Tente de novo.' }; }
+  }
+
+  // Corpo perdido: nada foi executado no servidor, então é seguro repetir. Resposta estranha também
+  // se repete, menos no login/código (as ações gravadas do portal são todas idempotentes).
+  async function chamarComRetry(acao, dados) {
+    let j = await chamar(acao, dados);
+    const repete = function (x) { return !x.ok && (x.erro === 'sem_corpo' || (x.erro === 'resposta' && SEM_LOGIN.indexOf(acao) < 0)); };
+    for (let i = 1; i <= 3 && repete(j); i++) {
+      await espera(400 * i);
+      j = await chamar(acao, dados);
+    }
+    return j;
+  }
+
+  async function api(acao, dados) {
+    if (!apiUrl()) throw { erro: 'config', mensagem: 'O endereço da API não está configurado (config.js).' };
+    let j = await chamarComRetry(acao, dados);
+    // "Sessão terminou" só vale se o servidor confirmar duas vezes: um aviso falso não pode derrubar o login.
+    if (!j.ok && j.erro === 'nao_autenticado' && SEM_LOGIN.indexOf(acao) < 0 && ler().token) {
+      let negativas = 0;
+      for (let i = 1; i <= 3; i++) {
+        await espera(500 * i);
+        const eu = await chamarComRetry('eu', {});
+        if (eu.ok) { j = await chamarComRetry(acao, dados); break; }
+        if (eu.erro === 'nao_autenticado' && ++negativas >= 2) break; // confirmado
+      }
+    }
     if (!j.ok) {
       if (j.erro === 'nao_autenticado' && SEM_LOGIN.indexOf(acao) < 0 && Portal.aoExpirar) Portal.aoExpirar();
       throw j;
