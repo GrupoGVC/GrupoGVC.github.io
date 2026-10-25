@@ -133,6 +133,10 @@ function semPermissao_(msg) { return { ok: false, erro: 'sem_permissao', mensage
 function doGet(e) {
   try {
     const p = e.parameter || {};
+    // O app só usa POST. Um GET sem token quase sempre é um POST que o Google redirecionou
+    // (ex.: navegador com várias contas Google) e perdeu o corpo no caminho: não é sessão expirada,
+    // é para o app tentar de novo.
+    if (!p.token) return json_({ ok: false, erro: 'sem_corpo', mensagem: 'A requisição chegou vazia ao servidor. Tente de novo.' });
     const u = sessao_(p.token);
     if (!u) return json_({ ok: false, erro: 'nao_autenticado' });
     if ((p.acao || 'dados') === 'dados') {
@@ -147,7 +151,7 @@ function doGet(e) {
 
 function doPost(e) {
   let body;
-  try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ ok: false, erro: 'corpo_invalido' }); }
+  try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ ok: false, erro: 'sem_corpo', mensagem: 'A requisição chegou vazia ao servidor. Tente de novo.' }); }
   try {
     const acao = body.acao;
     // ações sem login
