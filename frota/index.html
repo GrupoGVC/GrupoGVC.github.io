@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Frota · Portal GVC</title>
+<link rel="icon" type="image/png" href="../img/logo-retec.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Mesmo visual do Controle de Destinação: barra fixa no topo (unidade + abas), conteúdo em painéis */
+:root{
+  --bg:#f5f7f5; --surface:#ffffff; --sunken:#edf1ee; --line:#d8dfda; --line-soft:#e6ebe7;
+  --ink:#14211b; --ink-2:#4b5a52; --ink-3:#77857d;
+  --accent:#1d6b52; --accent-ink:#ffffff; --accent-soft:#dcefe6; --plate:transparent; --plate-pad:0px;
+  --s-dest:#2a78d6; --s-loc:#eb6834; --s-rec:#1baf7a;
+  --warn:#a86400; --warn-bg:#fff3dc; --crit:#b42f2f; --crit-bg:#fde8e6; --ok:#1d7a3e; --ok-bg:#e2f4e7;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1512; --surface:#161e1a; --sunken:#1c2621; --line:#2c3a33; --line-soft:#233029;
+  --ink:#e9efeb; --ink-2:#b2c0b8; --ink-3:#83938a;
+  --accent:#4fb08c; --accent-ink:#06130d; --accent-soft:#1d3a2f; --plate:#eef3f0; --plate-pad:6px 10px;
+  --s-dest:#3987e5; --s-loc:#d95926; --s-rec:#199e70;
+  --warn:#e8a43a; --warn-bg:#33270f; --crit:#f07b74; --crit-bg:#3a1a19; --ok:#5cc47f; --ok-bg:#15301f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --surface:#161e1a; --sunken:#1c2621; --line:#2c3a33; --line-soft:#233029;
+  --ink:#e9efeb; --ink-2:#b2c0b8; --ink-3:#83938a;
+  --accent:#4fb08c; --accent-ink:#06130d; --accent-soft:#1d3a2f; --plate:#eef3f0; --plate-pad:6px 10px;
+  --s-dest:#3987e5; --s-loc:#d95926; --s-rec:#199e70;
+  --warn:#e8a43a; --warn-bg:#33270f; --crit:#f07b74; --crit-bg:#3a1a19; --ok:#5cc47f; --ok-bg:#15301f;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:12px 0}
+.brand{display:flex;flex-direction:column;gap:0;margin-right:auto;min-width:0}
+.brand b{font-family:var(--f-display);font-weight:800;font-stretch:80%;font-size:22px;letter-spacing:.01em;line-height:1.1;text-wrap:balance}
+.brand span{font-size:12px;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+.brand-row{display:flex;align-items:center;gap:14px;margin-right:auto;min-width:0}
+.logos{display:flex;align-items:center;gap:10px;background:var(--plate);padding:var(--plate-pad);border-radius:6px;flex-shrink:0}
+.logos img{display:block;width:auto}
+.logos .l-retec{height:30px}.logos .l-gvc{height:34px}
+.logos i{width:1px;align-self:stretch;background:var(--line);margin:2px 0}
+.brand-row .brand{margin-right:0;padding-left:14px;border-left:1px solid var(--line)}
+.login-logos{display:flex;justify-content:center;align-items:center;gap:22px;margin:28px auto 0;width:max-content;max-width:100%}
+.login-logos .l-retec{height:48px}.login-logos .l-gvc{height:56px}
+.login-logos i{height:44px}
+@media (max-width:560px){.logos .l-retec{height:24px}.logos .l-gvc{height:27px}.brand-row{gap:10px}.brand-row .brand{padding-left:10px}.brand b{font-size:19px}.login-logos .l-retec{height:38px}.login-logos .l-gvc{height:44px}}
+.month{display:flex;align-items:center;gap:4px;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r);padding:3px}
+.month button{border:0;background:transparent;color:var(--ink-2);width:32px;height:32px;border-radius:4px;cursor:pointer;font-size:16px}
+.month button:hover{background:var(--surface);color:var(--ink)}
+.month .lbl{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:16px;min-width:150px;text-align:center}
+.sync{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--ink-3);display:inline-block}
+.sync.on i{background:var(--ok)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+nav.tabs button{border:0;background:transparent;color:var(--ink-2);font:600 14px var(--f-body);padding:10px 14px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button .ct{font:500 11px var(--f-mono);background:var(--sunken);border-radius:10px;padding:1px 6px;margin-left:6px;color:var(--ink-2)}
+nav.tabs button .ct.alert{background:var(--warn-bg);color:var(--warn)}
+main{padding-block:20px 60px;display:flex;flex-direction:column;gap:20px}
+h2{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:17px;margin:0;letter-spacing:.005em}
+.sub{color:var(--ink-3);font-size:12.5px;margin:2px 0 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.panel-h{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:20px}
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .k{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.kpi .k i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.kpi .v{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.kpi.net{background:var(--sunken)}
+.delta{font:500 11.5px var(--f-mono);padding:1px 5px;border-radius:3px}
+.delta.up{background:var(--crit-bg);color:var(--crit)} .delta.dn{background:var(--ok-bg);color:var(--ok)}
+.delta.rup{background:var(--ok-bg);color:var(--ok)} .delta.rdn{background:var(--crit-bg);color:var(--crit)}
+/* bars */
+.bars{display:flex;flex-direction:column;gap:7px}
+.bar{display:grid;grid-template-columns:minmax(90px,34%) 1fr auto;align-items:center;gap:10px;font-size:13px;cursor:default}
+.bar .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.bar .t{height:14px;background:var(--line-soft);border-radius:0 4px 4px 0;position:relative}
+.bar .t span{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;min-width:2px}
+.bar .val{font:500 12.5px var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;min-width:86px}
+.bar:hover .n{color:var(--ink)}
+.empty{color:var(--ink-3);font-size:13px;padding:14px 0}
+/* trend */
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink-2)}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:-1px}
+svg text{fill:var(--ink-3);font:11px var(--f-body)}
+.chart-box{overflow-x:auto}
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-weight:600;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:8px 10px;background:var(--sunken);border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:7px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.mono{font-family:var(--f-mono);font-size:12.5px}
+tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--accent-soft)}
+tfoot td{font-weight:600;background:var(--sunken);border-top:1px solid var(--line)}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.pill.custo{background:color-mix(in srgb,var(--s-dest) 15%,transparent);color:var(--s-dest)}
+.pill.receita{background:color-mix(in srgb,var(--s-rec) 18%,transparent);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.crit{background:var(--crit-bg);color:var(--crit)} .pill.ok{background:var(--ok-bg);color:var(--ok)}
+/* alerts */
+.alerts{display:flex;flex-direction:column;gap:8px}
+.al{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:10px 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface)}
+.al.crit{border-left:4px solid var(--crit)} .al.warn{border-left:4px solid var(--warn)}
+.al b{font-size:13.5px} .al .x{grid-column:2;color:var(--ink-2);font-size:12.5px}
+.al .x code{font-family:var(--f-mono);font-size:12px;background:var(--sunken);padding:0 4px;border-radius:3px;cursor:pointer}
+/* forms */
+.btn{font:600 13px var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:var(--r);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--ink-3)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--crit)}
+.btn.sm{padding:5px 10px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
+input,select,textarea{font:14px var(--f-body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;width:100%;min-width:0}
+input.mono{font-family:var(--f-mono)}
+input:focus,select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.hint{font-size:12px;color:var(--ink-3);min-height:16px}
+.hint.warn{color:var(--warn)} .hint.crit{color:var(--crit)}
+.calc{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.filters>*{flex:1 1 160px}
+td input,td select{padding:5px 8px;font-size:13px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r);font-size:13px;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.tip{position:fixed;pointer-events:none;z-index:30;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:4px;max-width:260px;line-height:1.4;white-space:pre-line}
+.dest-card{border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.dest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
+.dest-card h3{margin:0;font:700 15px var(--f-body)}
+.price-row{display:grid;grid-template-columns:1fr 100px 32px;gap:6px}
+.price-list{display:flex;flex-direction:column}
+.price-ro{display:flex;justify-content:space-between;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+.price-ro:last-child{border-bottom:0}
+.dest-card a.btn,.panel-h a.btn{text-decoration:none}
+.price-ro b{font-variant-numeric:tabular-nums;white-space:nowrap}.price-ro small{font-weight:400;color:var(--ink-2);margin-left:2px}
+.notice{padding:14px 16px;border-radius:var(--r);background:var(--sunken);border:1px dashed var(--line);color:var(--ink-2)}
+.confirm{display:inline-flex;gap:6px;align-items:center;font-size:12.5px}
+.kpis{}@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:1fr}.month .lbl{min-width:120px;font-size:15px}.kpi .v{font-size:23px}.bar{grid-template-columns:minmax(80px,38%) 1fr auto}}
+
+
+.inp-btn{display:flex;gap:6px}.inp-btn input{flex:1;min-width:0}
+.scan-btn{padding:0 10px!important;flex-shrink:0}
+.scan-ov{position:fixed;inset:0;z-index:40;background:rgba(8,14,11,.72);display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.scan-box{background:var(--surface);border-radius:12px;padding:16px;width:min(100%,480px);display:flex;flex-direction:column;gap:12px}
+#scan-cam{width:100%;min-height:220px;background:#000;border-radius:8px;overflow:hidden}
+#scan-cam video{width:100%!important;display:block;border-radius:8px}
+/* tipo de negócio */
+.seg{display:inline-flex;background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
+.seg button,.seg label{border:0;background:transparent;color:var(--ink-2);font:600 13px var(--f-body);padding:7px 14px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"],.seg input:checked+label{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input:focus-visible+label{outline:2px solid var(--accent);outline-offset:1px}
+.pill.neg-rss{background:color-mix(in srgb,var(--s-loc) 16%,transparent);color:var(--s-loc)}
+.pill.neg-ind{background:color-mix(in srgb,var(--s-dest) 15%,transparent);color:var(--s-dest)}
+.pill.neg-none{background:var(--warn-bg);color:var(--warn)}
+.bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r);margin-bottom:12px;font-size:13px;color:var(--ink-2)}
+/* ---------- celular ---------- */
+nav.tabs .ic,nav.tabs .t-short{display:none}
+.rt td.full,.rt td.strong-m{}
+@media (max-width:640px){
+  body{font-size:15px}
+  input,select,textarea{font-size:16px}
+  header.top{position:static}
+  .top-row{gap:8px;padding-block:10px 10px;flex-wrap:wrap}
+  .brand-row{flex-basis:100%;gap:10px}
+  .brand span{display:none}
+  .brand{min-width:0}
+  .brand b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .top-row>.row{flex-wrap:nowrap;gap:6px!important}
+  #u-box>.sync{display:none}
+  .month{flex:1 1 0;min-width:0}.month .lbl{min-width:0;flex:1;font-size:15px;white-space:nowrap}
+  .logos .l-retec{height:20px}.logos .l-gvc{height:23px}.logos{gap:7px}.brand-row .brand{padding-left:9px}
+  .month button{width:40px;height:36px}
+  .sync span{display:none}
+  #u-nivel{display:none}
+  #u-nome{max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:15;margin:0;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:2px;overflow:visible;
+    padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  nav.tabs button{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px 5px;border-bottom:0;border-radius:10px;font-size:11px;font-weight:600;position:relative}
+  nav.tabs button[aria-selected="true"]{color:var(--accent);background:var(--accent-soft)}
+  nav.tabs .ic{display:block;width:22px;height:22px}
+  nav.tabs .t-long{display:none}nav.tabs .t-short{display:inline}
+  nav.tabs .ct{position:absolute;top:1px;left:calc(50% + 7px);margin:0;font-size:10px;padding:0 5px;line-height:16px}
+  main{padding-block:14px calc(92px + env(safe-area-inset-bottom,0px));gap:14px}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 32px);text-align:center}
+  .panel{padding:14px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{padding:12px}.kpi .v{font-size:21px}.kpi .k{font-size:10.5px}.kpi .d{font-size:12px}
+  .form{grid-template-columns:1fr 1fr;gap:10px}
+  .form .full{grid-column:1/-1}
+  .btn{padding:10px 14px}.btn.sm{padding:7px 11px}
+  .filters>*{flex:1 1 100%}
+  .bar{grid-template-columns:minmax(78px,36%) 1fr auto;gap:8px}.bar .val{min-width:0}
+  /* tabelas viram cartões */
+  .rtw{border:0;border-radius:0;overflow:visible;max-height:none!important}
+  table.rt,.rt tbody,.rt tfoot{display:block}
+  .rt thead{display:none}
+  .rt tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-bottom:10px}
+  .rt td{display:block;padding:0;border:0;white-space:normal;text-align:left!important;min-width:0;overflow-wrap:anywhere}
+  .rt td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+  .rt td[data-label=""]::before{display:none}
+  .rt td.full{grid-column:1/-1}
+  .rt td.strong-m{font-weight:700;font-size:15px}
+  .rt .hide-m{display:none}
+  .rt td input,.rt td select{width:100%!important;text-align:left!important}
+  .rt tfoot tr{background:var(--sunken)}.rt tfoot td{background:transparent;border:0}
+  tbody tr.click:hover td{background:transparent}
+  tbody tr.click:active{background:var(--accent-soft)}
+  .dest-grid{grid-template-columns:1fr}
+  .login-logos{margin-top:12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.toolbar input[type=search]{max-width:280px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.chk input{width:auto}
+tr.inativo td{opacity:.55}
+tr.inativo td:last-child{opacity:1}
+.acoes{display:flex;gap:6px;justify-content:flex-end}
+.tag-uni{font-size:11.5px;color:var(--ink-3)}
+.sem-uni{font-size:11.5px;color:var(--warn);font-weight:600}
+.cnh{font:600 12px var(--f-mono);background:var(--sunken);border-radius:4px;padding:1px 6px}
+.form-panel{border-left:4px solid var(--accent)}
+.uni-sel{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-3)}
+.uni-sel select{width:auto;padding:5px 8px;font-size:13px}
+td.wrap{white-space:normal;min-width:160px}
+.loc-total{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:20px}
+</style>
+<script src="../config.js"></script>
+<script src="../portal.js?v=20261101"></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <div class="brand-row"><div class="logos" aria-label="Retec · Grupo GVC"><img class="l-retec" src="../img/logo-retec.png" alt="Retec"><i></i><img class="l-gvc" src="../img/logo-gvc.png" alt="Grupo GVC"></div><div class="brand"><span>Logística de resíduos</span><b>Frota</b></div></div>
+      <label class="uni-sel" id="uni-box" hidden>Unidade <select id="uni-sel" aria-label="Unidade"></select></label>
+      <div class="row" style="gap:10px"><div class="sync" id="sync"><i></i><span>Conectando…</span></div><button class="btn sm" id="btn-atualizar" hidden>Atualizar</button><span id="u-box" class="row" style="gap:8px" hidden><span class="sync" style="flex-direction:column;align-items:flex-end;gap:0;line-height:1.2"><b id="u-nome" style="color:var(--ink);font-weight:600"></b><span id="u-nivel"></span></span><a class="btn sm" href="../" title="Voltar ao portal">⌂ Portal</a><button class="btn sm" id="btn-sair">Sair</button></span></div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="veiculos" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></svg><span class="t-long">Veículos</span><span class="t-short">Veículos</span> <span class="ct" id="ct-vei">0</span></button>
+      <button role="tab" data-tab="locacao" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="t-long">Locação do mês</span><span class="t-short">Locação</span></button>
+      <button role="tab" data-tab="caixas" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18l-2 11H5z"/><path d="M7 8V5h10v3"/></svg><span class="t-long">Caixas estacionárias</span><span class="t-short">Caixas</span> <span class="ct" id="ct-cx">0</span></button>
+      <button role="tab" data-tab="tipos" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="t-long">Tipos de veículo</span><span class="t-short">Tipos</span></button>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main"><div class="notice">Carregando a frota…</div></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+(function () {
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const R = v => (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const mesLbl = m => { const [y, mm] = m.split('-'); return MESES[+mm - 1] + ' ' + y; };
+const addMes = (m, d) => { let [y, mm] = m.split('-').map(Number); mm += d; while (mm < 1) { mm += 12; y--; } while (mm > 12) { mm -= 12; y++; } return y + '-' + String(mm).padStart(2, '0'); };
+const hoje = new Date(); const MES_ATUAL = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
+const NIVEL_LBL = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
+const TABS = ['veiculos', 'locacao', 'caixas', 'tipos'];
+
+const S = { tab: 'veiculos', d: null, ro: true, uni: '', busca: '', inativos: false, edit: null, mes: MES_ATUAL, locDraft: null };
+
+function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 3200); }
+function setSync(ok, txt) { const s = $('#sync'); s.classList.toggle('on', ok); s.querySelector('span').textContent = txt; }
+function falha(e) { toast((e && e.mensagem) || 'Não foi possível salvar. Verifique a internet e tente de novo.'); }
+
+/* ---------- dados auxiliares ---------- */
+const nomeCaixa = n => /^caixa/i.test(String(n || '').trim()) ? String(n).trim() : 'Caixa ' + n;
+const tipoDe = id => (S.d.tipos.find(t => t.id === id) || {});
+const cadNome = id => (S.d.cadastros.find(c => c.id === id) || {}).nome || '';
+const uniNome = id => (S.d.todasUnidades.find(u => u.id === id) || {}).nome || '';
+const passaUni = x => !S.uni || (S.uni === '-' ? !x.unidadeId : x.unidadeId === S.uni);
+const passaBusca = (txt) => !S.busca || txt.toLowerCase().includes(S.busca.toLowerCase());
+const opts = (lista, sel, vazio) => (vazio !== undefined ? `<option value="">${esc(vazio)}</option>` : '') + lista.map(v => { const [val, lbl] = Array.isArray(v) ? v : [v, v]; return `<option value="${esc(val)}" ${String(val) === String(sel ?? '') ? 'selected' : ''}>${esc(lbl)}</option>`; }).join('');
+const uniCell = id => id ? `<span class="tag-uni">${esc(uniNome(id))}</span>` : '<span class="sem-uni" title="Defina a unidade no cadastro">sem unidade</span>';
+const situPill = s => { const cls = /opera|base|cliente/i.test(s) ? 'ok' : /manuten|parado/i.test(s) ? 'warn' : 'crit'; return `<span class="pill ${cls}">${esc(s || '—')}</span>`; };
+
+/* ---------- carregar ---------- */
+async function carregar(silencioso) {
+  if (!silencioso) setSync(false, 'Carregando…');
+  try {
+    S.d = await Portal.api('frota.dados', {});
+    S.ro = !Portal.podeEditar('frota');
+    setSync(true, (S.ro ? 'Somente leitura · ' : '') + 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    montarUnidades(); render();
+  } catch (e) {
+    setSync(false, 'Sem conexão');
+    if (!S.d) $('#main').innerHTML = `<section class="panel"><h2>Não consegui carregar a frota</h2><p class="sub">${esc((e && e.mensagem) || 'Verifique a internet.')}</p><div class="row" style="margin-top:10px"><button class="btn pri" id="tentar">Tentar de novo</button></div></section>`;
+    const t = $('#tentar'); if (t) t.onclick = () => carregar();
+  }
+}
+function montarUnidades() {
+  const us = S.d.unidades;
+  const box = $('#uni-box'); const sel = $('#uni-sel');
+  const temSem = S.d.veiculos.some(v => !v.unidadeId) || S.d.caixas.some(c => !c.unidadeId);
+  if (us.length <= 1 && !temSem) { box.hidden = true; S.uni = ''; return; }
+  box.hidden = false;
+  let salvo = ''; try { salvo = localStorage.getItem('frota-uni') || ''; } catch (e) {}
+  if (S.uni === '' && salvo && (salvo === '-' || us.some(u => u.id === salvo))) S.uni = salvo;
+  sel.innerHTML = opts([['', 'Todas'], ...us.map(u => [u.id, u.nome]), ...(temSem ? [['-', 'Sem unidade definida']] : [])], S.uni);
+  sel.onchange = () => { S.uni = sel.value; try { localStorage.setItem('frota-uni', S.uni); } catch (e) {} S.locDraft = null; render(); };
+}
+
+/* ---------- abas ---------- */
+function setTab(t) {
+  if (!TABS.includes(t)) t = 'veiculos';
+  S.tab = t; S.edit = null;
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  if (location.hash !== '#' + t) history.replaceState(null, '', '#' + t);
+  render();
+}
+document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+function render() {
+  if (!S.d) return;
+  $('#ct-vei').textContent = S.d.veiculos.filter(v => v.ativo && passaUni(v)).length;
+  $('#ct-cx').textContent = S.d.caixas.filter(c => c.ativo && passaUni(c)).length;
+  ({ veiculos: renderVeiculos, locacao: renderLocacao, caixas: renderCaixas, tipos: renderTipos })[S.tab]();
+}
+
+/* ---------- excluir / inativar / histórico (iguais em todas as abas) ---------- */
+async function excluir(tabela, id, nome) {
+  if (!confirm('Excluir "' + nome + '"?')) return;
+  try { await Portal.api('frota.excluir', { tabela, id }); toast('"' + nome + '" excluído'); await carregar(true); }
+  catch (e) {
+    if (e && e.erro === 'em_uso') { if (await Portal.confirmarInativar(e, nome)) await ativo(tabela, id, false, nome); }
+    else falha(e);
+  }
+}
+async function ativo(tabela, id, valor, nome) {
+  try { await Portal.api('frota.ativo', { tabela, id, ativo: valor }); toast('"' + nome + '" ' + (valor ? 'reativado' : 'inativado')); await carregar(true); }
+  catch (e) { falha(e); }
+}
+function ligarAcoes(tabela, lista, rotulo) {
+  document.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => { S.edit = { ...lista.find(x => x.id === b.dataset.ed) }; render(); $('#form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  document.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => { const x = lista.find(y => y.id === b.dataset.hist); Portal.mostrarHistorico(tabela, x.id, rotulo(x)); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const x = lista.find(y => y.id === b.dataset.del); excluir(tabela, x.id, rotulo(x)); });
+  document.querySelectorAll('[data-reat]').forEach(b => b.onclick = () => { const x = lista.find(y => y.id === b.dataset.reat); ativo(tabela, x.id, true, rotulo(x)); });
+}
+const botoes = (x) => `<div class="acoes">${S.ro ? '' : `<button class="btn sm" data-ed="${x.id}">Editar</button>`}<button class="btn sm" data-hist="${x.id}">Histórico</button>${S.ro ? '' : (x.ativo ? `<button class="btn sm danger" data-del="${x.id}" aria-label="Excluir">Excluir</button>` : `<button class="btn sm" data-reat="${x.id}">Reativar</button>`)}</div>`;
+const toolbar = (rotuloNovo) => `<div class="toolbar">
+  <input type="search" id="busca" placeholder="Buscar…" value="${esc(S.busca)}" aria-label="Buscar">
+  <label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label>
+  ${S.ro || !rotuloNovo ? '' : `<button class="btn pri" id="novo" style="margin-left:auto">${rotuloNovo}</button>`}</div>`;
+function ligarToolbar(novo) {
+  const b = $('#busca'); if (b) b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
+  const i = $('#inat'); if (i) i.onchange = () => { S.inativos = i.checked; render(); };
+  const n = $('#novo'); if (n) n.onclick = () => { S.edit = novo(); render(); $('#form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+}
+const unidadePadrao = () => S.uni && S.uni !== '-' ? S.uni : (S.d.unidades.length === 1 ? S.d.unidades[0].id : '');
+function rodapeForm(x) { return x.id && x.criadoEm ? `<div class="gvc-audit" style="margin-top:10px">${Portal.auditoriaHTML(x)}</div>` : ''; }
+async function salvarForm(tabela, reg, rotulo) {
+  const b = $('#f-save'); b.disabled = true;
+  try { await Portal.api('frota.salvar', { tabela, registro: reg }); toast(rotulo + (reg.id ? ' atualizado' : ' cadastrado')); S.edit = null; await carregar(true); }
+  catch (e) { b.disabled = false; falha(e); }
+}
+
+/* ---------- veículos ---------- */
+function formVeiculo() {
+  const e = S.edit; if (!e) return '';
+  const L = S.d.listas;
+  const tipo = tipoDe(e.tipoVeiculoId);
+  return `<section class="panel form-panel" id="form-panel">
+    <div class="panel-h"><div><h2>${e.id ? 'Editar veículo ' + esc(e.placa) : 'Novo veículo'}</h2><p class="sub">A categoria de CNH exigida vem do tipo de veículo e é usada na Programação para conferir o motorista.</p></div>
+      <button class="btn sm" id="f-cancel" type="button">Cancelar</button></div>
+    <form id="f" class="form" autocomplete="off">
+      <div class="fld"><label for="f-placa">Placa</label><input id="f-placa" class="mono" required value="${esc(e.placa)}" maxlength="8" placeholder="ABC1D23"></div>
+      <div class="fld"><label for="f-tipo">Tipo de veículo</label><select id="f-tipo" required>${opts(S.d.tipos.filter(t => t.ativo || t.id === e.tipoVeiculoId).map(t => [t.id, t.nome]), e.tipoVeiculoId, 'Escolha…')}</select><div class="hint" id="h-tipo">${tipo.categoriaCnh ? 'CNH exigida: categoria ' + esc(tipo.categoriaCnh) : ''}</div></div>
+      <div class="fld"><label for="f-prop">Propriedade</label><select id="f-prop" required>${opts(L.propriedade, e.propriedade, 'Escolha…')}</select></div>
+      <div class="fld" id="fld-loc"><label for="f-loc">Locadora</label><select id="f-loc">${opts(S.d.locadoras.map(c => [c.id, c.nome]), e.locadoraId, 'Escolha…')}</select><div class="hint">Locadoras são cadastros de fornecedor no Mapa Operacional.</div></div>
+      <div class="fld"><label for="f-uni">Unidade</label><select id="f-uni">${opts(S.d.unidades.map(u => [u.id, u.nome]), e.unidadeId, 'Sem unidade definida')}</select></div>
+      <div class="fld"><label for="f-sit">Situação</label><select id="f-sit" required>${opts(L.situacaoVeiculo, e.situacao)}</select></div>
+      <div class="fld"><label for="f-mod">Modelo</label><input id="f-mod" value="${esc(e.modelo)}" placeholder="Ex.: VW 26.320"></div>
+      <div class="fld"><label for="f-ano">Ano</label><input id="f-ano" value="${esc(e.ano)}" inputmode="numeric" maxlength="9"></div>
+      <div class="fld" style="grid-column:1/-1"><label for="f-obs">Observações</label><input id="f-obs" value="${esc(e.obs)}"></div>
+      <div class="row" style="grid-column:1/-1;justify-content:flex-end"><button class="btn pri" id="f-save" type="submit">${e.id ? 'Salvar alterações' : 'Cadastrar veículo'}</button></div>
+    </form>${rodapeForm(e)}</section>`;
+}
+function renderVeiculos() {
+  const lista = S.d.veiculos.filter(v => (S.inativos || v.ativo) && passaUni(v) &&
+    passaBusca([v.placa, tipoDe(v.tipoVeiculoId).nome, cadNome(v.locadoraId), v.situacao, v.modelo, v.propriedade].join(' ')))
+    .sort((a, b) => (b.ativo - a.ativo) || a.placa.localeCompare(b.placa));
+  $('#main').innerHTML = formVeiculo() + `<section class="panel">
+    <div class="panel-h"><div><h2>Veículos</h2><p class="sub">Próprios e locados, por unidade. Veículo devolvido ou parado não aparece para a Programação.</p></div></div>
+    ${toolbar('+ Veículo')}
+    ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Placa</th><th>Tipo</th><th>CNH</th><th>Propriedade</th><th>Locadora</th><th>Unidade</th><th>Situação</th><th></th></tr></thead><tbody>
+    ${lista.map(v => { const t = tipoDe(v.tipoVeiculoId); return `<tr class="${v.ativo ? '' : 'inativo'}">
+      <td class="mono"><b>${esc(v.placa)}</b>${v.modelo ? `<div class="sub" style="margin:0">${esc(v.modelo)}${v.ano ? ' · ' + esc(v.ano) : ''}</div>` : ''}</td>
+      <td>${esc(t.nome || '—')}</td><td>${t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '—'}</td>
+      <td>${esc(v.propriedade)}</td><td>${esc(cadNome(v.locadoraId) || '—')}</td><td>${uniCell(v.unidadeId)}</td>
+      <td>${v.ativo ? situPill(v.situacao) : '<span class="pill">Inativo</span>'}</td><td>${botoes(v)}</td></tr>`; }).join('')}
+    </tbody></table></div>` : '<div class="empty">Nenhum veículo com esses filtros.</div>'}</section>`;
+  ligarToolbar(() => ({ placa: '', tipoVeiculoId: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Em operação', modelo: '', ano: '', obs: '' }));
+  ligarAcoes('Veiculos', S.d.veiculos, v => v.placa);
+  if (!S.edit) return;
+  const sync = () => { $('#fld-loc').hidden = $('#f-prop').value !== 'Locada'; const t = tipoDe($('#f-tipo').value); $('#h-tipo').textContent = t.categoriaCnh ? 'CNH exigida: categoria ' + t.categoriaCnh : (t.id ? 'Este tipo ainda não tem categoria de CNH (defina em Tipos de veículo).' : ''); };
+  $('#f-prop').onchange = sync; $('#f-tipo').onchange = sync; sync();
+  $('#f-cancel').onclick = () => { S.edit = null; render(); };
+  $('#f').onsubmit = ev => { ev.preventDefault();
+    salvarForm('Veiculos', { id: S.edit.id, placa: $('#f-placa').value, tipoVeiculoId: $('#f-tipo').value, propriedade: $('#f-prop').value,
+      locadoraId: $('#f-prop').value === 'Locada' ? $('#f-loc').value : '', unidadeId: $('#f-uni').value, situacao: $('#f-sit').value,
+      modelo: $('#f-mod').value.trim(), ano: $('#f-ano').value.trim(), obs: $('#f-obs').value.trim() }, 'Veículo');
+  };
+}
+
+/* ---------- caixas ---------- */
+function formCaixa() {
+  const e = S.edit; if (!e) return '';
+  const L = S.d.listas;
+  return `<section class="panel form-panel" id="form-panel">
+    <div class="panel-h"><div><h2>${e.id ? 'Editar caixa ' + esc(e.numero) : 'Nova caixa'}</h2><p class="sub">Caixas de 5 m³ vão no poliguindaste; de 30 e 40 m³ no roll on/off. Quando a caixa está num cliente, escolha o cadastro dele.</p></div>
+      <button class="btn sm" id="f-cancel" type="button">Cancelar</button></div>
+    <form id="f" class="form" autocomplete="off">
+      <div class="fld"><label for="f-num">Número</label><input id="f-num" class="mono" required value="${esc(e.numero)}"></div>
+      <div class="fld"><label for="f-cap">Capacidade (m³)</label><select id="f-cap" required>${opts(L.capacidadeCaixa.map(c => [c, c + ' m³']), e.capacidade, 'Escolha…')}</select></div>
+      <div class="fld"><label for="f-prop">Propriedade</label><select id="f-prop" required>${opts(L.propriedade, e.propriedade, 'Escolha…')}</select></div>
+      <div class="fld" id="fld-loc"><label for="f-loc">Locadora</label><select id="f-loc">${opts(S.d.locadoras.map(c => [c.id, c.nome]), e.locadoraId, 'Escolha…')}</select></div>
+      <div class="fld"><label for="f-uni">Unidade</label><select id="f-uni">${opts(S.d.unidades.map(u => [u.id, u.nome]), e.unidadeId, 'Sem unidade definida')}</select></div>
+      <div class="fld"><label for="f-sit">Situação</label><select id="f-sit" required>${opts(L.situacaoCaixa, e.situacao)}</select></div>
+      <div class="fld" id="fld-onde" style="grid-column:span 2"><label for="f-onde">Onde está (cadastro no Mapa)</label><select id="f-onde">${opts(S.d.cadastros.map(c => [c.id, c.nome]), e.cadastroAtualId, '—')}</select></div>
+      <div class="fld" style="grid-column:1/-1"><label for="f-obs">Observações</label><input id="f-obs" value="${esc(e.obs)}"></div>
+      <div class="row" style="grid-column:1/-1;justify-content:flex-end"><button class="btn pri" id="f-save" type="submit">${e.id ? 'Salvar alterações' : 'Cadastrar caixa'}</button></div>
+    </form>${rodapeForm(e)}</section>`;
+}
+function renderCaixas() {
+  const lista = S.d.caixas.filter(c => (S.inativos || c.ativo) && passaUni(c) &&
+    passaBusca([c.numero, c.capacidade + ' m3', cadNome(c.locadoraId), cadNome(c.cadastroAtualId), c.situacao].join(' ')))
+    .sort((a, b) => (b.ativo - a.ativo) || String(a.numero).localeCompare(String(b.numero), 'pt-BR', { numeric: true }));
+  $('#main').innerHTML = formCaixa() + `<section class="panel">
+    <div class="panel-h"><div><h2>Caixas estacionárias</h2><p class="sub">Onde cada caixa está. Na Programação, a entrega, a retirada e a troca de caixa vão atualizar isso sozinhas.</p></div></div>
+    ${toolbar('+ Caixa')}
+    ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Número</th><th class="num">m³</th><th>Propriedade</th><th>Unidade</th><th>Situação</th><th>Onde está</th><th></th></tr></thead><tbody>
+    ${lista.map(c => `<tr class="${c.ativo ? '' : 'inativo'}">
+      <td class="mono"><b>${esc(c.numero)}</b></td><td class="num">${esc(c.capacidade)}</td>
+      <td>${esc(c.propriedade)}${c.locadoraId ? `<div class="sub" style="margin:0">${esc(cadNome(c.locadoraId))}</div>` : ''}</td>
+      <td>${uniCell(c.unidadeId)}</td><td>${c.ativo ? situPill(c.situacao) : '<span class="pill">Inativa</span>'}</td>
+      <td class="wrap">${esc(cadNome(c.cadastroAtualId) || '—')}</td><td>${botoes(c)}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">Nenhuma caixa com esses filtros. Cadastre as caixas em "+ Caixa".</div>'}</section>`;
+  ligarToolbar(() => ({ numero: '', capacidade: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Na base', cadastroAtualId: '', obs: '' }));
+  ligarAcoes('Caixas', S.d.caixas, c => nomeCaixa(c.numero));
+  if (!S.edit) return;
+  const sync = () => { $('#fld-loc').hidden = $('#f-prop').value !== 'Locada'; $('#fld-onde').hidden = $('#f-sit').value !== 'Em cliente'; };
+  $('#f-prop').onchange = sync; $('#f-sit').onchange = sync; sync();
+  $('#f-cancel').onclick = () => { S.edit = null; render(); };
+  $('#f').onsubmit = ev => { ev.preventDefault();
+    salvarForm('Caixas', { id: S.edit.id, numero: $('#f-num').value, capacidade: $('#f-cap').value, propriedade: $('#f-prop').value,
+      locadoraId: $('#f-prop').value === 'Locada' ? $('#f-loc').value : '', unidadeId: $('#f-uni').value, situacao: $('#f-sit').value,
+      cadastroAtualId: $('#f-sit').value === 'Em cliente' ? $('#f-onde').value : '', obs: $('#f-obs').value.trim() }, 'Caixa');
+  };
+}
+
+/* ---------- tipos de veículo ---------- */
+function renderTipos() {
+  const e = S.edit;
+  const lista = S.d.tipos.filter(t => (S.inativos || t.ativo) && passaBusca(t.nome)).sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  $('#main').innerHTML = (e ? `<section class="panel form-panel" id="form-panel">
+    <div class="panel-h"><div><h2>${e.id ? 'Editar tipo ' + esc(e.nome) : 'Novo tipo de veículo'}</h2><p class="sub">A categoria de CNH é a mínima exigida para dirigir este tipo. Confira com o DP antes de usar.</p></div><button class="btn sm" id="f-cancel" type="button">Cancelar</button></div>
+    <form id="f" class="form" autocomplete="off">
+      <div class="fld"><label for="f-nome">Nome</label><input id="f-nome" required value="${esc(e.nome)}"></div>
+      <div class="fld"><label for="f-cnh">Categoria de CNH exigida</label><select id="f-cnh">${opts(S.d.listas.categoriaCnh, e.categoriaCnh, 'Não definida')}</select></div>
+      <div class="fld"><label>Caixas que carrega (m³)</label><div class="row" style="gap:12px;min-height:38px">${S.d.listas.capacidadeCaixa.map(c => `<label class="chk"><input type="checkbox" data-cap="${c}" ${String(e.capacidadesCaixa || '').split(/\s*;\s*/).includes(c) ? 'checked' : ''}> ${c} m³</label>`).join('')}</div></div>
+      <div class="row" style="grid-column:1/-1;justify-content:flex-end"><button class="btn pri" id="f-save" type="submit">${e.id ? 'Salvar alterações' : 'Cadastrar tipo'}</button></div>
+    </form>${rodapeForm(e)}</section>` : '') + `<section class="panel">
+    <div class="panel-h"><div><h2>Tipos de veículo</h2><p class="sub">Lista usada no cadastro de veículos. Tipo que já tem veículo não pode ser excluído, só inativado.</p></div></div>
+    ${toolbar('+ Tipo')}
+    <div class="tbl-wrap"><table><thead><tr><th>Tipo</th><th>CNH exigida</th><th>Caixas (m³)</th><th class="num">Veículos</th><th></th></tr></thead><tbody>
+    ${lista.map(t => `<tr class="${t.ativo ? '' : 'inativo'}"><td><b>${esc(t.nome)}</b></td><td>${t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '<span class="sem-uni">não definida</span>'}</td>
+      <td>${esc(t.capacidadesCaixa || '—')}</td><td class="num">${t.veiculos}</td><td>${botoes(t)}</td></tr>`).join('')}
+    </tbody></table></div></section>`;
+  ligarToolbar(() => ({ nome: '', categoriaCnh: '', capacidadesCaixa: '' }));
+  ligarAcoes('TiposVeiculo', S.d.tipos, t => t.nome);
+  if (!e) return;
+  $('#f-cancel').onclick = () => { S.edit = null; render(); };
+  $('#f').onsubmit = ev => { ev.preventDefault();
+    salvarForm('TiposVeiculo', { id: e.id, nome: $('#f-nome').value, categoriaCnh: $('#f-cnh').value,
+      capacidadesCaixa: [...document.querySelectorAll('[data-cap]')].filter(c => c.checked).map(c => c.dataset.cap).join('; ') }, 'Tipo');
+  };
+}
+
+/* ---------- locação do mês ---------- */
+// Itens em uso no mês (veículos e caixas). Próprios entram com valor 0; locados com o valor da locadora.
+function itensDoMes(mes) { return S.d.locacao.filter(l => l.mes === mes); }
+function chave(x) { return x.veiculoId ? 'V' + x.veiculoId : 'C' + x.caixaId; }
+function rascunho() {
+  if (S.locDraft && S.locDraft.mes === S.mes && S.locDraft.uni === S.uni) return S.locDraft;
+  const m = {}; itensDoMes(S.mes).forEach(l => m[chave(l)] = { uso: true, valor: l.valor });
+  S.locDraft = { mes: S.mes, uni: S.uni, m, sujo: false };
+  return S.locDraft;
+}
+function renderLocacao() {
+  const d = rascunho();
+  const veis = S.d.veiculos.filter(v => passaUni(v) && (v.ativo && v.situacao !== 'Devolvido' || d.m['V' + v.id]));
+  const cxs = S.d.caixas.filter(c => passaUni(c) && c.propriedade === 'Locada' && (c.ativo && c.situacao !== 'Baixada' || d.m['C' + c.id]));
+  const linhas = [...veis.map(v => ({ k: 'V' + v.id, nome: v.placa, tipo: tipoDe(v.tipoVeiculoId).nome || '', prop: v.propriedade, loc: cadNome(v.locadoraId), uni: v.unidadeId })),
+                  ...cxs.map(c => ({ k: 'C' + c.id, nome: nomeCaixa(c.numero), tipo: 'Caixa ' + c.capacidade + ' m³', prop: c.propriedade, loc: cadNome(c.locadoraId), uni: c.unidadeId }))];
+  linhas.sort((a, b) => (a.prop === 'Locada' ? 0 : 1) - (b.prop === 'Locada' ? 0 : 1) || a.loc.localeCompare(b.loc) || a.nome.localeCompare(b.nome));
+  const total = linhas.reduce((s, l) => s + (d.m[l.k] && d.m[l.k].uso ? +d.m[l.k].valor || 0 : 0), 0);
+  const nUso = linhas.filter(l => d.m[l.k] && d.m[l.k].uso).length;
+  const ant = itensDoMes(addMes(S.mes, -1));
+  $('#main').innerHTML = `<section class="panel">
+    <div class="panel-h"><div><h2>Locação do mês</h2><p class="sub">Marque o que esteve em uso no mês e o valor da locação. O Controle de Destinação usa esta lista para o custo por viagem e para avisar veículo alugado sem viagem.</p></div>
+      <div class="month" role="group" aria-label="Mês"><button id="m-prev" aria-label="Mês anterior">‹</button><div class="lbl">${esc(mesLbl(S.mes))}</div><button id="m-next" aria-label="Próximo mês">›</button></div></div>
+    <div class="toolbar">
+      ${S.ro ? '' : `<button class="btn" id="copiar" ${ant.length ? '' : 'disabled'}>Copiar de ${esc(mesLbl(addMes(S.mes, -1)))}</button>`}
+      <span class="sub" style="margin:0 0 0 auto">${nUso} em uso · total</span><span class="loc-total">${R(total)}</span>
+      ${S.ro ? '' : `<button class="btn pri" id="salvar" ${d.sujo ? '' : 'disabled'}>Salvar ${esc(mesLbl(S.mes))}</button>`}
+    </div>
+    ${linhas.length ? `<div class="tbl-wrap"><table><thead><tr><th>Em uso</th><th>Placa / caixa</th><th>Tipo</th><th>Propriedade</th><th>Locadora</th><th>Unidade</th><th class="num">Valor no mês (R$)</th></tr></thead><tbody>
+    ${linhas.map(l => { const x = d.m[l.k] || { uso: false, valor: 0 }; return `<tr>
+      <td><input type="checkbox" data-uso="${l.k}" ${x.uso ? 'checked' : ''} ${S.ro ? 'disabled' : ''} aria-label="Em uso no mês: ${esc(l.nome)}" style="width:auto"></td>
+      <td class="mono"><b>${esc(l.nome)}</b></td><td>${esc(l.tipo)}</td><td>${esc(l.prop)}</td><td>${esc(l.loc || '—')}</td><td>${uniCell(l.uni)}</td>
+      <td class="num">${l.prop === 'Locada' ? `<input type="number" step="any" min="0" data-val="${l.k}" value="${x.uso ? esc(x.valor) : ''}" ${S.ro || !x.uso ? 'disabled' : ''} style="width:130px;text-align:right" aria-label="Valor de ${esc(l.nome)}">` : '<span class="sub">própria</span>'}</td></tr>`; }).join('')}
+    </tbody></table></div>` : '<div class="empty">Nenhum veículo ou caixa locada nesta unidade. Cadastre em Veículos e Caixas.</div>'}
+    ${d.sujo ? '<p class="hint warn" id="aviso-sujo" style="margin-top:8px">Alterações ainda não salvas.</p>' : ''}
+  </section>`;
+  $('#m-prev').onclick = () => { if (d.sujo && !confirm('Sair sem salvar as alterações deste mês?')) return; S.mes = addMes(S.mes, -1); S.locDraft = null; render(); };
+  $('#m-next').onclick = () => { if (d.sujo && !confirm('Sair sem salvar as alterações deste mês?')) return; S.mes = addMes(S.mes, 1); S.locDraft = null; render(); };
+  document.querySelectorAll('[data-uso]').forEach(c => c.onchange = () => { const k = c.dataset.uso; d.m[k] = d.m[k] || { valor: 0 }; d.m[k].uso = c.checked; d.sujo = true; render(); });
+  // valor: atualiza só o total (sem redesenhar a tabela, para não perder o foco nem o clique em Salvar)
+  document.querySelectorAll('[data-val]').forEach(i => i.oninput = () => {
+    const k = i.dataset.val; d.m[k].valor = +i.value || 0; d.sujo = true;
+    $('.loc-total').textContent = R(linhas.reduce((s, l) => s + (d.m[l.k] && d.m[l.k].uso ? +d.m[l.k].valor || 0 : 0), 0));
+    const sv = $('#salvar'); if (sv) sv.disabled = false;
+    if (!$('#aviso-sujo')) $('#main section.panel').insertAdjacentHTML('beforeend', '<p class="hint warn" id="aviso-sujo" style="margin-top:8px">Alterações ainda não salvas.</p>');
+  });
+  const cp = $('#copiar'); if (cp) cp.onclick = () => { ant.forEach(l => { d.m[chave(l)] = { uso: true, valor: l.valor }; }); d.sujo = true; render(); toast(ant.length + ' itens copiados. Confira os valores e salve.'); };
+  const sv = $('#salvar'); if (sv) sv.onclick = async () => {
+    sv.disabled = true;
+    const itens = Object.entries(d.m).filter(([k, x]) => x.uso && linhas.some(l => l.k === k)).map(([k, x]) => k[0] === 'V' ? { veiculoId: k.slice(1), valor: x.valor } : { caixaId: k.slice(1), valor: x.valor });
+    try { await Portal.api('frota.salvarLocacao', { mes: S.mes, itens }); toast('Locação de ' + mesLbl(S.mes) + ' salva'); S.locDraft = null; await carregar(true); }
+    catch (e) { sv.disabled = false; falha(e); }
+  };
+}
+
+/* ---------- início ---------- */
+$('#btn-sair').onclick = () => Portal.sair();
+$('#btn-atualizar').onclick = () => carregar();
+window.addEventListener('hashchange', () => { const t = location.hash.slice(1); if (TABS.includes(t) && t !== S.tab) setTab(t); });
+(async function start() {
+  let u;
+  try { u = await Portal.exigir('frota'); }
+  catch (e) { $('#main').innerHTML = `<section class="panel"><h2>Não consegui falar com o portal</h2><p class="sub">${esc((e && e.mensagem) || '')}</p></section>`; return; }
+  const mostrar = us => { $('#u-box').hidden = false; $('#btn-atualizar').hidden = false; $('#u-nome').textContent = us.nome; $('#u-nivel').textContent = NIVEL_LBL[Portal.nivel('frota', us)] || ''; };
+  mostrar(u); Portal.aoAtualizarUsuario = us => { mostrar(us); S.ro = !Portal.podeEditar('frota', us); render(); };
+  const t = location.hash.slice(1); if (TABS.includes(t)) S.tab = t;
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === S.tab));
+  await carregar();
+})();
+})();
+
+</script>
+</body>
+</html>
