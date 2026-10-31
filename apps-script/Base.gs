@@ -40,6 +40,22 @@ const TABELAS = {
                           texto: ['placa', 'ano'] },
   Caixas:               { prefixo: 'CXA', colunas: ['id', 'unidadeId', 'numero', 'capacidade', 'propriedade', 'locadoraId', 'situacao', 'cadastroAtualId', 'obs', 'ativo'],
                           texto: ['numero'], numero: ['capacidade'] },
+  // Fase 2: Solicitações, documentos, preço de venda e Faturamento (BM = NF)
+  Consultores:          { prefixo: 'CON', colunas: ['id', 'nome', 'email', 'telefone', 'ativo'], texto: ['email', 'telefone'] },
+  Solicitacoes:         { prefixo: 'SOL', colunas: ['id', 'unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds',
+                                                      'descricao', 'dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'valorPrevisto',
+                                                      'status', 'motivo', 'obs', 'solicitanteNome', 'programadorNome', 'origem', 'idOrigem', 'ativo'],
+                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto'], data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'] },
+  TiposDocumento:       { prefixo: 'TDO', colunas: ['id', 'nome', 'ativo'] },
+  DocumentosPadrao:     { prefixo: 'DPA', colunas: ['id', 'cadastroId', 'tipoDocumentoId', 'servico'] },
+  SolicitacaoDocumentos:{ prefixo: 'SDO', colunas: ['id', 'solicitacaoId', 'tipoDocumentoId', 'situacao', 'link', 'obs'] },
+  PrecosCliente:        { prefixo: 'PCL', colunas: ['id', 'cadastroId', 'residuoId', 'modalidade', 'valorTransporte', 'precoKg', 'vigenciaInicio', 'vigenciaFim', 'obs', 'ativo'],
+                          numero: ['valorTransporte', 'precoKg'], data: ['vigenciaInicio', 'vigenciaFim'] },
+  Faturamentos:         { prefixo: 'FAT', colunas: ['id', 'unidadeId', 'clienteId', 'bmNumero', 'bmData', 'bmValor', 'aprovacaoData', 'nfNumero', 'nfData', 'nfValor',
+                                                      'status', 'motivo', 'obs', 'origem', 'idOrigem', 'ativo'],
+                          texto: ['bmNumero', 'nfNumero', 'idOrigem'], numero: ['bmValor', 'nfValor'], data: ['bmData', 'aprovacaoData', 'nfData'] },
+  FaturamentoItens:     { prefixo: 'FIT', colunas: ['id', 'faturamentoId', 'solicitacaoId', 'precoClienteId', 'descricao', 'quantidade', 'unidadeMedida', 'valorUnitario', 'sentido', 'valor'],
+                          numero: ['quantidade', 'valorUnitario', 'valor'] },
   Listas:               { prefixo: 'LIS', colunas: ['id', 'lista', 'valor', 'ordem', 'ativo'], numero: ['ordem'] },
   Parametros:           { prefixo: 'PRM', colunas: ['id', 'chave', 'valor', 'vigenciaInicio', 'descricao'], data: ['vigenciaInicio'] },
 };
@@ -51,22 +67,36 @@ const REFERENCIAS = {
                  ['Veiculos', 'locadoraId', 'veículo(s) na Frota (como locadora)'],
                  ['Caixas', 'locadoraId', 'caixa(s) na Frota (como locadora)'],
                  ['Caixas', 'cadastroAtualId', 'caixa(s) que estão neste local'],
-                 ['LocacaoMensal', 'locadoraId', 'mês(es) de locação']],
+                 ['LocacaoMensal', 'locadoraId', 'mês(es) de locação'],
+                 ['Solicitacoes', 'clienteId', 'solicitação(ões) de cliente'],
+                 ['Faturamentos', 'clienteId', 'BM/NF no Faturamento'],
+                 ['PrecosCliente', 'cadastroId', 'preço(s) de venda']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
-                 ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação']],
+                 ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
+                 ['PrecosCliente', 'residuoId', 'preço(s) de venda de clientes']],
   Equipamentos: [['CadastroEquipamentos', 'equipamentoId', 'cadastro(s) no Mapa Operacional']],
   Unidades:     [['Lancamentos', 'unidadeId', 'lançamento(s) no Controle de Destinação'],
                  ['LocacaoMensal', 'unidadeId', 'item(ns) na locação mensal'],
                  ['Veiculos', 'unidadeId', 'veículo(s) na Frota'],
-                 ['Caixas', 'unidadeId', 'caixa(s) na Frota']],
+                 ['Caixas', 'unidadeId', 'caixa(s) na Frota'],
+                 ['Solicitacoes', 'unidadeId', 'solicitação(ões)'],
+                 ['Faturamentos', 'unidadeId', 'BM/NF no Faturamento']],
   TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota']],
   Veiculos:     [['LocacaoMensal', 'veiculoId', 'mês(es) de locação']],
   Caixas:       [['LocacaoMensal', 'caixaId', 'mês(es) de locação']],
   Locais:       [['CadastroLocais', 'localId', 'cadastro(s) que usam este local']],
+  Consultores:  [['Solicitacoes', 'consultorId', 'solicitação(ões)']],
+  TiposDocumento: [['DocumentosPadrao', 'tipoDocumentoId', 'cliente(s) com este documento como padrão'],
+                   ['SolicitacaoDocumentos', 'tipoDocumentoId', 'solicitação(ões) com este documento']],
+  Solicitacoes: [['FaturamentoItens', 'solicitacaoId', 'BM/NF no Faturamento']],
+  PrecosCliente: [['FaturamentoItens', 'precoClienteId', 'item(ns) de BM/NF no Faturamento']],
 };
 // Tabelas "filhas" que pertencem ao registro e saem junto quando ele é excluído (sem uso).
 const FILHAS = {
-  Cadastros: [['CadastroResiduos', 'cadastroId'], ['CadastroEquipamentos', 'cadastroId'], ['CadastroLocais', 'cadastroId'], ['Locais', 'cadastroId']],
+  Cadastros: [['CadastroResiduos', 'cadastroId'], ['CadastroEquipamentos', 'cadastroId'], ['CadastroLocais', 'cadastroId'], ['Locais', 'cadastroId'],
+              ['DocumentosPadrao', 'cadastroId']],
+  Solicitacoes: [['SolicitacaoDocumentos', 'solicitacaoId']],
+  Faturamentos: [['FaturamentoItens', 'faturamentoId']],
 };
 
 const HISTORICO_COLUNAS = ['quando', 'usuarioEmail', 'usuarioNome', 'modulo', 'tabela', 'registroId', 'registroNome', 'acao', 'campo', 'de', 'para', 'detalhe'];
@@ -101,7 +131,7 @@ function formatoColuna_(nome, col) {
   if (AUDITORIA.indexOf(col) >= 0 && /Em$/.test(col)) return 'dd/mm/yyyy hh:mm:ss';
   if ((t.momento || []).indexOf(col) >= 0) return 'dd/mm/yyyy hh:mm:ss';
   if ((t.data || []).indexOf(col) >= 0) return 'dd/mm/yyyy';
-  if ((t.numero || []).indexOf(col) >= 0) return col === 'valor' || col === 'valorFixo' ? '#,##0.00' : '0.######';
+  if ((t.numero || []).indexOf(col) >= 0) return /^valor|Valor$/.test(col) && col !== 'valorUnitario' ? '#,##0.00' : '0.######';
   return '@';
 }
 // Escreve um bloco de linhas já com o formato certo de cada coluna.
@@ -189,6 +219,29 @@ function inserir_(nome, dados, u, modulo, registroNome) {
   return o;
 }
 
+/** Cria vários registros de uma vez (importações). Sem histórico por linha: quem chama registra um resumo. */
+function inserirLote_(nome, lista, u) {
+  if (!lista.length) return [];
+  const agora = new Date();
+  // reserva os códigos de uma vez (uma gravação nas propriedades)
+  const pre = TABELAS[nome].prefixo, p = PropertiesService.getScriptProperties();
+  let n = Number(p.getProperty('SEQ_' + pre) || 0);
+  if (!n) ler_(nome).forEach(function (o) { const m = String(o.id).match(/-(\d+)$/); if (m) n = Math.max(n, Number(m[1])); });
+  p.setProperty('SEQ_' + pre, String(n + lista.length));
+  const objs = lista.map(function (dados) {
+    const o = {};
+    colunas_(nome).forEach(function (c) { o[c] = dados[c]; });
+    o.id = dados.id || (pre + '-' + ('00000' + (++n)).slice(-6));
+    if ('ativo' in o && o.ativo === undefined) o.ativo = true;
+    o.criadoEm = agora; o.criadoPor = quemEmail_(u); o.atualizadoEm = agora; o.atualizadoPor = quemEmail_(u);
+    return o;
+  });
+  const sh = aba_(nome);
+  escreverLinhas_(sh, nome, sh.getLastRow() + 1, objs.map(function (o) { return linhaDe_(nome, o); }));
+  limparCache_(nome);
+  return objs;
+}
+
 /** Altera campos de um registro. Grava no histórico só o que mudou. Devolve a lista de mudanças. */
 function atualizar_(nome, id, campos, u, modulo, opcoes) {
   opcoes = opcoes || {};
@@ -243,6 +296,10 @@ function usos_(nome, id) {
     const v = porId_('Veiculos', id); const placa = v ? String(v.placa).toUpperCase() : '';
     const n = placa ? ler_('Lancamentos').filter(function (l) { return String(l.placa).toUpperCase() === placa; }).length : 0;
     if (n) out.push({ tabela: 'Lancamentos', rotulo: 'lançamento(s) no Controle de Destinação com esta placa', n: n });
+  }
+  if (nome === 'Residuos') { // as solicitações guardam a lista de resíduos
+    const n = ler_('Solicitacoes').filter(function (o) { return separar_(o.residuoIds).indexOf(id) >= 0; }).length;
+    if (n) out.push({ tabela: 'Solicitacoes', rotulo: 'solicitação(ões) de cliente', n: n });
   }
   if (nome === 'Unidades') {
     const n = ler_('Usuarios').filter(function (o) { return String(o.unidades).split(/\s*[;,]\s*/).indexOf(id) >= 0; }).length;
@@ -301,7 +358,14 @@ const ROTULOS_CAMPOS = {
   kg: 'Peso (kg)', preco: 'Preço (R$/kg)', valorFixo: 'Valor fechado', valor: 'Valor', negocio: 'Tipo de negócio', tipo: 'Tipo',
   fornecedor: 'Fornecedor', email: 'E-mail', categoriaCnh: 'Categoria de CNH exigida', capacidadesCaixa: 'Caixas compatíveis (m³)',
   tipoVeiculoId: 'Tipo de veículo', propriedade: 'Propriedade', locadoraId: 'Locadora', modelo: 'Modelo', ano: 'Ano', situacao: 'Situação',
-  numero: 'Número', capacidade: 'Capacidade (m³)', cadastroAtualId: 'Onde está', veiculoId: 'Veículo', caixaId: 'Caixa', adminPortal: 'Admin do portal', unidades: 'Unidades', unidadeId: 'Unidade', nivel: 'Nível'
+  numero: 'Número', capacidade: 'Capacidade (m³)', cadastroAtualId: 'Onde está', veiculoId: 'Veículo', caixaId: 'Caixa', adminPortal: 'Admin do portal', unidades: 'Unidades', unidadeId: 'Unidade', nivel: 'Nível',
+  telefone: 'Telefone', clienteId: 'Cliente', consultorId: 'Consultor', servico: 'Serviço', demanda: 'Demanda', perfil: 'Perfil', execucao: 'Execução',
+  residuoIds: 'Resíduos', descricao: 'Descrição', dataSolicitacaoConsultor: 'Data da solicitação do consultor', dataSolicitacao: 'Data da solicitação',
+  dataPrevista: 'Data prevista da coleta', dataColeta: 'Data da coleta', valorPrevisto: 'Valor previsto (R$)', status: 'Status', motivo: 'Motivo',
+  solicitanteNome: 'Solicitante (planilha)', programadorNome: 'Programador (planilha)', tipoDocumentoId: 'Documento', link: 'Link', modalidade: 'Modalidade',
+  valorTransporte: 'Valor do transporte (R$)', vigenciaInicio: 'Vigência a partir de', vigenciaFim: 'Vigência até', bmNumero: 'Nº do BM', bmData: 'Data de envio do BM',
+  bmValor: 'Valor do BM', aprovacaoData: 'Data de aprovação', nfNumero: 'Nº da NF', nfData: 'Data da NF', nfValor: 'Valor da NF', quantidade: 'Quantidade',
+  unidadeMedida: 'Unidade de medida', valorUnitario: 'Valor unitário', sentido: 'Sentido'
 };
 function rotuloCampo_(c) { return ROTULOS_CAMPOS[c] || c; }
 function resumo_(nome, o) {
