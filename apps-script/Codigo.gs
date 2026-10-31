@@ -11,6 +11,7 @@
  *   Frota.gs      Frota (tipos de veículo, veículos, caixas, locação mensal) e migração da Fase 1
  *   Solicitacoes.gs  Solicitações, consultores, documentos, importação da planilha Coletas e migração da Fase 2
  *   Faturamento.gs   BM/NF e preço de venda por cliente
+ *   Programacao.gs   equipe, viagens, paradas, pernoites, caixas e importação das planilhas de programação/equipe (Fase 3)
  *   Historico.gs  consulta do histórico
  *   Instalacao.gs criação da planilha central, migração e backup semanal
  *
@@ -26,7 +27,7 @@ const DIAS_SESSAO = 30;
 
 // Planilha antiga do Mapa (origem da migração; não é mais usada depois dela).
 const MAPA_PLANILHA_ID = '176bQkfOlMFCuKuACKfaogA1liMAxaTIIg-W_wPbV_9E';
-const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento' };
+const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação' };
 const NIVEIS = ['leitor', 'editor', 'admin'];
 const MESES_JANELA = 6;
 
@@ -38,11 +39,13 @@ const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa
 const ACOES_SOL_LEITURA = ['sol.dados'];
 const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.excluir', 'sol.salvarCadastro', 'sol.excluirCadastro', 'sol.ativoCadastro',
                            'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente'];
+const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
+const ACOES_PROG_ESCRITA = ['prog.salvarColaborador', 'prog.ativoColaborador', 'prog.excluirColaborador', 'prog.foto', 'prog.salvarViagem', 'prog.viagemAcao'];
 const ACOES_FAT_LEITURA = ['fat.dados'];
 const ACOES_FAT_ESCRITA = ['fat.salvar', 'fat.acao'];
 const ACOES_FROTA_LEITURA = ['frota.dados'];
 const ACOES_FROTA_ESCRITA = ['frota.salvar', 'frota.excluir', 'frota.ativo', 'frota.salvarLocacao'];
-const ACOES_ADMIN = ['listarUsuarios', 'salvarUsuario', 'resetarSenha', 'historico.geral', 'sol.importar'];
+const ACOES_ADMIN = ['listarUsuarios', 'salvarUsuario', 'resetarSenha', 'historico.geral', 'sol.importar', 'prog.importarEquipe', 'prog.importarProgramacao'];
 
 function podeLer_(u, modulo) { return NIVEIS.indexOf(u.modulos[modulo]) >= 0; }
 function podeEditar_(u, modulo) { return u.modulos[modulo] === 'editor' || u.modulos[modulo] === 'admin'; }
@@ -96,6 +99,10 @@ function rotear_(body) {
     if (!podeLer_(u, 'solicitacoes')) return semPermissao_('Você não tem acesso às Solicitações.');
     return solDados_(u);
   }
+  if (ACOES_PROG_LEITURA.indexOf(acao) >= 0) {
+    if (!podeLer_(u, 'programacao')) return semPermissao_('Você não tem acesso à Programação.');
+    return acao === 'prog.verFoto' ? progVerFoto_(String(body.id), u) : progDados_(u);
+  }
   if (ACOES_FAT_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'faturamento')) return semPermissao_('Você não tem acesso ao Faturamento.');
     return fatDados_(u);
@@ -117,6 +124,8 @@ function rotear_(body) {
     if (!podeEditar_(u, 'frota')) return semPermissao_(podeLer_(u, 'frota') ? 'Seu acesso à Frota é só de leitura.' : 'Você não tem acesso à Frota.');
   } else if (ACOES_SOL_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'solicitacoes')) return semPermissao_(podeLer_(u, 'solicitacoes') ? 'Seu acesso às Solicitações é só de leitura.' : 'Você não tem acesso às Solicitações.');
+  } else if (ACOES_PROG_ESCRITA.indexOf(acao) >= 0) {
+    if (!podeEditar_(u, 'programacao')) return semPermissao_(podeLer_(u, 'programacao') ? 'Seu acesso à Programação é só de leitura.' : 'Você não tem acesso à Programação.');
   } else if (ACOES_FAT_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'faturamento')) return semPermissao_(podeLer_(u, 'faturamento') ? 'Seu acesso ao Faturamento é só de leitura.' : 'Você não tem acesso ao Faturamento.');
   } else {
@@ -160,6 +169,14 @@ function rotear_(body) {
       case 'sol.salvarLista': return solSalvarLista_(String(body.lista), body.valores, u);
       case 'sol.novoCliente': return solNovoCliente_(body.cliente, u);
       case 'sol.importar': return solImportar_(body.linhas, body.simular === true, u);
+      case 'prog.salvarColaborador': return progSalvarColaborador_(body.registro, u);
+      case 'prog.ativoColaborador': return progAtivoColaborador_(String(body.id), body.ativo, u);
+      case 'prog.excluirColaborador': return progExcluirColaborador_(String(body.id), u);
+      case 'prog.foto': return progFoto_(String(body.id), body.dataUrl, u);
+      case 'prog.salvarViagem': return progSalvarViagem_(body.registro, body.confirmar === true, u);
+      case 'prog.viagemAcao': return progViagemAcao_(String(body.id), String(body.tipo), body.dados, u);
+      case 'prog.importarEquipe': return progImportarEquipe_(String(body.unidadeId), body.linhas, body.simular === true, u);
+      case 'prog.importarProgramacao': return progImportarProgramacao_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'fat.salvar': return fatSalvar_(body.registro, u);
       case 'fat.acao': return fatAcao_(String(body.id), String(body.tipo), body.dados, u);
     }

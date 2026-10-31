@@ -56,6 +56,18 @@ const TABELAS = {
                           texto: ['bmNumero', 'nfNumero', 'idOrigem'], numero: ['bmValor', 'nfValor'], data: ['bmData', 'aprovacaoData', 'nfData'] },
   FaturamentoItens:     { prefixo: 'FIT', colunas: ['id', 'faturamentoId', 'solicitacaoId', 'precoClienteId', 'descricao', 'quantidade', 'unidadeMedida', 'valorUnitario', 'sentido', 'valor'],
                           numero: ['quantidade', 'valorUnitario', 'valor'] },
+  // Fase 3: Programação
+  Colaboradores:        { prefixo: 'COL', colunas: ['id', 'unidadeId', 'nome', 'apelido', 'funcao', 'vinculo', 'cpf', 'cnhCategoria', 'cnhValidade', 'telefone', 'fotoId', 'obs', 'ativo'],
+                          texto: ['cpf', 'telefone', 'fotoId', 'cnhCategoria'], data: ['cnhValidade'] },
+  Viagens:              { prefixo: 'VIA', colunas: ['id', 'unidadeId', 'execucao', 'dataSaida', 'dataRetornoPrevisto', 'dataRetorno', 'veiculoId', 'placa', 'motoristaId',
+                                                      'transportadorId', 'custoTerceiro', 'pernoitesPrevistos', 'pernoitesRealizados', 'valorNoite', 'status', 'motivo', 'obs',
+                                                      'origem', 'idOrigem', 'ativo'],
+                          texto: ['placa', 'idOrigem'], numero: ['custoTerceiro', 'pernoitesPrevistos', 'pernoitesRealizados', 'valorNoite'],
+                          data: ['dataSaida', 'dataRetornoPrevisto', 'dataRetorno'] },
+  ViagemEquipe:         { prefixo: 'VEQ', colunas: ['id', 'viagemId', 'colaboradorId', 'funcao'] },
+  Paradas:              { prefixo: 'PAR', colunas: ['id', 'viagemId', 'ordem', 'solicitacaoId', 'clienteId', 'data', 'resultado', 'motivo', 'caixaEntregueId', 'caixaRetiradaId',
+                                                      'peso', 'destinacao', 'obs'],
+                          numero: ['ordem', 'peso'], data: ['data'] },
   Listas:               { prefixo: 'LIS', colunas: ['id', 'lista', 'valor', 'ordem', 'ativo'], numero: ['ordem'] },
   Parametros:           { prefixo: 'PRM', colunas: ['id', 'chave', 'valor', 'vigenciaInicio', 'descricao'], data: ['vigenciaInicio'] },
 };
@@ -70,7 +82,9 @@ const REFERENCIAS = {
                  ['LocacaoMensal', 'locadoraId', 'mês(es) de locação'],
                  ['Solicitacoes', 'clienteId', 'solicitação(ões) de cliente'],
                  ['Faturamentos', 'clienteId', 'BM/NF no Faturamento'],
-                 ['PrecosCliente', 'cadastroId', 'preço(s) de venda']],
+                 ['PrecosCliente', 'cadastroId', 'preço(s) de venda'],
+                 ['Paradas', 'clienteId', 'parada(s) de viagem na Programação'],
+                 ['Viagens', 'transportadorId', 'viagem(ns) terceirizada(s) na Programação']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
                  ['PrecosCliente', 'residuoId', 'preço(s) de venda de clientes']],
@@ -80,15 +94,23 @@ const REFERENCIAS = {
                  ['Veiculos', 'unidadeId', 'veículo(s) na Frota'],
                  ['Caixas', 'unidadeId', 'caixa(s) na Frota'],
                  ['Solicitacoes', 'unidadeId', 'solicitação(ões)'],
-                 ['Faturamentos', 'unidadeId', 'BM/NF no Faturamento']],
+                 ['Faturamentos', 'unidadeId', 'BM/NF no Faturamento'],
+                 ['Viagens', 'unidadeId', 'viagem(ns) na Programação'],
+                 ['Colaboradores', 'unidadeId', 'pessoa(s) da equipe']],
   TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota']],
-  Veiculos:     [['LocacaoMensal', 'veiculoId', 'mês(es) de locação']],
-  Caixas:       [['LocacaoMensal', 'caixaId', 'mês(es) de locação']],
+  Veiculos:     [['LocacaoMensal', 'veiculoId', 'mês(es) de locação'],
+                 ['Viagens', 'veiculoId', 'viagem(ns) na Programação']],
+  Caixas:       [['LocacaoMensal', 'caixaId', 'mês(es) de locação'],
+                 ['Paradas', 'caixaEntregueId', 'entrega(s) em parada de viagem'],
+                 ['Paradas', 'caixaRetiradaId', 'retirada(s) em parada de viagem']],
+  Colaboradores: [['Viagens', 'motoristaId', 'viagem(ns) como motorista'],
+                  ['ViagemEquipe', 'colaboradorId', 'viagem(ns) como ajudante']],
   Locais:       [['CadastroLocais', 'localId', 'cadastro(s) que usam este local']],
   Consultores:  [['Solicitacoes', 'consultorId', 'solicitação(ões)']],
   TiposDocumento: [['DocumentosPadrao', 'tipoDocumentoId', 'cliente(s) com este documento como padrão'],
                    ['SolicitacaoDocumentos', 'tipoDocumentoId', 'solicitação(ões) com este documento']],
-  Solicitacoes: [['FaturamentoItens', 'solicitacaoId', 'BM/NF no Faturamento']],
+  Solicitacoes: [['FaturamentoItens', 'solicitacaoId', 'BM/NF no Faturamento'],
+                 ['Paradas', 'solicitacaoId', 'parada(s) de viagem na Programação']],
   PrecosCliente: [['FaturamentoItens', 'precoClienteId', 'item(ns) de BM/NF no Faturamento']],
 };
 // Tabelas "filhas" que pertencem ao registro e saem junto quando ele é excluído (sem uso).
@@ -97,6 +119,7 @@ const FILHAS = {
               ['DocumentosPadrao', 'cadastroId']],
   Solicitacoes: [['SolicitacaoDocumentos', 'solicitacaoId']],
   Faturamentos: [['FaturamentoItens', 'faturamentoId']],
+  Viagens: [['ViagemEquipe', 'viagemId'], ['Paradas', 'viagemId']],
 };
 
 const HISTORICO_COLUNAS = ['quando', 'usuarioEmail', 'usuarioNome', 'modulo', 'tabela', 'registroId', 'registroNome', 'acao', 'campo', 'de', 'para', 'detalhe'];
@@ -264,7 +287,8 @@ function atualizar_(nome, id, campos, u, modulo, opcoes) {
     const regId = opcoes.registroId || id, regNome = opcoes.registroNome || atual.nome || '';
     mudancas.forEach(function (m) {
       const acao = m.campo === 'ativo' ? (m.para === 'NÃO' ? 'inativou' : 'reativou') : 'alterou';
-      hist_(u, modulo, opcoes.tabela || nome, regId, regNome, acao, (opcoes.prefixoCampo || '') + rotuloCampo_(m.campo), m.de, m.para, '');
+      const sigilo = m.campo === 'cpf'; // LGPD: o histórico registra que mudou, sem guardar o número
+      hist_(u, modulo, opcoes.tabela || nome, regId, regNome, acao, (opcoes.prefixoCampo || '') + rotuloCampo_(m.campo), sigilo && m.de ? '(oculto)' : m.de, sigilo && m.para ? '(oculto)' : m.para, '');
     });
   }
   return mudancas;
@@ -365,11 +389,15 @@ const ROTULOS_CAMPOS = {
   solicitanteNome: 'Solicitante (planilha)', programadorNome: 'Programador (planilha)', tipoDocumentoId: 'Documento', link: 'Link', modalidade: 'Modalidade',
   valorTransporte: 'Valor do transporte (R$)', vigenciaInicio: 'Vigência a partir de', vigenciaFim: 'Vigência até', bmNumero: 'Nº do BM', bmData: 'Data de envio do BM',
   bmValor: 'Valor do BM', aprovacaoData: 'Data de aprovação', nfNumero: 'Nº da NF', nfData: 'Data da NF', nfValor: 'Valor da NF', quantidade: 'Quantidade',
-  unidadeMedida: 'Unidade de medida', valorUnitario: 'Valor unitário', sentido: 'Sentido'
+  unidadeMedida: 'Unidade de medida', valorUnitario: 'Valor unitário', sentido: 'Sentido',
+  apelido: 'Nome na programação', funcao: 'Função', vinculo: 'Vínculo', cpf: 'CPF', cnhCategoria: 'Categoria da CNH', cnhValidade: 'Validade da CNH', fotoId: 'Foto',
+  dataSaida: 'Data de saída', dataRetornoPrevisto: 'Retorno previsto', dataRetorno: 'Retorno à base', motoristaId: 'Motorista', transportadorId: 'Transportadora',
+  custoTerceiro: 'Custo do terceiro (R$)', pernoitesPrevistos: 'Pernoites previstos', pernoitesRealizados: 'Pernoites realizados', valorNoite: 'Valor do pernoite (R$)',
+  ordem: 'Ordem', solicitacaoId: 'Solicitação', resultado: 'Resultado', caixaEntregueId: 'Caixa entregue', caixaRetiradaId: 'Caixa retirada', peso: 'Peso (kg)', destinacao: 'Destinação'
 };
 function rotuloCampo_(c) { return ROTULOS_CAMPOS[c] || c; }
 function resumo_(nome, o) {
-  const pular = { id: 1, _linha: 1, senhaHash: 1, salt: 1, criadoEm: 1, criadoPor: 1, atualizadoEm: 1, atualizadoPor: 1 };
+  const pular = { id: 1, _linha: 1, senhaHash: 1, salt: 1, criadoEm: 1, criadoPor: 1, atualizadoEm: 1, atualizadoPor: 1, cpf: 1, fotoId: 1 };
   return colunas_(nome).filter(function (c) { return !pular[c] && o[c] !== '' && o[c] != null; })
     .map(function (c) { return rotuloCampo_(c) + ': ' + textoComparavel_(nome, c, o[c]); }).join(' · ').slice(0, 1500);
 }

@@ -72,8 +72,16 @@ function faturamentoPorSolicitacao_() {
 }
 function solDados_(u) {
   const fat = faturamentoPorSolicitacao_();
+  // última parada (viagem não cancelada) de cada solicitação
+  const vs = {}; ler_('Viagens').forEach(function (v) { if (v.status !== 'Cancelada') vs[v.id] = v; });
+  const prog = {};
+  ler_('Paradas').forEach(function (p) {
+    const v = vs[p.viagemId]; if (!v || !p.solicitacaoId) return;
+    const x = { viagemId: v.id, data: dataTexto_(p.data) || dataTexto_(v.dataSaida), placa: String(v.placa || ''), resultado: String(p.resultado || ''), execucao: String(v.execucao) };
+    if (!prog[p.solicitacaoId] || prog[p.solicitacaoId].data <= x.data) prog[p.solicitacaoId] = x;
+  });
   const sols = ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId); }).map(function (r) {
-    const o = solPublica_(r); o.faturamento = fat[r.id] || null; return o;
+    const o = solPublica_(r); o.faturamento = fat[r.id] || null; o.programacao = prog[r.id] || null; return o;
   });
   const visiveis = {}; sols.forEach(function (s) { visiveis[s.id] = 1; });
   return { ok: true,
@@ -160,6 +168,8 @@ function solStatus_(id, status, dados, u) {
   if (SOL_STATUS.indexOf(status) < 0) return erroDados_('Status inválido.');
   if (SOL_STATUS_FATURAMENTO.indexOf(status) >= 0) return erroDados_('BM enviado e NF emitida são registrados no módulo Faturamento.');
   if (faturamentoPorSolicitacao_()[id]) return erroDados_('Esta solicitação já está num BM do Faturamento. Para mudar o status, cancele o BM primeiro.');
+  const naProg = paradasAtivasDaSolicitacao_(id);
+  if (naProg.length) return erroDados_('Esta solicitação está na Programação (' + rotuloViagem_(naProg[0].v) + '). O status muda pelas paradas da viagem.');
   const campos = { status: status };
   if (status === 'Liberada para programar') {
     const pend = docsPendentes_(id);
