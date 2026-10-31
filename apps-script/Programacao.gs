@@ -53,7 +53,7 @@ function cpfValido_(c) {
 }
 function cpfFormatado_(c) { c = cpfDigitos_(c); return c.length === 11 ? c.slice(0, 3) + '.' + c.slice(3, 6) + '.' + c.slice(6, 9) + '-' + c.slice(9) : c; }
 function cpfMascarado_(c) { c = cpfDigitos_(c); return c.length === 11 ? '***.***.' + c.slice(6, 9).replace(/^./, '*') + '-' + c.slice(9) : (c ? '***' : ''); }
-function vePessoal_(u) { return u.adminPortal || podeEditar_(u, 'programacao'); }
+function vePessoal_(u) { return u.adminPortal || podeEditar_(u, 'programacao') || podeLer_(u, 'dp'); }
 // A categoria da pessoa cobre a exigida? (B < C < D < E; A é separada)
 function cnhCobre_(daPessoa, exigida) {
   daPessoa = String(daPessoa || '').toUpperCase(); exigida = String(exigida || '').toUpperCase();
@@ -115,6 +115,7 @@ function progDados_(u) {
     parametros: { valorPernoite: num_(parametro_('valorPernoite')), diasAvisoCnh: num_(parametro_('diasAvisoCnh')) || 30 },
     listas: { funcao: listaValores_('funcaoColaborador'), vinculo: listaValores_('vinculoColaborador'), categoriaCnh: listaValores_('categoriaCnhPessoa'),
               resultado: listaValores_('resultadoParada'), execucao: listaValores_('execucaoViagem') },
+    adiantamentos: ler_('Adiantamentos').filter(function (a) { return vis[a.viagemId]; }).map(adiPublico_),
     podeImportar: !!u.adminPortal };
 }
 
@@ -359,6 +360,7 @@ function progSalvarViagem_(reg, confirmar, u) {
   limparCache_('Paradas');
   realizouAgora.forEach(function (x) { moverCaixas_(x, u); });
   Object.keys(solAfetadas).forEach(function (sid) { sincronizarSolicitacao_(sid, u); });
+  sincronizarAdiantamentos_(id, u);
   return { ok: true, id: id, avisos: conf.avisos };
 }
 /** Parada realizada: a caixa entregue fica no cliente; a retirada volta para a base. */
@@ -385,11 +387,13 @@ function progViagemAcao_(id, tipo, x, u) {
     if (v.execucao !== 'Terceirizada') campos.pernoitesRealizados = x.pernoitesRealizados === '' || x.pernoitesRealizados == null ? diasEntre_(dataTexto_(v.dataSaida), ret) : Math.max(0, Math.round(num_(x.pernoitesRealizados)));
     if (v.execucao === 'Terceirizada' && x.custoTerceiro !== undefined && x.custoTerceiro !== '') campos.custoTerceiro = num_(x.custoTerceiro);
     atualizar_('Viagens', id, campos, u, 'programacao', { registroNome: nomeV });
+    sincronizarAdiantamentos_(id, u);
     return { ok: true };
   }
   if (tipo === 'reabrir') {
     if (v.status !== 'Concluída') return erroDados_('Só viagem concluída pode ser reaberta.');
     atualizar_('Viagens', id, { status: 'Programada' }, u, 'programacao', { registroNome: nomeV });
+    sincronizarAdiantamentos_(id, u);
     return { ok: true };
   }
   if (tipo === 'cancelar') {
@@ -397,6 +401,7 @@ function progViagemAcao_(id, tipo, x, u) {
     if (ps.some(function (p) { return p.resultado === 'Realizada'; })) return erroDados_('A viagem tem parada realizada e não pode ser cancelada. Ajuste as paradas.');
     const m = String(x.motivo || '').trim(); if (!m) return erroDados_('Informe o motivo do cancelamento.');
     atualizar_('Viagens', id, { status: 'Cancelada', motivo: m }, u, 'programacao', { registroNome: nomeV });
+    sincronizarAdiantamentos_(id, u);
     ps.forEach(function (p) { if (p.solicitacaoId) sincronizarSolicitacao_(String(p.solicitacaoId), u); });
     return { ok: true };
   }

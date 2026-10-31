@@ -68,6 +68,10 @@ const TABELAS = {
   Paradas:              { prefixo: 'PAR', colunas: ['id', 'viagemId', 'ordem', 'solicitacaoId', 'clienteId', 'data', 'resultado', 'motivo', 'caixaEntregueId', 'caixaRetiradaId',
                                                       'peso', 'destinacao', 'obs'],
                           numero: ['ordem', 'peso'], data: ['data'] },
+  // Fase 4: DP (adiantamentos de pernoite)
+  Adiantamentos:        { prefixo: 'ADI', colunas: ['id', 'viagemId', 'unidadeId', 'colaboradorId', 'noites', 'valorNoite', 'valor', 'status', 'pagoEm', 'pagoPor',
+                                                      'acertoNoites', 'acertoValor', 'acertoStatus', 'acertoEm', 'obs', 'ativo'],
+                          numero: ['noites', 'valorNoite', 'valor', 'acertoNoites', 'acertoValor'], data: ['pagoEm', 'acertoEm'], texto: ['pagoPor'] },
   Listas:               { prefixo: 'LIS', colunas: ['id', 'lista', 'valor', 'ordem', 'ativo'], numero: ['ordem'] },
   Parametros:           { prefixo: 'PRM', colunas: ['id', 'chave', 'valor', 'vigenciaInicio', 'descricao'], data: ['vigenciaInicio'] },
 };
@@ -104,7 +108,8 @@ const REFERENCIAS = {
                  ['Paradas', 'caixaEntregueId', 'entrega(s) em parada de viagem'],
                  ['Paradas', 'caixaRetiradaId', 'retirada(s) em parada de viagem']],
   Colaboradores: [['Viagens', 'motoristaId', 'viagem(ns) como motorista'],
-                  ['ViagemEquipe', 'colaboradorId', 'viagem(ns) como ajudante']],
+                  ['ViagemEquipe', 'colaboradorId', 'viagem(ns) como ajudante'],
+                  ['Adiantamentos', 'colaboradorId', 'adiantamento(s) de pernoite no DP']],
   Locais:       [['CadastroLocais', 'localId', 'cadastro(s) que usam este local']],
   Consultores:  [['Solicitacoes', 'consultorId', 'solicitação(ões)']],
   TiposDocumento: [['DocumentosPadrao', 'tipoDocumentoId', 'cliente(s) com este documento como padrão'],
@@ -393,6 +398,8 @@ const ROTULOS_CAMPOS = {
   apelido: 'Nome na programação', funcao: 'Função', vinculo: 'Vínculo', cpf: 'CPF', cnhCategoria: 'Categoria da CNH', cnhValidade: 'Validade da CNH', fotoId: 'Foto',
   dataSaida: 'Data de saída', dataRetornoPrevisto: 'Retorno previsto', dataRetorno: 'Retorno à base', motoristaId: 'Motorista', transportadorId: 'Transportadora',
   custoTerceiro: 'Custo do terceiro (R$)', pernoitesPrevistos: 'Pernoites previstos', pernoitesRealizados: 'Pernoites realizados', valorNoite: 'Valor do pernoite (R$)',
+  noites: 'Noites', pagoEm: 'Pago em', pagoPor: 'Pago por', acertoNoites: 'Noites realizadas (acerto)', acertoValor: 'Valor do acerto (R$)',
+  acertoStatus: 'Acerto', acertoEm: 'Acertado em', colaboradorId: 'Pessoa', viagemId: 'Viagem',
   ordem: 'Ordem', solicitacaoId: 'Solicitação', resultado: 'Resultado', caixaEntregueId: 'Caixa entregue', caixaRetiradaId: 'Caixa retirada', peso: 'Peso (kg)', destinacao: 'Destinação'
 };
 function rotuloCampo_(c) { return ROTULOS_CAMPOS[c] || c; }

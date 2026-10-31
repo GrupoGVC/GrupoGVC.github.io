@@ -11,6 +11,7 @@
  *   Frota.gs      Frota (tipos de veículo, veículos, caixas, locação mensal) e migração da Fase 1
  *   Solicitacoes.gs  Solicitações, consultores, documentos, importação da planilha Coletas e migração da Fase 2
  *   Faturamento.gs   BM/NF e preço de venda por cliente
+ *   DP.gs            adiantamentos de pernoite, acertos e aviso por e-mail ao DP (Fase 4)
  *   Programacao.gs   equipe, viagens, paradas, pernoites, caixas e importação das planilhas de programação/equipe (Fase 3)
  *   Historico.gs  consulta do histórico
  *   Instalacao.gs criação da planilha central, migração e backup semanal
@@ -27,7 +28,7 @@ const DIAS_SESSAO = 30;
 
 // Planilha antiga do Mapa (origem da migração; não é mais usada depois dela).
 const MAPA_PLANILHA_ID = '176bQkfOlMFCuKuACKfaogA1liMAxaTIIg-W_wPbV_9E';
-const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação' };
+const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação', dp: 'DP' };
 const NIVEIS = ['leitor', 'editor', 'admin'];
 const MESES_JANELA = 6;
 
@@ -41,6 +42,8 @@ const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.exc
                            'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente'];
 const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
 const ACOES_PROG_ESCRITA = ['prog.salvarColaborador', 'prog.ativoColaborador', 'prog.excluirColaborador', 'prog.foto', 'prog.salvarViagem', 'prog.viagemAcao'];
+const ACOES_DP_LEITURA = ['dp.dados'];
+const ACOES_DP_ESCRITA = ['dp.acao'];
 const ACOES_FAT_LEITURA = ['fat.dados'];
 const ACOES_FAT_ESCRITA = ['fat.salvar', 'fat.acao'];
 const ACOES_FROTA_LEITURA = ['frota.dados'];
@@ -103,6 +106,10 @@ function rotear_(body) {
     if (!podeLer_(u, 'programacao')) return semPermissao_('Você não tem acesso à Programação.');
     return acao === 'prog.verFoto' ? progVerFoto_(String(body.id), u) : progDados_(u);
   }
+  if (ACOES_DP_LEITURA.indexOf(acao) >= 0) {
+    if (!podeLer_(u, 'dp')) return semPermissao_('Você não tem acesso ao DP.');
+    return dpDados_(u);
+  }
   if (ACOES_FAT_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'faturamento')) return semPermissao_('Você não tem acesso ao Faturamento.');
     return fatDados_(u);
@@ -126,6 +133,8 @@ function rotear_(body) {
     if (!podeEditar_(u, 'solicitacoes')) return semPermissao_(podeLer_(u, 'solicitacoes') ? 'Seu acesso às Solicitações é só de leitura.' : 'Você não tem acesso às Solicitações.');
   } else if (ACOES_PROG_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'programacao')) return semPermissao_(podeLer_(u, 'programacao') ? 'Seu acesso à Programação é só de leitura.' : 'Você não tem acesso à Programação.');
+  } else if (ACOES_DP_ESCRITA.indexOf(acao) >= 0) {
+    if (!podeEditar_(u, 'dp')) return semPermissao_(podeLer_(u, 'dp') ? 'Seu acesso ao DP é só de leitura.' : 'Você não tem acesso ao DP.');
   } else if (ACOES_FAT_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'faturamento')) return semPermissao_(podeLer_(u, 'faturamento') ? 'Seu acesso ao Faturamento é só de leitura.' : 'Você não tem acesso ao Faturamento.');
   } else {
@@ -177,6 +186,7 @@ function rotear_(body) {
       case 'prog.viagemAcao': return progViagemAcao_(String(body.id), String(body.tipo), body.dados, u);
       case 'prog.importarEquipe': return progImportarEquipe_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'prog.importarProgramacao': return progImportarProgramacao_(String(body.unidadeId), body.linhas, body.simular === true, u);
+      case 'dp.acao': return dpAcao_(String(body.tipo), body.dados, u);
       case 'fat.salvar': return fatSalvar_(body.registro, u);
       case 'fat.acao': return fatAcao_(String(body.id), String(body.tipo), body.dados, u);
     }

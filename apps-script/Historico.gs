@@ -5,7 +5,7 @@
 // Tabela → módulo que precisa poder ler para ver o histórico.
 const MODULO_DA_TABELA = { Cadastros: 'mapa', Residuos: 'mapa', Equipamentos: 'mapa', Lancamentos: 'destinacao', LocacaoMensal: 'frota', Veiculos: 'frota', Caixas: 'frota', TiposVeiculo: 'frota',
   Solicitacoes: 'solicitacoes', Consultores: 'solicitacoes', TiposDocumento: 'solicitacoes', Faturamentos: 'faturamento',
-  Viagens: 'programacao', Colaboradores: 'programacao' };
+  Viagens: 'programacao', Colaboradores: 'programacao', Adiantamentos: 'dp' };
 
 function linhaHistorico_(r) {
   return { quando: isoMomento_(r[0]), email: String(r[1]), nome: String(r[2]), modulo: String(r[3]), tabela: String(r[4]),
