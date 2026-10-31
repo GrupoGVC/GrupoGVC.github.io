@@ -327,7 +327,7 @@ details.mais .chips{margin-top:6px}
 }
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261103"></script>
+<script src="../portal.js?v=20261104"></script>
 </head>
 <body>
 <header class="top">
@@ -569,6 +569,7 @@ function renderViagem() {
   const proprias = [v.motoristaId, ...v.equipe].filter(Boolean).filter(id => colDe(id).vinculo !== 'Terceirizado');
   const noites = +v.pernoitesPrevistos || 0;
   const al = alertasLocais(v);
+  const adisV = v.id ? (S.d.adiantamentos || []).filter(a => a.viagemId === v.id && a.status !== 'Cancelado') : [];
   const transps = S.d.clientes.filter(c => c.ativo && (c.tipos.includes('transportador') || c.tipos.includes('fornecedor') || c.id === v.transportadorId));
   const filaUni = S.d.solicitacoes.filter(s => (s.status === 'Liberada para programar' || s.status === 'Frustrada') && (!uniV || s.unidadeId === uniV) && !v.paradas.some(p => p.solicitacaoId === s.id));
   const cxs = S.d.caixas.filter(c => c.ativo);
@@ -588,7 +589,8 @@ function renderViagem() {
         <div class="fld full"><label>Ajudantes</label><div class="chips">${ajudantes.filter(c => /Ajudante/.test(c.funcao) || v.equipe.includes(c.id)).map(c => `<label class="chip"><input type="checkbox" data-aj="${esc(c.id)}" ${v.equipe.includes(c.id) ? 'checked' : ''} ${ro ? 'disabled' : ''}> ${esc(c.apelido || c.nome)}${c.vinculo === 'Terceirizado' ? ' <span class="sub">(terc.)</span>' : ''}</label>`).join('') || '<span class="sub">Nenhum ajudante cadastrado nesta unidade.</span>'}
           <details class="mais"><summary>outros (motoristas como ajudante)</summary><div class="chips">${ajudantes.filter(c => !/Ajudante/.test(c.funcao) && !v.equipe.includes(c.id)).map(c => `<label class="chip"><input type="checkbox" data-aj="${esc(c.id)}" ${ro ? 'disabled' : ''}> ${esc(c.apelido || c.nome)}</label>`).join('')}</div></details></div></div>
         <div class="fld"><label for="v-noites">Pernoites previstos</label><input id="v-noites" type="number" min="0" step="1" value="${esc(v.pernoitesPrevistos)}" ${ro ? 'disabled' : ''}><div class="hint">Sugestão: dias entre saída e retorno.</div></div>
-        <div class="fld"><label>Adiantamento de pernoite</label><div class="calc"><b>${R(noites * proprias.length * valorNoite)}</b><div class="sub">${noites} noite(s) × ${proprias.length} pessoa(s) própria(s) × ${R(valorNoite)}</div></div></div>`}
+        <div class="fld"><label>Adiantamento de pernoite</label><div class="calc"><b>${R(noites * proprias.length * valorNoite)}</b><div class="sub">${noites} noite(s) × ${proprias.length} pessoa(s) própria(s) × ${R(valorNoite)}</div></div></div>
+        ${adisV.length ? `<div class="fld full"><label>No DP</label><div class="chips">${adisV.map(a => `<span class="chip">${esc(apel(a.colaboradorId))}: ${esc(a.status)}${a.pagoEm ? ' em ' + esc(D2(a.pagoEm)) : ''} · ${R(a.valor)}${a.acertoStatus ? ' · ' + esc(a.acertoStatus) + (a.acertoValor ? ' ' + R(Math.abs(a.acertoValor)) : '') : ''}</span>`).join('')}</div><div class="hint">Os adiantamentos são lançados no DP quando a viagem é salva; a analista recebe um e-mail.</div></div>` : ''}`}
       <div class="fld full"><label for="v-obs">Observações</label><input id="v-obs" value="${esc(v.obs)}" ${ro ? 'disabled' : ''}></div>
     </div>
     ${al.length ? `<div class="alerts">${al.map(([c, t]) => `<div class="al ${c === 'crit' ? 'crit' : ''}"><span class="pill ${c === 'crit' ? 'crit' : 'warn'}">${c === 'crit' ? 'Bloqueia' : 'Atenção'}</span><b>${esc(t)}</b></div>`).join('')}</div>` : ''}
