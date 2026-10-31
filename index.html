@@ -342,8 +342,9 @@ tr.inativo td{opacity:.55}
   }
 
   /* ---------- histórico geral (admin do portal) ---------- */
-  const NOMES_MOD = { mapa: 'Mapa Operacional', destinacao: 'Controle de Destinação', portal: 'Portal (usuários e acessos)' };
-  const ACOES = { criou: 'Criou', alterou: 'Alterou', inativou: 'Inativou', reativou: 'Reativou', excluiu: 'Excluiu', entrou: 'Entrou no portal', 'registro antigo': 'Registro antigo', migrou: 'Migração' };
+  const NOMES_MOD = Object.assign({}, ...Object.entries(Portal.MODULOS).map(([k, m]) => ({ [k]: m.nome })), { portal: 'Portal (usuários e acessos)' });
+  const ACOES = { criou: 'Criou', alterou: 'Alterou', inativou: 'Inativou', reativou: 'Reativou', excluiu: 'Excluiu', entrou: 'Entrou no portal', 'registro antigo': 'Registro antigo', migrou: 'Migração',
+    importou: 'Importou', gerou: 'Gerou', 'pediu código de senha': 'Pediu código de senha', 'criou/trocou a senha': 'Criou/trocou a senha', 'apagou a senha': 'Apagou a senha' };
   let histDados = null;
   async function carregarHistorico() {
     $('#h-res').innerHTML = '<p class="sub" style="padding:14px">Carregando…</p>';
