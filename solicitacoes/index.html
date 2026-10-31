@@ -360,7 +360,7 @@ function statusPill(st) {
 }
 
 /* ---------- carregar ---------- */
-async function carregar(silencioso) {
+async function carregar(silencioso, semRedesenhar) {
   if (!silencioso) setSync(false, 'Carregando…');
   try {
     S.d = await Portal.api('sol.dados', {});
@@ -368,7 +368,7 @@ async function carregar(silencioso) {
     setSync(true, (S.ro ? 'Somente leitura · ' : '') + 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
     $('#tab-importar').hidden = !S.d.podeImportar;
     if (S.edit && S.edit.id) { const s = S.d.solicitacoes.find(x => x.id === S.edit.id); S.edit = s ? { ...s } : null; }
-    montarUnidades(); render();
+    montarUnidades(); if (!semRedesenhar) render();
   } catch (e) {
     setSync(false, 'Sem conexão');
     if (!S.d) $('#main').innerHTML = `<section class="panel"><h2>Não consegui carregar as solicitações</h2><p class="sub">${esc((e && e.mensagem) || 'Verifique a internet.')}</p><div class="row" style="margin-top:10px"><button class="btn pri" id="tentar">Tentar de novo</button></div></section>`;
@@ -682,7 +682,7 @@ function renderImportar() {
       box.innerHTML = resumoImport(r, true) + (r.novas ? '<div class="row" style="margin-top:12px"><button class="btn pri" id="imp-ok">Importar ' + r.novas + ' solicitação(ões)</button></div>' : '');
       const b = $('#imp-ok'); if (b) b.onclick = async () => {
         b.disabled = true; b.textContent = 'Importando…';
-        try { const r2 = await Portal.api('sol.importar', { linhas }); box.innerHTML = '<div class="al ok"><span class="pill ok">Ok</span><b>Importação concluída.</b></div>' + resumoImport(r2, false); await carregar(true); }
+        try { const r2 = await Portal.api('sol.importar', { linhas }); box.innerHTML = '<div class="al ok"><span class="pill ok">Ok</span><b>Importação concluída.</b></div>' + resumoImport(r2, false); await carregar(true, true); }
         catch (e) { b.disabled = false; b.textContent = 'Tentar de novo'; falha(e); }
       };
     } catch (e) { box.innerHTML = `<div class="al crit"><span class="pill crit">Erro</span><b>${esc((e && (e.mensagem || e.message)) || 'Não consegui ler a planilha.')}</b></div>`; }
