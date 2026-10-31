@@ -12,6 +12,8 @@
       desc: 'Destinações de resíduos (custo), vendas de recicláveis (receita), locação de veículos e conferência dos MTRs do mês.' },
     mapa: { nome: 'Mapa Operacional', caminho: 'mapa/',
       desc: 'Clientes, unidades GVC, parceiros, fornecedores, destinadores, transportadores e recicladores no mapa, com resíduos, preços e equipamentos.' },
+    frota: { nome: 'Frota', caminho: 'frota/',
+      desc: 'Veículos, caixas estacionárias, tipos de veículo e locação mensal de cada unidade.' },
   };
   const NIVEIS = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 
