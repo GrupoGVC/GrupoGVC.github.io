@@ -328,7 +328,7 @@ function solImportar_(linhas, simular, u) {
     }
     let consId = '';
     const cons = String(l['Consultor'] || '').trim();
-    if (cons && !/^RETEC$/.test(semAcento_(cons))) {
+    if (cons && !/^RETEC( SA| S\/A| S\.A\.?)?$/.test(semAcento_(cons))) { // "Retec" / "Retec Sa" = sem consultor
       consId = consultores[semAcento_(cons)] || '';
       if (!consId) { novosConsultores[semAcento_(cons)] = cons; consId = '#' + semAcento_(cons); }
     }
