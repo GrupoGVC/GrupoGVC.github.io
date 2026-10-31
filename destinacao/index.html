@@ -235,7 +235,7 @@ nav.tabs .ic,nav.tabs .t-short{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261031"></script>
+<script src="../portal.js?v=20261101"></script>
 </head>
 <body>
 <header class="top">
@@ -610,29 +610,22 @@ async function baixarCsv(){
 }
 
 /* ---------- frota ---------- */
+// Só para consulta: a locação é lançada no módulo Frota do portal.
 function renderFrota(){
-  const d=S.locDraft||(S.loc?JSON.parse(JSON.stringify(S.loc.veiculos||[])):[]);S.locDraft=d;
-  const a=agg(S.lanc,{veiculos:d});const dirty=JSON.stringify(d)!==JSON.stringify((S.loc&&S.loc.veiculos)||[]);
+  const d=(S.loc&&S.loc.veiculos)||[];
+  const a=agg(S.lanc,{veiculos:d});
+  const temFrota=!!(window.Portal&&Portal.nivel('frota'));
   $('#main').innerHTML=`<section class="panel">
-    <div class="panel-h"><div><h2>Locação de veículos · ${esc(mesLbl(S.mes))}</h2><p class="sub">Um cadastro por mês. Para começar um mês novo, copie a frota do mês anterior e ajuste só o que mudou.</p></div>
-      <div class="row">${!d.length?`<button class="btn" id="loc-copy">Copiar frota de ${esc(mesLbl(addMes(S.mes,-1)))}</button>`:''}${S.readOnly?'':`<button class="btn" id="loc-add">+ Veículo</button><button class="btn pri" id="loc-save" ${dirty?'':'disabled'}>Salvar frota</button>`}</div></div>
-    ${d.length?`<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Tipo</th><th>Placa / ativo</th><th>Fornecedor</th><th class="num">Valor no mês (R$)</th><th class="num">Viagens</th><th class="num">R$/viagem</th><th></th></tr></thead><tbody>
-    ${d.map((v,i)=>{const p=a.byPlaca[String(v.placa).toUpperCase()];const n=p?p.mtr.size:0;return `<tr>
-      <td><input data-i="${i}" data-k="tipo" value="${esc(v.tipo)}" style="width:130px" aria-label="Tipo"></td>
-      <td><input data-i="${i}" data-k="placa" class="mono" value="${esc(v.placa)}" style="width:120px" aria-label="Placa"></td>
-      <td><input data-i="${i}" data-k="fornecedor" value="${esc(v.fornecedor)}" style="width:150px" aria-label="Fornecedor"></td>
-      <td class="num"><input data-i="${i}" data-k="valor" type="number" step="any" value="${esc(v.valor)}" style="width:120px;text-align:right" aria-label="Valor"></td>
-      <td class="num">${n}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td>
-      <td class="full">${S.readOnly?'':`<button class="btn sm danger" data-rm="${i}" aria-label="Remover">Remover</button>`}</td></tr>`}).join('')}
-    </tbody><tfoot><tr><td colspan="3">${d.length} itens${dirty?' · alterações não salvas':''}</td><td class="num">${R(a.loc)}</td><td></td><td></td><td></td></tr></tfoot></table></div>`:
-    `<div class="empty">Nenhum veículo cadastrado para este mês.</div>`}
+    <div class="panel-h"><div><h2>Locação de veículos · ${esc(mesLbl(S.mes))}</h2><p class="sub">Vem do módulo Frota: veículos e caixas em uso no mês, com o valor da locação. As viagens e o custo por viagem são calculados com os lançamentos deste mês.</p></div>
+      ${temFrota?`<a class="btn pri" href="../frota/#locacao" style="text-decoration:none">Abrir a Frota ↗</a>`:''}</div>
+    <div class="notice" style="margin-bottom:12px">Esta tela é só para consulta. Para incluir, tirar ou mudar o valor de um veículo ou caixa no mês, use o módulo Frota${temFrota?'':' (peça acesso ao administrador do portal)'}.</div>
+    ${d.length?`<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Tipo</th><th>Placa / ativo</th><th>Fornecedor</th><th class="num">Valor no mês (R$)</th><th class="num">Viagens</th><th class="num">R$/viagem</th></tr></thead><tbody>
+    ${d.map(v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];const n=p?p.mtr.size:0;return `<tr>
+      <td>${esc(v.tipo)}</td><td class="mono">${esc(v.placa)}</td><td>${esc(v.fornecedor)}</td>
+      <td class="num">${R(v.valor)}</td><td class="num">${n}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td></tr>`}).join('')}
+    </tbody><tfoot><tr><td colspan="3">${d.length} itens</td><td class="num">${R(a.loc)}</td><td></td><td></td></tr></tfoot></table></div>`:
+    `<div class="empty">Nenhum veículo lançado na Frota para este mês.</div>`}
   </section>`;
-  document.querySelectorAll('#main input[data-i]').forEach(inp=>{inp.onchange=()=>{const v=d[+inp.dataset.i];v[inp.dataset.k]=inp.dataset.k==='valor'?(+inp.value||0):inp.dataset.k==='placa'?inp.value.replace(/[\s-]/g,'').toUpperCase():inp.value;renderFrota()}});
-  document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{d.splice(+b.dataset.rm,1);renderFrota()});
-  if($('#loc-add'))$('#loc-add').onclick=()=>{d.push({tipo:'Baú',placa:'',fornecedor:'',valor:0});renderFrota();const ins=document.querySelectorAll('#main input[data-k="placa"]');ins[ins.length-1].focus()};
-  if($('#loc-copy'))$('#loc-copy').onclick=async()=>{const vs=S.locs[addMes(S.mes,-1)]||[];
-    if(!vs.length){toast('O mês anterior não tem frota cadastrada');return}S.locDraft=JSON.parse(JSON.stringify(vs));renderFrota();toast(vs.length+' veículos copiados. Confira e salve.')};
-  if($('#loc-save'))$('#loc-save').onclick=async()=>{const vs=d.filter(v=>v.placa);try{await api('salvarLocacao',{mes:S.mes,veiculos:vs});S.locs[S.mes]=vs;S.locDraft=null;recompute();toast('Frota salva');render()}catch(e){falha(e)}};
 }
 
 /* ---------- destinadores ---------- */
