@@ -8,6 +8,7 @@
  *   Auth.gs       login, sessões e usuários
  *   Mapa.gs       Mapa Operacional (cadastros, locais, resíduos, preços, equipamentos)
  *   Controle.gs   Controle de Destinação (lançamentos e locação)
+ *   Frota.gs      Frota (tipos de veículo, veículos, caixas, locação mensal) e migração da Fase 1
  *   Historico.gs  consulta do histórico
  *   Instalacao.gs criação da planilha central, migração e backup semanal
  *
@@ -23,7 +24,7 @@ const DIAS_SESSAO = 30;
 
 // Planilha antiga do Mapa (origem da migração; não é mais usada depois dela).
 const MAPA_PLANILHA_ID = '176bQkfOlMFCuKuACKfaogA1liMAxaTIIg-W_wPbV_9E';
-const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional' };
+const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota' };
 const NIVEIS = ['leitor', 'editor', 'admin'];
 const MESES_JANELA = 6;
 
@@ -31,6 +32,8 @@ const ACOES_DESTINACAO_LEITURA = ['dados'];
 const ACOES_DESTINACAO_ESCRITA = ['salvarLancamento', 'excluirLancamento', 'definirNegocioLote', 'salvarLocacao', 'salvarDestinador'];
 const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista'];
 const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa.reativar', 'mapa.listaAdd', 'mapa.listaDel', 'mapa.listaInativar', 'mapa.listaSet'];
+const ACOES_FROTA_LEITURA = ['frota.dados'];
+const ACOES_FROTA_ESCRITA = ['frota.salvar', 'frota.excluir', 'frota.ativo', 'frota.salvarLocacao'];
 const ACOES_ADMIN = ['listarUsuarios', 'salvarUsuario', 'resetarSenha', 'historico.geral'];
 
 function podeLer_(u, modulo) { return NIVEIS.indexOf(u.modulos[modulo]) >= 0; }
@@ -61,6 +64,7 @@ function rotear_(body) {
   const acao = body.acao;
   if (acao === 'sair') { if (body.token) PropertiesService.getScriptProperties().deleteProperty('S_' + body.token); return { ok: true }; }
   if (!baseInstalada_()) return MANUTENCAO;
+  garantirEsquema_();
   switch (acao) {
     case 'login': return login_(body.email, body.senha);
     case 'enviarCodigo': return enviarCodigo_(body.email);
@@ -79,6 +83,10 @@ function rotear_(body) {
     if (!podeLer_(u, 'mapa')) return semPermissao_('Você não tem acesso ao Mapa Operacional.');
     return acao === 'mapa.listar' ? MAPA.listar() : MAPA.lista(body.nome);
   }
+  if (ACOES_FROTA_LEITURA.indexOf(acao) >= 0) {
+    if (!podeLer_(u, 'frota')) return semPermissao_('Você não tem acesso à Frota.');
+    return frotaDados_(u);
+  }
   if (acao === 'historico.registro') return historicoRegistro_(String(body.tabela || ''), String(body.id || ''), u);
 
   // escritas e administração (com trava)
@@ -88,6 +96,8 @@ function rotear_(body) {
     if (!podeEditar_(u, 'destinacao')) return semPermissao_(podeLer_(u, 'destinacao') ? 'Seu acesso ao Controle de Destinação é só de leitura.' : 'Você não tem acesso ao Controle de Destinação.');
   } else if (ACOES_MAPA_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'mapa')) return semPermissao_(podeLer_(u, 'mapa') ? 'Seu acesso ao Mapa Operacional é só de leitura.' : 'Você não tem acesso ao Mapa Operacional.');
+  } else if (ACOES_FROTA_ESCRITA.indexOf(acao) >= 0) {
+    if (!podeEditar_(u, 'frota')) return semPermissao_(podeLer_(u, 'frota') ? 'Seu acesso à Frota é só de leitura.' : 'Você não tem acesso à Frota.');
   } else {
     return { ok: false, erro: 'acao_desconhecida' };
   }
@@ -112,6 +122,10 @@ function rotear_(body) {
       case 'mapa.listaDel': return MAPA.listaDel(body.nome, body.valor, u);
       case 'mapa.listaInativar': return MAPA.listaInativar(body.nome, body.valor, u);
       case 'mapa.listaSet': return MAPA.listaSet(body.nome, body.list, u);
+      case 'frota.salvar': return frotaSalvar_(String(body.tabela), body.registro, u);
+      case 'frota.excluir': return frotaExcluir_(String(body.tabela), String(body.id), u);
+      case 'frota.ativo': return frotaAtivo_(String(body.tabela), String(body.id), body.ativo, u);
+      case 'frota.salvarLocacao': return frotaSalvarLocacao_(body.mes, body.itens, u);
     }
     return { ok: false, erro: 'acao_desconhecida' };
   } finally { gravarHistorico_(); lock.releaseLock(); }

@@ -32,8 +32,14 @@ const TABELAS = {
   Lancamentos:          { prefixo: 'LAN', colunas: ['id', 'unidadeId', 'data', 'mes', 'mtr', 'ticket', 'destinadorId', 'gerador', 'origem', 'residuoId',
                                                       'transportadora', 'placa', 'kg', 'preco', 'valorFixo', 'valor', 'negocio', 'obs', 'idOrigem', 'ativo'],
                           texto: ['mes', 'mtr', 'ticket', 'placa', 'idOrigem'], numero: ['kg', 'preco', 'valorFixo', 'valor'], data: ['data'] },
-  LocacaoMensal:        { prefixo: 'LOM', colunas: ['id', 'unidadeId', 'mes', 'tipo', 'placa', 'fornecedor', 'valor', 'ativo'],
+  // Locação mensal: um item (veículo ou caixa) por mês. tipo/placa/fornecedor guardam como estava naquele mês.
+  LocacaoMensal:        { prefixo: 'LOM', colunas: ['id', 'unidadeId', 'mes', 'veiculoId', 'caixaId', 'tipo', 'placa', 'locadoraId', 'fornecedor', 'valor', 'ativo'],
                           texto: ['mes', 'placa'], numero: ['valor'] },
+  TiposVeiculo:         { prefixo: 'TVE', colunas: ['id', 'nome', 'categoriaCnh', 'capacidadesCaixa', 'ativo'], texto: ['capacidadesCaixa'] },
+  Veiculos:             { prefixo: 'VEI', colunas: ['id', 'unidadeId', 'placa', 'tipoVeiculoId', 'propriedade', 'locadoraId', 'modelo', 'ano', 'situacao', 'obs', 'ativo'],
+                          texto: ['placa', 'ano'] },
+  Caixas:               { prefixo: 'CXA', colunas: ['id', 'unidadeId', 'numero', 'capacidade', 'propriedade', 'locadoraId', 'situacao', 'cadastroAtualId', 'obs', 'ativo'],
+                          texto: ['numero'], numero: ['capacidade'] },
   Listas:               { prefixo: 'LIS', colunas: ['id', 'lista', 'valor', 'ordem', 'ativo'], numero: ['ordem'] },
   Parametros:           { prefixo: 'PRM', colunas: ['id', 'chave', 'valor', 'vigenciaInicio', 'descricao'], data: ['vigenciaInicio'] },
 };
@@ -41,12 +47,21 @@ const TABELAS = {
 // Onde cada tabela é usada. Se houver uso, o registro não pode ser excluído — só inativado.
 const REFERENCIAS = {
   Cadastros:    [['Lancamentos', 'destinadorId', 'lançamento(s) no Controle de Destinação'],
-                 ['Cadastros', 'cadastroPrincipalId', 'cadastro(s) auxiliar(es) ligados a ele']],
+                 ['Cadastros', 'cadastroPrincipalId', 'cadastro(s) auxiliar(es) ligados a ele'],
+                 ['Veiculos', 'locadoraId', 'veículo(s) na Frota (como locadora)'],
+                 ['Caixas', 'locadoraId', 'caixa(s) na Frota (como locadora)'],
+                 ['Caixas', 'cadastroAtualId', 'caixa(s) que estão neste local'],
+                 ['LocacaoMensal', 'locadoraId', 'mês(es) de locação']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação']],
   Equipamentos: [['CadastroEquipamentos', 'equipamentoId', 'cadastro(s) no Mapa Operacional']],
   Unidades:     [['Lancamentos', 'unidadeId', 'lançamento(s) no Controle de Destinação'],
-                 ['LocacaoMensal', 'unidadeId', 'veículo(s) na locação mensal']],
+                 ['LocacaoMensal', 'unidadeId', 'item(ns) na locação mensal'],
+                 ['Veiculos', 'unidadeId', 'veículo(s) na Frota'],
+                 ['Caixas', 'unidadeId', 'caixa(s) na Frota']],
+  TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota']],
+  Veiculos:     [['LocacaoMensal', 'veiculoId', 'mês(es) de locação']],
+  Caixas:       [['LocacaoMensal', 'caixaId', 'mês(es) de locação']],
   Locais:       [['CadastroLocais', 'localId', 'cadastro(s) que usam este local']],
 };
 // Tabelas "filhas" que pertencem ao registro e saem junto quando ele é excluído (sem uso).
@@ -224,6 +239,11 @@ function usos_(nome, id) {
     }).length;
     if (n) out.push({ tabela: ref[0], rotulo: ref[2], n: n });
   });
+  if (nome === 'Veiculos') { // os lançamentos guardam a placa
+    const v = porId_('Veiculos', id); const placa = v ? String(v.placa).toUpperCase() : '';
+    const n = placa ? ler_('Lancamentos').filter(function (l) { return String(l.placa).toUpperCase() === placa; }).length : 0;
+    if (n) out.push({ tabela: 'Lancamentos', rotulo: 'lançamento(s) no Controle de Destinação com esta placa', n: n });
+  }
   if (nome === 'Unidades') {
     const n = ler_('Usuarios').filter(function (o) { return String(o.unidades).split(/\s*[;,]\s*/).indexOf(id) >= 0; }).length;
     if (n) out.push({ tabela: 'Usuarios', rotulo: 'usuário(s) do portal', n: n });
@@ -279,7 +299,9 @@ const ROTULOS_CAMPOS = {
   ativo: 'Situação', precoKg: 'Preço por kg', natureza: 'Natureza', data: 'Data', mes: 'Mês', mtr: 'MTR', ticket: 'Ticket',
   destinadorId: 'Destinador', gerador: 'Gerador', origem: 'Origem', residuoId: 'Resíduo', transportadora: 'Transportadora', placa: 'Placa',
   kg: 'Peso (kg)', preco: 'Preço (R$/kg)', valorFixo: 'Valor fechado', valor: 'Valor', negocio: 'Tipo de negócio', tipo: 'Tipo',
-  fornecedor: 'Fornecedor', email: 'E-mail', adminPortal: 'Admin do portal', unidades: 'Unidades', unidadeId: 'Unidade', nivel: 'Nível'
+  fornecedor: 'Fornecedor', email: 'E-mail', categoriaCnh: 'Categoria de CNH exigida', capacidadesCaixa: 'Caixas compatíveis (m³)',
+  tipoVeiculoId: 'Tipo de veículo', propriedade: 'Propriedade', locadoraId: 'Locadora', modelo: 'Modelo', ano: 'Ano', situacao: 'Situação',
+  numero: 'Número', capacidade: 'Capacidade (m³)', cadastroAtualId: 'Onde está', veiculoId: 'Veículo', caixaId: 'Caixa', adminPortal: 'Admin do portal', unidades: 'Unidades', unidadeId: 'Unidade', nivel: 'Nível'
 };
 function rotuloCampo_(c) { return ROTULOS_CAMPOS[c] || c; }
 function resumo_(nome, o) {

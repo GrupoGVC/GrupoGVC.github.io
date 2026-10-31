@@ -131,19 +131,9 @@ function definirNegocioLote_(ids, negocio, u) {
   });
   return { ok: true, alterados: alt };
 }
-function salvarLocacao_(mes, veiculos, u) {
-  if (!/^\d{4}-\d{2}$/.test(mes || '')) return { ok: false, erro: 'dados_invalidos', mensagem: 'Mês inválido.' };
-  const atuais = ler_('LocacaoMensal').filter(function (r) { return r.ativo && mesTexto_(r.mes) === mes; });
-  const usados = {};
-  (veiculos || []).filter(function (v) { return v.placa; }).forEach(function (v) {
-    const placa = String(v.placa).trim().toUpperCase();
-    const campos = { mes: mes, tipo: String(v.tipo || ''), placa: placa, fornecedor: String(v.fornecedor || ''), valor: num_(v.valor) };
-    const a = atuais.filter(function (r) { return !usados[r.id] && String(r.placa).toUpperCase() === placa; })[0];
-    if (a) { usados[a.id] = true; atualizar_('LocacaoMensal', a.id, campos, u, 'destinacao', { registroNome: placa + ' · ' + mes }); }
-    else inserir_('LocacaoMensal', campos, u, 'destinacao', placa + ' · ' + mes);
-  });
-  atuais.forEach(function (r) { if (!usados[r.id]) atualizar_('LocacaoMensal', r.id, { ativo: false }, u, 'destinacao', { registroNome: String(r.placa) + ' · ' + mes }); });
-  return { ok: true };
+// A locação passou para o módulo Frota (Fase 1). Mantido para telas antigas ainda abertas.
+function salvarLocacao_() {
+  return { ok: false, erro: 'dados_invalidos', mensagem: 'A locação de veículos agora é lançada no módulo Frota do portal.' };
 }
 function salvarDestinador_() {
   return { ok: false, erro: 'dados_invalidos', mensagem: 'Destinadores, resíduos e preços são cadastrados no Mapa Operacional. Edite o cadastro por lá.' };
