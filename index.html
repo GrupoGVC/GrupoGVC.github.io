@@ -79,6 +79,7 @@ main{padding-block:24px 48px}
 .pill.ok{background:var(--ok-bg);color:var(--ok)}
 .pill.warn{background:var(--warn-bg);color:var(--warn)}
 .pill.off{background:var(--sunken);color:var(--ink-3)}
+.pill.crit{background:var(--crit-bg);color:var(--crit)}
 
 /* login */
 .login-logos{display:flex;justify-content:center;align-items:center;gap:22px;margin:24px auto 18px;width:max-content;max-width:100%}
@@ -108,7 +109,7 @@ th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-
 td{padding:8px 10px;border-top:1px solid var(--line-soft);vertical-align:middle}
 td select,td input{min-height:32px;padding:5px 8px;width:auto}
 tr.inativo td{opacity:.55}
-.nu{display:grid;grid-template-columns:2fr 1.5fr 1fr 1fr auto;gap:10px;align-items:end;margin-top:16px}
+.nu{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end;margin-top:16px}
 @media (max-width:820px){.nu{grid-template-columns:1fr 1fr}}
 .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);white-space:nowrap}
 .chk input{width:auto;min-height:0}
@@ -116,7 +117,7 @@ tr.inativo td{opacity:.55}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--ink-3);font-size:12px;margin-top:10px}
 </style>
 <script src="config.js"></script>
-<script src="portal.js?v=20261025"></script>
+<script src="portal.js?v=20261031"></script>
 </head>
 <body>
 <header class="top">
@@ -128,6 +129,7 @@ tr.inativo td{opacity:.55}
     <div class="user-box" id="user-box" hidden>
       <div class="who"><b id="u-nome"></b><span id="u-email"></span></div>
       <button class="btn sm" id="btn-usuarios" hidden>Usuários</button>
+      <button class="btn sm" id="btn-historico" hidden>Histórico</button>
       <button class="btn sm" id="btn-sair">Sair</button>
     </div>
   </div>
@@ -145,7 +147,7 @@ tr.inativo td{opacity:.55}
     mapa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>',
   };
   const CORES = { destinacao: 'var(--m-dest)', mapa: 'var(--m-mapa)' };
-  let usuario = null, usuarios = null, tela = 'home';
+  let usuario = null, usuarios = null, unidades = [], tela = 'home', histFiltros = {};
 
   function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2800); }
   function aviso(msg, tipo) {
@@ -161,6 +163,8 @@ tr.inativo td{opacity:.55}
     $('#u-email').textContent = usuario.email;
     $('#btn-usuarios').hidden = !usuario.adminPortal;
     $('#btn-usuarios').textContent = tela === 'usuarios' ? '← Módulos' : 'Usuários';
+    $('#btn-historico').hidden = !usuario.adminPortal;
+    $('#btn-historico').textContent = tela === 'historico' ? '← Módulos' : 'Histórico';
   }
 
   /* ---------- login ---------- */
@@ -261,28 +265,33 @@ tr.inativo td{opacity:.55}
   const optNivel = v => [['', 'Sem acesso'], ['leitor', 'Leitor'], ['editor', 'Editor'], ['admin', 'Administrador']]
     .map(([k, l]) => `<option value="${k}" ${k === (v || '') ? 'selected' : ''}>${l}</option>`).join('');
   async function carregarUsuarios() {
-    try { const j = await Portal.api('listarUsuarios', {}); usuarios = j.usuarios; if (tela === 'usuarios') renderUsuarios(); }
+    try { const j = await Portal.api('listarUsuarios', {}); usuarios = j.usuarios; unidades = j.unidades || []; if (tela === 'usuarios') renderUsuarios(); }
     catch (e) { toast((e && e.mensagem) || 'Não consegui carregar os usuários'); }
   }
+  // Unidades que a pessoa vê. Nenhuma marcada = todas.
+  const chkUnidades = (pref, sel) => unidades.map(x => `<label class="chk" style="font-weight:500"><input type="checkbox" data-uni="${esc(x.id)}" ${(sel || []).includes(x.id) ? 'checked' : ''} id="${pref}-${esc(x.id)}"> ${esc(x.nome)}</label>`).join('');
+  const lerUnidades = el => [...el.querySelectorAll('[data-uni]')].filter(c => c.checked).map(c => c.dataset.uni);
   function renderUsuarios() {
     if (!usuarios) { $('#main').innerHTML = '<p class="sub">Carregando usuários…</p>'; carregarUsuarios(); return; }
     const mods = Object.entries(Portal.MODULOS);
     const us = [...usuarios].sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
     $('#main').innerHTML = `<section class="panel">
       <h2>Usuários e acessos</h2>
-      <p class="sub">Para cada pessoa, escolha o nível em cada módulo: <b>Leitor</b> só vê, <b>Editor</b> lança e altera, <b>Administrador</b> também mexe nas configurações do módulo. <b>Admin do portal</b> cadastra usuários. Mudanças valem na hora, inclusive para quem já está conectado.</p>
+      <p class="sub">Para cada pessoa, escolha o nível em cada módulo: <b>Leitor</b> só vê, <b>Editor</b> lança e altera, <b>Administrador</b> também mexe nas configurações do módulo. <b>Admin do portal</b> cadastra usuários e vê o histórico geral. Em <b>Unidades</b>, marque a unidade da pessoa (programadora, frota e equipe são por unidade); sem nenhuma marcada, ela vê todas. Mudanças valem na hora, inclusive para quem já está conectado.</p>
       <form id="nu" class="nu">
         <div><label for="nu-email">E-mail</label><input id="nu-email" type="email" required></div>
         <div><label for="nu-nome">Nome</label><input id="nu-nome" required></div>
         ${mods.map(([k, m]) => `<div><label for="nu-${k}">${esc(m.nome)}</label><select id="nu-${k}">${optNivel(k === 'mapa' ? 'leitor' : 'editor')}</select></div>`).join('')}
+        <div><label>Unidades</label><div id="nu-uni" class="row" style="gap:10px">${chkUnidades('nu-uni', [])}</div></div>
         <div><label class="chk"><input type="checkbox" id="nu-admin"> Admin do portal</label><button class="btn pri" id="nu-btn" style="margin-top:6px">Cadastrar</button></div>
       </form>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Nome</th><th>E-mail</th>${mods.map(([, m]) => `<th>${esc(m.nome)}</th>`).join('')}<th>Admin do portal</th><th>Ativo</th><th>Senha</th><th>Último acesso</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>E-mail</th>${mods.map(([, m]) => `<th>${esc(m.nome)}</th>`).join('')}<th>Unidades</th><th>Admin do portal</th><th>Ativo</th><th>Senha</th><th>Último acesso</th><th></th></tr></thead>
         <tbody>${us.map(u => `<tr data-email="${esc(u.email)}" class="${u.ativo ? '' : 'inativo'}">
           <td><input data-k="nome" value="${esc(u.nome)}" style="width:170px" aria-label="Nome"></td>
           <td class="mono">${esc(u.email)}</td>
           ${mods.map(([k, m]) => `<td><select data-mod="${k}" aria-label="${esc(m.nome)}">${optNivel((u.modulos || {})[k])}</select></td>`).join('')}
+          <td><div data-unis style="display:flex;flex-direction:column;gap:2px;min-width:120px">${chkUnidades('u-' + esc(u.email), u.unidades)}</div></td>
           <td><select data-k="admin" aria-label="Admin do portal"><option value="1" ${u.adminPortal ? 'selected' : ''}>Sim</option><option value="0" ${u.adminPortal ? '' : 'selected'}>Não</option></select></td>
           <td><select data-k="ativo" aria-label="Ativo"><option value="1" ${u.ativo ? 'selected' : ''}>Sim</option><option value="0" ${u.ativo ? '' : 'selected'}>Não</option></select></td>
           <td>${u.temSenha ? '<span class="pill ok">criada</span>' : '<span class="pill warn">aguardando 1º acesso</span>'}</td>
@@ -296,19 +305,19 @@ tr.inativo td{opacity:.55}
       e.preventDefault(); const b = $('#nu-btn'); b.disabled = true;
       const modulos = {}; mods.forEach(([k]) => modulos[k] = $('#nu-' + k).value);
       try {
-        await Portal.api('salvarUsuario', { usuario: { email: $('#nu-email').value.trim(), nome: $('#nu-nome').value.trim(), modulos, adminPortal: $('#nu-admin').checked, ativo: true } });
+        await Portal.api('salvarUsuario', { usuario: { email: $('#nu-email').value.trim(), nome: $('#nu-nome').value.trim(), modulos, adminPortal: $('#nu-admin').checked, ativo: true, unidades: lerUnidades($('#nu-uni')) } });
         toast('Usuário cadastrado'); usuarios = null; renderUsuarios();
       } catch (er) { b.disabled = false; toast((er && er.mensagem) || 'Não foi possível cadastrar'); }
     };
     document.querySelectorAll('tr[data-email]').forEach(tr => {
       const email = tr.dataset.email; const sv = tr.querySelector('[data-salvar]');
-      tr.querySelectorAll('[data-k],[data-mod]').forEach(x => x.oninput = x.onchange = () => sv.hidden = false);
+      tr.querySelectorAll('[data-k],[data-mod],[data-uni]').forEach(x => x.oninput = x.onchange = () => sv.hidden = false);
       sv.onclick = async () => {
         sv.disabled = true;
         const modulos = {}; tr.querySelectorAll('[data-mod]').forEach(s => modulos[s.dataset.mod] = s.value);
         try {
           await Portal.api('salvarUsuario', { usuario: { email, nome: tr.querySelector('[data-k="nome"]').value.trim(), modulos,
-            adminPortal: tr.querySelector('[data-k="admin"]').value === '1', ativo: tr.querySelector('[data-k="ativo"]').value === '1' } });
+            adminPortal: tr.querySelector('[data-k="admin"]').value === '1', ativo: tr.querySelector('[data-k="ativo"]').value === '1', unidades: lerUnidades(tr) } });
           toast('Usuário atualizado'); usuarios = null;
           if (email === usuario.email) { const j = await Portal.api('eu', {}); usuario = j.usuario; const s = Portal.sessao(); s.usuario = usuario; Portal.gravarSessao(s); }
           renderUsuarios();
@@ -326,14 +335,66 @@ tr.inativo td{opacity:.55}
     });
   }
 
+  /* ---------- histórico geral (admin do portal) ---------- */
+  const NOMES_MOD = { mapa: 'Mapa Operacional', destinacao: 'Controle de Destinação', portal: 'Portal (usuários e acessos)' };
+  const ACOES = { criou: 'Criou', alterou: 'Alterou', inativou: 'Inativou', reativou: 'Reativou', excluiu: 'Excluiu', entrou: 'Entrou no portal', 'registro antigo': 'Registro antigo', migrou: 'Migração' };
+  let histDados = null;
+  async function carregarHistorico() {
+    $('#h-res').innerHTML = '<p class="sub" style="padding:14px">Carregando…</p>';
+    try { histDados = await Portal.api('historico.geral', { filtros: histFiltros }); desenharHistorico(); }
+    catch (e) { $('#h-res').innerHTML = `<p class="sub" style="padding:14px">${esc((e && e.mensagem) || 'Não consegui carregar o histórico.')}</p>`; }
+  }
+  function desenharHistorico() {
+    const j = histDados; if (!j) return;
+    const sel = $('#h-pessoa'); const atual = histFiltros.pessoa || '';
+    sel.innerHTML = '<option value="">Todas</option>' + (j.pessoas || []).map(p => `<option ${p === atual ? 'selected' : ''}>${esc(p)}</option>`).join('');
+    const cls = a => a === 'criou' ? 'ok' : (a === 'inativou' || a === 'excluiu') ? 'crit' : a === 'alterou' ? 'warn' : 'off';
+    $('#h-res').innerHTML = j.itens.length ? `<div class="tbl-wrap" style="margin-top:0;border:0"><table>
+      <thead><tr><th>Quando</th><th>Quem</th><th>Módulo</th><th>Registro</th><th>Ação</th><th>Campo</th><th>De</th><th>Para</th></tr></thead>
+      <tbody>${j.itens.map(x => `<tr>
+        <td class="mono" style="white-space:nowrap">${esc(Portal.dataHora(x.quando).replace(' às ', ' '))}</td>
+        <td>${esc(x.nome || x.email)}</td><td>${esc(NOMES_MOD[x.modulo] || x.modulo || '—')}</td>
+        <td><span class="mono" style="white-space:nowrap">${esc(x.registroId)}</span>${x.registroNome ? `<div class="sub" style="margin:0">${esc(x.registroNome)}</div>` : ''}</td>
+        <td><span class="pill ${cls(x.acao)}">${esc(ACOES[x.acao] || x.acao)}</span></td>
+        <td>${esc(x.campo)}${!x.campo && x.detalhe ? `<div class="sub" style="margin:0;max-width:360px">${esc(x.detalhe)}</div>` : ''}</td>
+        <td>${esc(x.de)}</td><td>${esc(x.para)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="sub" style="padding:10px 14px">Mostrando ${j.itens.length} de ${j.total} alterações encontradas${j.total > j.itens.length ? ' (refine os filtros para ver as mais antigas)' : ''}.</p>`
+      : '<p class="sub" style="padding:14px">Nenhuma alteração com esses filtros.</p>';
+  }
+  function renderHistorico() {
+    const f = histFiltros;
+    $('#main').innerHTML = `<section class="panel">
+      <h2>Histórico geral</h2>
+      <p class="sub">Tudo o que foi criado, alterado, inativado ou excluído em qualquer módulo, com quem fez e quando. Cada registro também tem o próprio botão "Histórico" dentro do módulo.</p>
+      <form id="h-f" class="nu" style="margin-top:12px">
+        <div><label for="h-de">De</label><input type="date" id="h-de" value="${esc(f.de || '')}"></div>
+        <div><label for="h-ate">Até</label><input type="date" id="h-ate" value="${esc(f.ate || '')}"></div>
+        <div><label for="h-mod">Módulo</label><select id="h-mod"><option value="">Todos</option>${Object.entries(NOMES_MOD).map(([k, n]) => `<option value="${k}" ${f.modulo === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+        <div><label for="h-pessoa">Pessoa</label><select id="h-pessoa"><option value="">Todas</option></select></div>
+        <div><label for="h-reg">Registro</label><input id="h-reg" placeholder="Código ou nome, ex.: CAD-000012" value="${esc(f.registro || '')}"></div>
+        <div><label class="chk"><input type="checkbox" id="h-acessos" ${f.acessos ? 'checked' : ''}> Incluir entradas no portal</label><button class="btn pri" style="margin-top:6px">Filtrar</button></div>
+      </form>
+      <div id="h-res" style="margin-top:14px;border:1px solid var(--line);border-radius:10px"></div>
+    </section>`;
+    $('#h-f').onsubmit = e => {
+      e.preventDefault();
+      histFiltros = { de: $('#h-de').value, ate: $('#h-ate').value, modulo: $('#h-mod').value, pessoa: $('#h-pessoa').value, registro: $('#h-reg').value.trim(), acessos: $('#h-acessos').checked };
+      carregarHistorico();
+    };
+    if (histDados) desenharHistorico(); else carregarHistorico();
+  }
+
   function render(msg, tipo) {
     mostrarUsuario();
-    if (tela === 'usuarios' && usuario.adminPortal) renderUsuarios(); else { tela = 'home'; renderHome(msg, tipo); }
+    if (tela === 'usuarios' && usuario.adminPortal) renderUsuarios();
+    else if (tela === 'historico' && usuario.adminPortal) renderHistorico();
+    else { tela = 'home'; renderHome(msg, tipo); }
     mostrarUsuario();
   }
 
   $('#btn-sair').onclick = () => Portal.sair();
   $('#btn-usuarios').onclick = () => { tela = tela === 'usuarios' ? 'home' : 'usuarios'; if (tela === 'usuarios') usuarios = null; render(); };
+  $('#btn-historico').onclick = () => { tela = tela === 'historico' ? 'home' : 'historico'; histDados = null; render(); };
   Portal.aoExpirar = () => telaLogin('Sua sessão terminou. Entre de novo.');
 
   async function start() {
