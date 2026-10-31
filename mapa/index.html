@@ -1514,6 +1514,22 @@ tr.cad-inativo td:last-child { opacity: 1; }
 .collapse-body { padding: 0 12px 12px; }
 
 
+
+/* Preço de venda (cliente) */
+.pv-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 7px 0; border-top: 1px dashed var(--border); font-size: 0.76rem; }
+.pv-row:first-child { border-top: none; }
+.pv-row.inativo { opacity: 0.5; }
+.pv-row .pv-sub { color: var(--text-muted); font-size: 0.7rem; }
+.pv-row .pv-acts { display: flex; gap: 4px; align-items: center; }
+.pv-mini { background: none; border: 1px solid var(--border2); border-radius: 6px; color: var(--text); cursor: pointer; font-size: 0.7rem; padding: 3px 8px; font-family: var(--font-main); }
+.pv-mini:hover { border-color: var(--retec); color: var(--retec); }
+.pv-mini.del:hover { border-color: #dc2626; color: #dc2626; }
+.pv-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border2); }
+.pv-form .pv-full { grid-column: 1 / -1; }
+.pv-form label { font-size: 0.66rem; margin-bottom: 3px; display: block; }
+.pv-form input, .pv-form select { width: 100%; }
+.pv-hint { font-size: 0.7rem; color: var(--text-muted); }
+
 /* Modal actions */
 .modal-actions {
   display: flex;
@@ -1974,7 +1990,7 @@ tr.cad-inativo td:last-child { opacity: 1; }
 }
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261101"></script>
+<script src="../portal.js?v=20261102"></script>
 <style>
 /* ── Portal: usuário logado e modo somente leitura ── */
 .portal-user { display:flex; align-items:center; gap:8px; margin-left:4px; }
@@ -5255,6 +5271,16 @@ function showRouteError(msg) {
       </div>
     </div>
 
+    <!-- PREÇO DE VENDA (clientes já salvos; usado no Faturamento) -->
+    <div class="fg equip-wrap" id="pv-wrap" style="display:none">
+      <button type="button" class="collapse-head" id="pv-head" onclick="pvToggle()" aria-expanded="false" aria-controls="pv-body">
+        <span class="collapse-arrow" id="pv-arrow">▸</span>
+        <span class="collapse-title">💰 Preço de venda</span>
+        <span class="collapse-count" id="pv-count">…</span>
+      </button>
+      <div class="collapse-body" id="pv-body" style="display:none"></div>
+    </div>
+
     <div class="fg">
       <label>Observações</label>
       <textarea id="f-obs" rows="2" placeholder="Informações adicionais, condições comerciais, restrições..."></textarea>
@@ -6102,10 +6128,77 @@ function openModal(id, draft) {
   const markNewBtn = document.getElementById('btn-mark-new-loc');
   if (markNewBtn) markNewBtn.style.display = (!id && modalNewLat === null) ? 'flex' : 'none';
 
+  pvAbrirCadastro(id, fonte.tipos || []);
   aplicarSomenteLeituraModal();
   document.getElementById('overlay').classList.add('open');
   document.querySelector('#overlay .modal')?.scrollTo?.(0, 0);
   setTimeout(() => document.getElementById(id ? 'f-nome' : 'f-cnpj').focus(), 50);
+}
+
+
+// ─── PREÇO DE VENDA DO CLIENTE (tabela PrecosCliente; o Faturamento usa para montar o BM) ───
+const PV = { id: null, precos: [], residuos: [], modalidades: [], edit: null, aberto: false };
+const pvEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pvR = v => v === '' || v == null ? '' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const pvD = iso => iso ? iso.split('-').reverse().join('/') : '';
+function pvAbrirCadastro(id, tipos) {
+  const wrap = document.getElementById('pv-wrap'); if (!wrap) return;
+  PV.id = id && /^CAD-/.test(id) && (tipos || []).includes('cliente') ? id : null;
+  PV.edit = null; PV.precos = [];
+  wrap.style.display = PV.id ? '' : 'none';
+  pvSetAberto(false);
+  if (PV.id) pvCarregar();
+}
+async function pvCarregar() {
+  const alvo = PV.id; document.getElementById('pv-count').textContent = '…';
+  try {
+    const r = await Portal.api('mapa.precosVenda', { cadastroId: alvo });
+    if (alvo !== PV.id) return;
+    PV.precos = r.precos; PV.residuos = r.residuos || []; PV.modalidades = r.modalidades;
+    const n = PV.precos.filter(p => p.ativo).length;
+    const c = document.getElementById('pv-count'); c.textContent = n ? n + ' preço(s)' : 'nenhum'; c.classList.toggle('has', n > 0);
+    pvRender();
+  } catch (e) { document.getElementById('pv-count').textContent = 'erro ao carregar'; }
+}
+function pvSetAberto(a) {
+  PV.aberto = a;
+  document.getElementById('pv-body').style.display = a ? '' : 'none';
+  document.getElementById('pv-arrow').textContent = a ? '▾' : '▸';
+  document.getElementById('pv-head').setAttribute('aria-expanded', a ? 'true' : 'false');
+}
+function pvToggle() { pvSetAberto(!PV.aberto); }
+const pvResNome = id => (PV.residuos.find(r => r.id === id) || {}).nome || '';
+function pvRender() {
+  const b = document.getElementById('pv-body'); if (!b) return;
+  const e = PV.edit;
+  const comTransp = m => m === 'Transporte + kg' || m === 'Valorização com transporte';
+  b.innerHTML = `<div class="pv-hint">Preço cobrado do cliente. Valorização = o kg é pago ao cliente e entra como desconto no BM.</div>
+    ${PV.precos.length ? PV.precos.map(p => `<div class="pv-row ${p.ativo ? '' : 'inativo'}"><div><b>${pvEsc(p.residuoId ? pvResNome(p.residuoId) : 'Transporte')}</b> · ${pvEsc(p.modalidade)}
+        <div class="pv-sub">${[p.valorTransporte !== '' ? 'transporte ' + pvR(p.valorTransporte) : '', p.precoKg !== '' ? pvR(p.precoKg) + '/kg' : ''].filter(Boolean).join(' + ')} · desde ${pvD(p.vigenciaInicio)}${p.vigenciaFim ? ' até ' + pvD(p.vigenciaFim) : ''}${p.ativo ? '' : ' · inativo'}${p.obs ? ' · ' + pvEsc(p.obs) : ''}</div></div>
+        <div class="pv-acts">${somenteLeitura || !p.ativo ? '' : `<button type="button" class="pv-mini" onclick="pvEditar('${p.id}')">Editar</button><button type="button" class="pv-mini del" onclick="pvExcluir('${p.id}')">Excluir</button>`}</div></div>`).join('')
+      : '<div class="pv-hint" style="margin-top:6px">Nenhum preço de venda cadastrado.</div>'}
+    ${somenteLeitura ? '' : e ? `<div class="pv-form">
+      <div><label for="pv-mod">Modalidade</label><select id="pv-mod" onchange="pvCampo('modalidade', this.value); pvRender()">${['', ...PV.modalidades].map(m => `<option value="${pvEsc(m)}" ${m === e.modalidade ? 'selected' : ''}>${pvEsc(m || 'Escolha…')}</option>`).join('')}</select></div>
+      <div><label for="pv-res">Resíduo</label><select id="pv-res" onchange="pvCampo('residuoId', this.value)"><option value="">${comTransp(e.modalidade) ? 'Só transporte' : 'Escolha…'}</option>${PV.residuos.map(r => `<option value="${r.id}" ${r.id === e.residuoId ? 'selected' : ''}>${pvEsc(r.nome)}</option>`).join('')}</select></div>
+      ${comTransp(e.modalidade) ? `<div><label for="pv-tr">Transporte (R$ por viagem)</label><input id="pv-tr" type="number" step="any" min="0" value="${pvEsc(e.valorTransporte)}" oninput="pvCampo('valorTransporte', this.value)"></div>` : ''}
+      <div><label for="pv-kg">${/Valorização/.test(e.modalidade) ? 'Pago ao cliente (R$/kg)' : 'Preço (R$/kg)'}</label><input id="pv-kg" type="number" step="any" min="0" value="${pvEsc(e.precoKg)}" oninput="pvCampo('precoKg', this.value)"></div>
+      <div><label for="pv-ini">Vigência a partir de</label><input id="pv-ini" type="date" value="${pvEsc(e.vigenciaInicio)}" oninput="pvCampo('vigenciaInicio', this.value)"></div>
+      <div><label for="pv-fim">Até (opcional)</label><input id="pv-fim" type="date" value="${pvEsc(e.vigenciaFim)}" oninput="pvCampo('vigenciaFim', this.value)"></div>
+      <div class="pv-full"><label for="pv-obs">Observação</label><input id="pv-obs" value="${pvEsc(e.obs)}" oninput="pvCampo('obs', this.value)"></div>
+      <div class="pv-full" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="pv-mini" onclick="PV.edit=null;pvRender()">Cancelar</button><button type="button" class="residuo-add-btn" style="padding:7px 14px" onclick="pvSalvar()">${e.id ? 'Salvar preço' : 'Incluir preço'}</button></div>
+    </div>` : `<button type="button" class="multi-add" onclick="pvNovo()">+ Incluir preço de venda</button>`}`;
+}
+function pvCampo(k, v) { if (PV.edit) PV.edit[k] = v; }
+function pvNovo() { const d = new Date(); PV.edit = { modalidade: '', residuoId: '', valorTransporte: '', precoKg: '', vigenciaInicio: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01', vigenciaFim: '', obs: '' }; pvRender(); }
+function pvEditar(id) { PV.edit = { ...PV.precos.find(p => p.id === id) }; pvRender(); }
+async function pvSalvar() {
+  try { await Portal.api('mapa.salvarPrecoVenda', { registro: Object.assign({ cadastroId: PV.id }, PV.edit) }); PV.edit = null; await pvCarregar(); }
+  catch (e) { alert((e && e.mensagem) || 'Não foi possível salvar o preço.'); }
+}
+async function pvExcluir(id) {
+  if (!confirm('Excluir este preço de venda?')) return;
+  try { const r = await Portal.api('mapa.excluirPrecoVenda', { id }); if (r.mensagem) alert(r.mensagem); await pvCarregar(); }
+  catch (e) { alert((e && e.mensagem) || 'Não foi possível excluir.'); }
 }
 
 // No nível leitor o formulário abre só para consulta: campos travados, sem salvar/mover.
