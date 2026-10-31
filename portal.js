@@ -14,6 +14,10 @@
       desc: 'Clientes, unidades GVC, parceiros, fornecedores, destinadores, transportadores e recicladores no mapa, com resíduos, preços e equipamentos.' },
     frota: { nome: 'Frota', caminho: 'frota/',
       desc: 'Veículos, caixas estacionárias, tipos de veículo e locação mensal de cada unidade.' },
+    solicitacoes: { nome: 'Solicitações', caminho: 'solicitacoes/',
+      desc: 'Pedidos dos clientes da chegada até a NF: documentos, liberação para programar, consultores e histórico.' },
+    faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
+      desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
   };
   const NIVEIS = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 
