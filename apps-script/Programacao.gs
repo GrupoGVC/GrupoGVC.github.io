@@ -278,6 +278,8 @@ function progSalvarViagem_(reg, confirmar, u) {
   if (reg.id && !atual) return erroDados_('Viagem não encontrada. Atualize a página.');
   if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
   if (atual && atual.status === 'Cancelada') return erroDados_('Viagem cancelada não pode ser alterada.');
+  if (atual && atual.status === 'Concluída' && (reg.paradas || []).some(function (p) { return !p.resultado || p.resultado === 'Pendente'; }))
+    return erroDados_('A viagem já foi concluída: toda parada precisa de resultado. Para incluir uma parada pendente, reabra a viagem.');
   const v = { unidadeId: String(reg.unidadeId || ''), execucao: String(reg.execucao || 'Própria'), dataSaida: dataTexto_(reg.dataSaida),
               dataRetornoPrevisto: dataTexto_(reg.dataRetornoPrevisto), veiculoId: String(reg.veiculoId || ''), motoristaId: String(reg.motoristaId || ''),
               transportadorId: String(reg.transportadorId || ''), custoTerceiro: reg.custoTerceiro === '' || reg.custoTerceiro == null ? '' : num_(reg.custoTerceiro),

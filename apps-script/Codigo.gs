@@ -185,7 +185,7 @@ function rotear_(body) {
       case 'sol.novoCliente': return solNovoCliente_(body.cliente, u);
       case 'sol.rotSalvar': return rotSalvar_(body.registro, u);
       case 'sol.rotAtivo': return rotAtivo_(String(body.id), body.ativo, u);
-      case 'sol.rotGerar': return gerarRecorrentes_(u, true);
+      case 'sol.rotGerar': return gerarRecorrentes_(u, true, true);
       case 'sol.importar': return solImportar_(body.linhas, body.simular === true, u);
       case 'prog.salvarColaborador': return progSalvarColaborador_(body.registro, u);
       case 'prog.ativoColaborador': return progAtivoColaborador_(String(body.id), body.ativo, u);

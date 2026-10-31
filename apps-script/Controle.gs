@@ -60,7 +60,8 @@ function lancPublico_(r, nomesRes) {
 
 function dados_(mes, u) {
   const nomesRes = nomesPorId_('Residuos');
-  const lanc = ler_('Lancamentos').filter(function (r) { return r.ativo; }).map(function (r) { return lancPublico_(r, nomesRes); });
+  // a programadora vê só a unidade dela (lançamentos sem unidade, como os antigos, aparecem para todos)
+  const lanc = ler_('Lancamentos').filter(function (r) { return r.ativo && veUnidade_(u, r.unidadeId); }).map(function (r) { return lancPublico_(r, nomesRes); });
   let ultimo = '';
   lanc.forEach(function (l) { if (l.mes > ultimo) ultimo = l.mes; });
   if (!/^\d{4}-\d{2}$/.test(mes || '')) mes = ultimo || Utilities.formatDate(new Date(), tz_(), 'yyyy-MM');
@@ -68,7 +69,7 @@ function dados_(mes, u) {
   for (let i = 0; i < MESES_JANELA; i++) janela.push(addMes_(mes, -i));
   const locacao = {};
   ler_('LocacaoMensal').forEach(function (r) {
-    const m = mesTexto_(r.mes); if (!r.ativo || janela.indexOf(m) < 0 || !r.placa) return;
+    const m = mesTexto_(r.mes); if (!r.ativo || janela.indexOf(m) < 0 || !r.placa || !veUnidade_(u, r.unidadeId)) return;
     (locacao[m] = locacao[m] || []).push({ id: r.id, tipo: String(r.tipo || ''), placa: String(r.placa).trim().toUpperCase(),
       fornecedor: String(r.fornecedor || ''), valor: num_(r.valor) });
   });
@@ -104,6 +105,7 @@ function salvarLancamento_(l, u) {
     valor: num_(l.valor), negocio: normNegocio_(l.negocio), obs: String(l.obs || '') };
   const rotulo = (campos.mtr ? 'MTR ' + campos.mtr : 'sem MTR') + ' · ' + dest.nome;
   const atual = l.id ? acharLanc_(l.id) : null;
+  if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Este lançamento é de outra unidade.');
   if (atual) {
     if (!atual.ativo) campos.ativo = true;
     atualizar_('Lancamentos', atual.id, campos, u, 'destinacao', { registroNome: rotulo });
@@ -117,6 +119,7 @@ function salvarLancamento_(l, u) {
 // "Excluir" um lançamento só o tira das telas (fica inativo e no histórico).
 function excluirLancamento_(id, u) {
   const atual = acharLanc_(id);
+  if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Este lançamento é de outra unidade.');
   if (atual && atual.ativo) atualizar_('Lancamentos', atual.id, { ativo: false }, u, 'destinacao',
     { registroNome: (atual.mtr ? 'MTR ' + atual.mtr : 'sem MTR') });
   return { ok: true };

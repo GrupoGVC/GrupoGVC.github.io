@@ -161,12 +161,13 @@ function datasRotina_(r, ini, fim) {
   return out;
 }
 /** Gera as solicitações das rotinas até N semanas à frente. Roda no máximo uma vez por dia (ou quando forçado). */
-function gerarRecorrentes_(u, forcar) {
+// jaComTrava: quem chama já está dentro da trava de escrita (não pode pegar de novo nem soltar a trava dos outros)
+function gerarRecorrentes_(u, forcar, jaComTrava) {
   const p = PropertiesService.getScriptProperties();
   const hoje = dataTexto_(new Date());
   if (!forcar && p.getProperty('ROTINAS_DIA') === hoje) return { ok: true, geradas: 0 };
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return { ok: true, geradas: 0 };
+  const lock = jaComTrava ? null : LockService.getScriptLock();
+  if (lock && !lock.tryLock(5000)) return { ok: true, geradas: 0 };
   try {
     p.setProperty('ROTINAS_DIA', hoje);
     const semanas = num_(parametro_('semanasRecorrentes')) || 4;
@@ -190,9 +191,9 @@ function gerarRecorrentes_(u, forcar) {
     inserirLote_('Solicitacoes', novas, u);
     Object.keys(porRotina).forEach(function (rid) { const r = porId_('Rotinas', rid);
       hist_(u, 'solicitacoes', 'Rotinas', rid, rotuloRotina_(r), 'gerou', '', '', '', porRotina[rid] + ' solicitação(ões) até ' + horizonte.split('-').reverse().join('/') + '.'); });
-    gravarHistorico_();
+    if (lock) gravarHistorico_();
     return { ok: true, geradas: novas.length };
-  } finally { lock.releaseLock(); }
+  } finally { if (lock) lock.releaseLock(); }
 }
 /** Tira as solicitações futuras da rotina que ainda não foram programadas (para regerar com a regra nova ou parar). */
 function limparFuturasRotina_(rid, u) {
@@ -228,7 +229,7 @@ function rotSalvar_(reg, u) {
     atualizar_('Rotinas', id, r, u, 'solicitacoes', { registroNome: rotuloRotina_(r) });
     if (mudouRegra) { limparFuturasRotina_(id, u); atualizar_('Rotinas', id, { geradaAte: '' }, u, null); }
   } else { r.geradaAte = ''; r.ativo = true; id = inserir_('Rotinas', r, u, 'solicitacoes', rotuloRotina_(r)).id; }
-  const g = gerarRecorrentes_(u, true);
+  const g = gerarRecorrentes_(u, true, true);
   return { ok: true, id: id, geradas: g.geradas };
 }
 function rotAtivo_(id, ativo, u) {
@@ -236,7 +237,7 @@ function rotAtivo_(id, ativo, u) {
   atualizar_('Rotinas', id, { ativo: !!ativo }, u, 'solicitacoes', { registroNome: rotuloRotina_(r) });
   let removidas = 0;
   if (!ativo) removidas = limparFuturasRotina_(id, u);
-  else { atualizar_('Rotinas', id, { geradaAte: '' }, u, null); gerarRecorrentes_(u, true); }
+  else { atualizar_('Rotinas', id, { geradaAte: '' }, u, null); gerarRecorrentes_(u, true, true); }
   return { ok: true, removidas: removidas };
 }
 

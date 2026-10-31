@@ -181,13 +181,13 @@ function ler_(nome) {
   if (CACHE_TAB_[nome]) return CACHE_TAB_[nome];
   const sh = aba_(nome);
   const cab = colunas_(nome);
-  const n = sh.getLastRow();
-  const vals = n > 1 ? sh.getRange(2, 1, n - 1, cab.length).getValues() : [];
+  // uma leitura só (getDataRange) em vez de duas: as telas leem muitas tabelas por chamada
+  const vals = sh.getDataRange().getValues().slice(1);
   const out = [];
   vals.forEach(function (r, i) {
     if (String(r[0]).trim() === '') return;
     const o = { _linha: i + 2 };
-    cab.forEach(function (c, j) { o[c] = r[j]; });
+    cab.forEach(function (c, j) { o[c] = r[j] === undefined ? '' : r[j]; });
     o.id = String(o.id);
     if ('ativo' in o) o.ativo = simNao_(o.ativo);
     out.push(o);

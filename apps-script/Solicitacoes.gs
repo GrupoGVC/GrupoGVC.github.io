@@ -171,7 +171,8 @@ function solStatus_(id, status, dados, u) {
   if (SOL_STATUS.indexOf(status) < 0) return erroDados_('Status inválido.');
   if (SOL_STATUS_FATURAMENTO.indexOf(status) >= 0) return erroDados_('BM enviado e NF emitida são registrados no módulo Faturamento.');
   if (faturamentoPorSolicitacao_()[id]) return erroDados_('Esta solicitação já está num BM do Faturamento. Para mudar o status, cancele o BM primeiro.');
-  const naProg = paradasAtivasDaSolicitacao_(id);
+  // pendente ou realizada numa viagem: quem manda é a Programação (frustrada/no-show libera a mudança manual, ex.: cancelar)
+  const naProg = paradasAtivasDaSolicitacao_(id).filter(function (x) { return !x.p.resultado || x.p.resultado === 'Pendente' || x.p.resultado === 'Realizada'; });
   if (naProg.length) return erroDados_('Esta solicitação está na Programação (' + rotuloViagem_(naProg[0].v) + '). O status muda pelas paradas da viagem.');
   const campos = { status: status };
   if (status === 'Liberada para programar') {
