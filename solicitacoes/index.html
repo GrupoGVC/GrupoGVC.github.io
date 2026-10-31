@@ -451,7 +451,8 @@ function funil(e) {
   const atual = e.status === 'Documentação pendente' ? 'Recebida' : e.status;
   const iA = passos.indexOf(atual);
   const fora = e.status === 'Cancelada' || e.status === 'Frustrada';
-  const emBm = !!e.faturamento || !!e.programacao;
+  const naProg = !!e.programacao && ['Pendente', 'Realizada', ''].includes(e.programacao.resultado || '');
+  const emBm = !!e.faturamento || naProg;
   const b = [];
   if (!S.ro && !emBm) {
     if (['Recebida', 'Documentação pendente', 'Frustrada', 'Cancelada'].includes(e.status)) b.push(['Liberada para programar', 'Liberar para programar', 'pri']);
@@ -463,7 +464,7 @@ function funil(e) {
   }
   return `<ol class="funil">${passos.map((p, i) => `<li class="${fora ? '' : i < iA ? 'feito' : i === iA ? 'agora' : ''}">${esc(p === 'Recebida' && e.status === 'Documentação pendente' ? 'Doc. pendente' : p)}</li>`).join('')}</ol>
     ${b.length ? `<div class="row" style="gap:6px;margin:4px 0 12px">${b.map(x => `<button class="btn sm ${x[2]}" data-st="${esc(x[0])}">${esc(x[1])}</button>`).join('')}</div>` : ''}
-    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : e.programacao ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
+    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : naProg ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
 }
 function docsHTML(e, docs) {
   const L = S.d.listas;
