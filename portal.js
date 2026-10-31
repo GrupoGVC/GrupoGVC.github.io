@@ -16,6 +16,8 @@
       desc: 'Veículos, caixas estacionárias, tipos de veículo e locação mensal de cada unidade.' },
     solicitacoes: { nome: 'Solicitações', caminho: 'solicitacoes/',
       desc: 'Pedidos dos clientes da chegada até a NF: documentos, liberação para programar, consultores e histórico.' },
+    programacao: { nome: 'Programação', caminho: 'programacao/',
+      desc: 'Viagens e paradas da unidade, equipe com CNH, pernoites, terceirizadas e caixas entregues ou retiradas.' },
     faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
       desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
   };
