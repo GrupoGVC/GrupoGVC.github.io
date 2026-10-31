@@ -90,6 +90,7 @@ function paradaPublica_(p) {
   const o = publico_('Paradas', p); o.data = dataTexto_(p.data); o.ordem = num_(p.ordem); o.peso = p.peso === '' ? '' : num_(p.peso); return o;
 }
 function progDados_(u) {
+  try { gerarRecorrentes_(u, false); } catch (e) {}
   const viagens = ler_('Viagens').filter(function (v) { return veUnidade_(u, v.unidadeId); });
   const vis = {}; viagens.forEach(function (v) { vis[v.id] = 1; });
   const paradas = ler_('Paradas').filter(function (p) { return vis[p.viagemId]; });
@@ -116,6 +117,9 @@ function progDados_(u) {
     listas: { funcao: listaValores_('funcaoColaborador'), vinculo: listaValores_('vinculoColaborador'), categoriaCnh: listaValores_('categoriaCnhPessoa'),
               resultado: listaValores_('resultadoParada'), execucao: listaValores_('execucaoViagem') },
     adiantamentos: ler_('Adiantamentos').filter(function (a) { return vis[a.viagemId]; }).map(adiPublico_),
+    lancamentos: ler_('Lancamentos').filter(function (l) { return l.ativo && vis[l.viagemId]; }).map(lancParadaPublico_),
+    destinadores: destinadoresProgramacao_(),
+    residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome), ativo: r.ativo }; }),
     podeImportar: !!u.adminPortal };
 }
 
@@ -298,6 +302,7 @@ function progSalvarViagem_(reg, confirmar, u) {
                 resultado: listaValores_('resultadoParada').indexOf(p.resultado) >= 0 ? p.resultado : 'Pendente', motivo: String(p.motivo || '').trim(),
                 caixaEntregueId: String(p.caixaEntregueId || ''), caixaRetiradaId: String(p.caixaRetiradaId || ''),
                 peso: p.peso === '' || p.peso == null ? '' : num_(p.peso), destinacao: String(p.destinacao || '').trim(), obs: String(p.obs || '').trim() };
+    const lancs = Array.isArray(p.lancamentos) ? p.lancamentos : null; // null = não mexe (tela antiga)
     if (x.solicitacaoId) {
       const s = porId_('Solicitacoes', x.solicitacaoId);
       if (!s) { erroP = 'Parada ' + (i + 1) + ': solicitação não encontrada.'; return; }
@@ -308,6 +313,12 @@ function progSalvarViagem_(reg, confirmar, u) {
     if (!porId_('Cadastros', x.clienteId)) { erroP = 'Parada ' + (i + 1) + ': escolha o cliente.'; return; }
     if ((x.resultado === 'Frustrada' || x.resultado === 'No-show') && !x.motivo) { erroP = 'Parada ' + (i + 1) + ': informe o motivo (' + x.resultado + ').'; return; }
     [x.caixaEntregueId, x.caixaRetiradaId].forEach(function (c) { if (c && !porId_('Caixas', c)) erroP = 'Parada ' + (i + 1) + ': caixa não encontrada.'; });
+    if (lancs) {
+      if (lancs.length && x.resultado !== 'Realizada') { erroP = 'Parada ' + (i + 1) + ': a destinação só é lançada quando a parada é realizada.'; return; }
+      const e = validarLancamentosParada_(lancs, i + 1); if (e) { erroP = e; return; }
+      x._lancs = lancs;
+      if (lancs.length && x.peso === '') x.peso = lancs.reduce(function (t, l) { return t + num_(l.kg); }, 0);
+    }
     paradas.push(x);
   });
   if (erroP) conf.erros.push(erroP);
@@ -338,14 +349,15 @@ function progSalvarViagem_(reg, confirmar, u) {
   const realizouAgora = [];
   paradas.forEach(function (x) {
     const a = x.id ? pAtuais.filter(function (y) { return y.id === x.id; })[0] : null;
-    const dados = Object.assign({}, x); delete dados.id;
+    const dados = Object.assign({}, x); delete dados.id; delete dados._lancs;
     if (a) {
+      x._id = a.id;
       if (a.solicitacaoId) solAfetadas[a.solicitacaoId] = 1;
       if (x.resultado === 'Realizada' && a.resultado !== 'Realizada') realizouAgora.push(x);
       atualizar_('Paradas', a.id, dados, u, 'programacao', { tabela: 'Viagens', registroId: id, registroNome: nomeV, prefixoCampo: 'Parada ' + x.ordem + ' (' + nomeCli(x.clienteId) + ') · ' });
     } else {
       dados.viagemId = id;
-      inserir_('Paradas', dados, u, null);
+      x._id = inserir_('Paradas', dados, u, null).id;
       hist_(u, 'programacao', 'Viagens', id, nomeV, 'alterou', 'Parada incluída', '', x.ordem + '. ' + nomeCli(x.clienteId) + (x.solicitacaoId ? ' (solicitação)' : ''), '');
       if (x.resultado === 'Realizada') realizouAgora.push(x);
     }
@@ -354,11 +366,17 @@ function progSalvarViagem_(reg, confirmar, u) {
   pAtuais.filter(function (a) { return !paradas.some(function (x) { return x.id === a.id; }); })
     .sort(function (a, b) { return b._linha - a._linha; }).forEach(function (a) {
       if (a.solicitacaoId) solAfetadas[a.solicitacaoId] = 1;
-      aba_('Paradas').deleteRow(a._linha);
+      inativarLancamentosParada_(a.id, u, 'Parada removida da viagem.');
+      aba_('Paradas').deleteRow(porId_('Paradas', a.id)._linha); limparCache_('Paradas');
       hist_(u, 'programacao', 'Viagens', id, nomeV, 'alterou', 'Parada removida', nomeCli(a.clienteId) + ' (' + a.resultado + ')', '', '');
     });
   limparCache_('Paradas');
   realizouAgora.forEach(function (x) { moverCaixas_(x, u); });
+  const vGravada = porId_('Viagens', id);
+  paradas.forEach(function (x) {
+    if (x._lancs) sincronizarLancamentosParada_(vGravada, Object.assign({}, x, { id: x._id }), x._lancs, u);
+    else if (x.resultado !== 'Realizada') inativarLancamentosParada_(x._id, u, 'A parada deixou de estar realizada.');
+  });
   Object.keys(solAfetadas).forEach(function (sid) { sincronizarSolicitacao_(sid, u); });
   sincronizarAdiantamentos_(id, u);
   return { ok: true, id: id, avisos: conf.avisos };

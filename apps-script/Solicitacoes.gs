@@ -71,6 +71,7 @@ function faturamentoPorSolicitacao_() {
   return out;
 }
 function solDados_(u) {
+  try { gerarRecorrentes_(u, false); } catch (e) {}
   const fat = faturamentoPorSolicitacao_();
   // última parada (viagem não cancelada) de cada solicitação
   const vs = {}; ler_('Viagens').forEach(function (v) { if (v.status !== 'Cancelada') vs[v.id] = v; });
@@ -96,6 +97,8 @@ function solDados_(u) {
     status: SOL_STATUS,
     listas: { demanda: listaValores_('demanda'), perfil: listaValores_('perfil'), execucao: listaValores_('execucao'),
               servico: listaValores_('servico'), situacaoDocumento: listaValores_('situacaoDocumento') },
+    rotinas: ler_('Rotinas').filter(function (r) { return veUnidade_(u, r.unidadeId); }).map(rotPublica_),
+    frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,
     podeImportar: !!u.adminPortal };
 }
 

@@ -11,6 +11,7 @@
  *   Frota.gs      Frota (tipos de veículo, veículos, caixas, locação mensal) e migração da Fase 1
  *   Solicitacoes.gs  Solicitações, consultores, documentos, importação da planilha Coletas e migração da Fase 2
  *   Faturamento.gs   BM/NF e preço de venda por cliente
+ *   Integracao.gs    Fase 5: lançamentos das paradas, destinação para o BM, coletas recorrentes e "Minhas solicitações"
  *   DP.gs            adiantamentos de pernoite, acertos e aviso por e-mail ao DP (Fase 4)
  *   Programacao.gs   equipe, viagens, paradas, pernoites, caixas e importação das planilhas de programação/equipe (Fase 3)
  *   Historico.gs  consulta do histórico
@@ -28,7 +29,7 @@ const DIAS_SESSAO = 30;
 
 // Planilha antiga do Mapa (origem da migração; não é mais usada depois dela).
 const MAPA_PLANILHA_ID = '176bQkfOlMFCuKuACKfaogA1liMAxaTIIg-W_wPbV_9E';
-const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação', dp: 'DP' };
+const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação', dp: 'DP', minhas: 'Minhas solicitações' };
 const NIVEIS = ['leitor', 'editor', 'admin'];
 const MESES_JANELA = 6;
 
@@ -39,7 +40,8 @@ const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa
                             'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda'];
 const ACOES_SOL_LEITURA = ['sol.dados'];
 const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.excluir', 'sol.salvarCadastro', 'sol.excluirCadastro', 'sol.ativoCadastro',
-                           'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente'];
+                           'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar'];
+const ACOES_MINHAS = ['minhas.dados', 'minhas.linhaTempo'];
 const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
 const ACOES_PROG_ESCRITA = ['prog.salvarColaborador', 'prog.ativoColaborador', 'prog.excluirColaborador', 'prog.foto', 'prog.salvarViagem', 'prog.viagemAcao'];
 const ACOES_DP_LEITURA = ['dp.dados'];
@@ -105,6 +107,10 @@ function rotear_(body) {
   if (ACOES_PROG_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'programacao')) return semPermissao_('Você não tem acesso à Programação.');
     return acao === 'prog.verFoto' ? progVerFoto_(String(body.id), u) : progDados_(u);
+  }
+  if (ACOES_MINHAS.indexOf(acao) >= 0) {
+    if (!podeLer_(u, 'minhas')) return semPermissao_('Você não tem acesso a "Minhas solicitações".');
+    return acao === 'minhas.dados' ? minhasDados_(u) : minhasLinhaTempo_(String(body.id), u);
   }
   if (ACOES_DP_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'dp')) return semPermissao_('Você não tem acesso ao DP.');
@@ -177,6 +183,9 @@ function rotear_(body) {
       case 'sol.docsPadrao': return solDocsPadrao_(String(body.cadastroId), body.itens, u);
       case 'sol.salvarLista': return solSalvarLista_(String(body.lista), body.valores, u);
       case 'sol.novoCliente': return solNovoCliente_(body.cliente, u);
+      case 'sol.rotSalvar': return rotSalvar_(body.registro, u);
+      case 'sol.rotAtivo': return rotAtivo_(String(body.id), body.ativo, u);
+      case 'sol.rotGerar': return gerarRecorrentes_(u, true);
       case 'sol.importar': return solImportar_(body.linhas, body.simular === true, u);
       case 'prog.salvarColaborador': return progSalvarColaborador_(body.registro, u);
       case 'prog.ativoColaborador': return progAtivoColaborador_(String(body.id), body.ativo, u);

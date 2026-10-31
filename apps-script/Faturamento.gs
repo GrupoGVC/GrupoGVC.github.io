@@ -37,6 +37,7 @@ function fatDados_(u) {
     consultores: ler_('Consultores').map(function (r) { return { id: r.id, nome: String(r.nome) }; }),
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome) }; }),
     precos: ler_('PrecosCliente').filter(function (p) { return p.ativo; }).map(precoPublico_),
+    destinacao: destinacaoPorSolicitacao_(),
     listas: { unidadeMedida: listaValores_('unidadeMedida'), sentido: FAT_SENTIDOS } };
 }
 
