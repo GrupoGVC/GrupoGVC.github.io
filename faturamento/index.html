@@ -286,7 +286,7 @@ table.itens td input,table.itens td select{min-width:70px}
 .toolbar .seg button{white-space:nowrap}
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261104"></script>
+<script src="../portal.js?v=20261105"></script>
 </head>
 <body>
 <header class="top">
@@ -466,6 +466,7 @@ function renderBM() {
     </tbody><tfoot><tr><td colspan="6">Total do BM</td><td class="num" id="bm-total"><b>${R(total)}</b></td><td></td></tr></tfoot></table></div>
     <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
       <button class="btn sm" id="it-livre">+ Item livre</button>
+      ${precos.length ? '<button class="btn sm pri" id="it-sugerir" title="Usa a tabela de preço do cliente e o peso lançado na Programação">Sugerir itens</button>' : ''}
       ${precos.length ? `<select id="it-preco" style="width:auto;max-width:100%">${opts(precos.map(p => [p.id, precoRot(p)]), '', 'Item da tabela de preço do cliente…')}</select><button class="btn sm" id="it-preco-add">Incluir</button>`
         : `<span class="sub">Cliente sem tabela de preço de venda. <a href="../mapa/?abrir=${encodeURIComponent(b.clienteId)}" target="_blank" rel="noopener">Cadastrar no Mapa ↗</a></span>`}
     </div>
@@ -496,12 +497,29 @@ function renderBM() {
   });
   $$('[data-rm]').forEach(x => x.onclick = () => { b.itens.splice(+x.dataset.rm, 1); marcar(); renderBM(); });
   $('#it-livre').onclick = () => { b.itens.push({ solicitacaoId: b.solIds[0] || '', precoClienteId: '', descricao: '', quantidade: 1, unidadeMedida: 'un', valorUnitario: 0, sentido: 'Cobrança' }); marcar(); renderBM(); };
+  const sg = $('#it-sugerir'); if (sg) sg.onclick = () => {
+    const dest = S.d.destinacao || {};
+    const novos = [];
+    b.solIds.forEach(sid => {
+      const d = dest[sid] || { viagens: 0, kg: {} }; const dc = D(solDe(sid).dataColeta);
+      precos.forEach(p => {
+        const valoriza = /Valorização/.test(p.modalidade);
+        if (p.valorTransporte !== '') novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : '') + (dc ? ' (' + dc + ')' : ''), quantidade: d.viagens || 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
+        const kg = p.residuoId ? +(d.kg[p.residuoId] || 0) : 0;
+        if (p.precoKg !== '' && kg > 0) novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: (valoriza ? 'Valorização — ' : '') + resNome(p.residuoId) + (dc ? ' (' + dc + ')' : ''), quantidade: Math.round(kg * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza ? 'Desconto' : 'Cobrança' });
+      });
+    });
+    if (!novos.length) { toast('Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
+    if (b.itens.length && !confirm('Trocar os ' + b.itens.length + ' item(ns) atuais pelos ' + novos.length + ' sugeridos?')) return;
+    b.itens = novos; marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s). Confira e salve.');
+  };
   const pa = $('#it-preco-add'); if (pa) pa.onclick = () => {
     const p = S.d.precos.find(x => x.id === $('#it-preco').value); if (!p) return;
     const sol = b.solIds[0] || '';
     const valoriza = /Valorização/.test(p.modalidade);
     if (p.valorTransporte !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : ''), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
-    if (p.precoKg !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: (valoriza ? 'Valorização — ' : '') + (resNome(p.residuoId) || 'Resíduo'), quantidade: 0, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza ? 'Desconto' : 'Cobrança' });
+    const kgLanc = p.residuoId ? b.solIds.reduce((t, sid) => t + +(((S.d.destinacao || {})[sid] || { kg: {} }).kg[p.residuoId] || 0), 0) : 0;
+    if (p.precoKg !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: (valoriza ? 'Valorização — ' : '') + (resNome(p.residuoId) || 'Resíduo'), quantidade: Math.round(kgLanc * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza ? 'Desconto' : 'Cobrança' });
     marcar(); renderBM(); toast(p.precoKg !== '' ? 'Item incluído: informe a quantidade em kg.' : 'Item incluído.');
   };
   $('#bm-fechar').onclick = () => { if (b.sujo && !confirm('Fechar sem salvar o BM?')) return; S.bm = null; render(); };
