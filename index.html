@@ -13,7 +13,7 @@
   --ink:#14211b; --ink-2:#4b5a52; --ink-3:#77857d;
   --accent:#1d6b52; --accent-ink:#ffffff; --accent-soft:#dcefe6; --plate:transparent; --plate-pad:0px;
   --warn:#a86400; --warn-bg:#fff3dc; --crit:#b42f2f; --crit-bg:#fde8e6; --ok:#1d7a3e; --ok-bg:#e2f4e7;
-  --m-dest:#2a78d6; --m-mapa:#0f9e78; --m-frota:#b4690e; --m-sol:#6a4fc4; --m-fat:#c0396b; --m-prog:#0e7c86; --m-dp:#7a5a12;
+  --m-dest:#2a78d6; --m-mapa:#0f9e78; --m-frota:#b4690e; --m-sol:#6a4fc4; --m-fat:#c0396b; --m-prog:#0e7c86; --m-dp:#7a5a12; --m-min:#3b6fd4;
   --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
@@ -24,14 +24,14 @@
   --ink:#e9efeb; --ink-2:#b2c0b8; --ink-3:#83938a;
   --accent:#4fb08c; --accent-ink:#06130d; --accent-soft:#1d3a2f; --plate:#eef3f0; --plate-pad:6px 10px;
   --warn:#e8a43a; --warn-bg:#33270f; --crit:#f07b74; --crit-bg:#3a1a19; --ok:#5cc47f; --ok-bg:#15301f;
-  --m-dest:#5a9cf0; --m-mapa:#3cc79c; --m-frota:#e8a43a; --m-sol:#a28cf0; --m-fat:#ef7aa5; --m-prog:#3fbfca; --m-dp:#d9b45a;
+  --m-dest:#5a9cf0; --m-mapa:#3cc79c; --m-frota:#e8a43a; --m-sol:#a28cf0; --m-fat:#ef7aa5; --m-prog:#3fbfca; --m-dp:#d9b45a; --m-min:#7aa4f2;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1512; --surface:#161e1a; --sunken:#1c2621; --line:#2c3a33; --line-soft:#233029;
   --ink:#e9efeb; --ink-2:#b2c0b8; --ink-3:#83938a;
   --accent:#4fb08c; --accent-ink:#06130d; --accent-soft:#1d3a2f; --plate:#eef3f0; --plate-pad:6px 10px;
   --warn:#e8a43a; --warn-bg:#33270f; --crit:#f07b74; --crit-bg:#3a1a19; --ok:#5cc47f; --ok-bg:#15301f;
-  --m-dest:#5a9cf0; --m-mapa:#3cc79c; --m-frota:#e8a43a; --m-sol:#a28cf0; --m-fat:#ef7aa5; --m-prog:#3fbfca; --m-dp:#d9b45a;
+  --m-dest:#5a9cf0; --m-mapa:#3cc79c; --m-frota:#e8a43a; --m-sol:#a28cf0; --m-fat:#ef7aa5; --m-prog:#3fbfca; --m-dp:#d9b45a; --m-min:#7aa4f2;
   color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -117,7 +117,7 @@ tr.inativo td{opacity:.55}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--ink-3);font-size:12px;margin-top:10px}
 </style>
 <script src="config.js"></script>
-<script src="portal.js?v=20261104"></script>
+<script src="portal.js?v=20261105"></script>
 </head>
 <body>
 <header class="top">
@@ -151,7 +151,8 @@ tr.inativo td{opacity:.55}
   ICONES.faturamento = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>';
   ICONES.programacao = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M7 14h4v3H7z"/></svg>';
   ICONES.dp = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V9l9-5 9 5v9"/><path d="M3 18h18M7 18v-6h4v6M15 12h3"/><path d="M14 4.5V3h3v3"/></svg>';
-  const CORES = { destinacao: 'var(--m-dest)', mapa: 'var(--m-mapa)', frota: 'var(--m-frota)', solicitacoes: 'var(--m-sol)', faturamento: 'var(--m-fat)', programacao: 'var(--m-prog)', dp: 'var(--m-dp)' };
+  ICONES.minhas = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.8-3.4 3.2-5 6-5"/><path d="M14 13h7M14 17h7M14 21h4"/></svg>';
+  const CORES = { destinacao: 'var(--m-dest)', mapa: 'var(--m-mapa)', frota: 'var(--m-frota)', solicitacoes: 'var(--m-sol)', faturamento: 'var(--m-fat)', programacao: 'var(--m-prog)', dp: 'var(--m-dp)', minhas: 'var(--m-min)' };
   let usuario = null, usuarios = null, unidades = [], tela = 'home', histFiltros = {};
 
   function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2800); }

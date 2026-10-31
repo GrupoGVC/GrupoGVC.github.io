@@ -20,6 +20,8 @@
       desc: 'Viagens e paradas da unidade, equipe com CNH, pernoites, terceirizadas e caixas entregues ou retiradas.' },
     dp: { nome: 'DP · Pernoites', caminho: 'dp/',
       desc: 'Adiantamentos de pernoite lançados pela Programação, pagamentos, acertos depois da viagem e relatório do mês.' },
+    minhas: { nome: 'Minhas solicitações', caminho: 'minhas/',
+      desc: 'Para consultores: acompanhe os pedidos dos seus clientes, da chegada até a nota fiscal.' },
     faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
       desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
   };
