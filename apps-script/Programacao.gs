@@ -468,7 +468,7 @@ function progImportarProgramacao_(unidadeId, linhas, simular, u) {
   ler_('Cadastros').forEach(function (c) { if (String(c.codigoUplog).trim()) porCod[String(c.codigoUplog).trim()] = c.id; porNome[semAcento_(c.nome)] = c.id; });
   const novosClientes = {};
   const acharCliente = function (cod, nome) {
-    cod = String(cod || '').trim().replace(/\.0+$/, '');
+    cod = String(cod || '').trim().replace(/\.0+$/, ''); if (!/\d/.test(cod)) cod = ''; // "-" ou vazio = sem código
     const base = cod.split('_')[0];
     const id = (cod && porCod[cod]) || (base && porCod[base]) || porNome[semAcento_(nome)];
     if (id) return id;

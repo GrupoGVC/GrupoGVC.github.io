@@ -328,7 +328,7 @@ function solImportar_(linhas, simular, u) {
     const chave = base + '#' + vistas[base];
     if (ja[chave]) { res.jaImportadas++; return; }
     ja[chave] = 1;
-    const cod = String(l['Cod'] == null ? '' : l['Cod']).trim().replace(/\.0+$/, '');
+    let cod = String(l['Cod'] == null ? '' : l['Cod']).trim().replace(/\.0+$/, ''); if (!/\d/.test(cod)) cod = '';
     let cli = (cod && porCod[cod]) || porNome[semAcento_(nomeCli)] || '';
     if (!cli) {
       const k = cod || ('N:' + semAcento_(nomeCli));
