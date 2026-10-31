@@ -18,6 +18,8 @@
       desc: 'Pedidos dos clientes da chegada até a NF: documentos, liberação para programar, consultores e histórico.' },
     programacao: { nome: 'Programação', caminho: 'programacao/',
       desc: 'Viagens e paradas da unidade, equipe com CNH, pernoites, terceirizadas e caixas entregues ou retiradas.' },
+    dp: { nome: 'DP · Pernoites', caminho: 'dp/',
+      desc: 'Adiantamentos de pernoite lançados pela Programação, pagamentos, acertos depois da viagem e relatório do mês.' },
     faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
       desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
   };
