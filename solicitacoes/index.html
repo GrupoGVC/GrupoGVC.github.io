@@ -286,7 +286,7 @@ table.itens td input,table.itens td select{min-width:70px}
 .toolbar .seg button{white-space:nowrap}
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261102"></script>
+<script src="../portal.js?v=20261103"></script>
 </head>
 <body>
 <header class="top">
@@ -438,6 +438,7 @@ function formSol() {
       ${travado ? '' : `<div class="row full" style="justify-content:flex-end"><button class="btn pri" id="f-save" type="submit">${e.id ? 'Salvar alterações' : 'Registrar solicitação'}</button></div>`}
     </form>
     ${e.id ? `<h3 class="sec">Documentos ${docs.length ? `<span class="sub">(${docs.filter(d => d.situacao === 'Pendente').length} pendente(s))</span>` : ''}</h3>${docsHTML(e, docs)}` : ''}
+    ${e.programacao ? `<h3 class="sec">Programação</h3><div class="fat-box">Viagem de ${esc(D(e.programacao.data))} · ${esc(e.programacao.execucao === 'Terceirizada' ? 'terceirizada' : (e.programacao.placa || 'sem veículo'))} · parada ${esc(e.programacao.resultado)} <a href="../programacao/#viagens" style="margin-left:6px">Abrir a Programação ↗</a></div>` : ''}
     ${fat ? `<h3 class="sec">Faturamento</h3><div class="fat-box">${statusPill(fat.status === 'NF emitida' ? 'NF emitida' : 'BM enviado')} BM ${esc(fat.bmNumero || 's/nº')}${fat.bmData ? ' · enviado em ' + D(fat.bmData) : ''} · ${R(fat.bmValor)}${fat.nfNumero || fat.nfData ? ` · NF ${esc(fat.nfNumero || 's/nº')}${fat.nfData ? ' de ' + D(fat.nfData) : ''}` : ''}</div>` : ''}
     ${e.id && e.criadoEm ? `<div class="gvc-audit" style="margin-top:12px">${Portal.auditoriaHTML(e)}</div>` : ''}
     ${e.id ? `<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sm" id="f-hist">Histórico</button>${travado ? '' : '<button class="btn sm danger" id="f-del">Excluir</button>'}</div>` : ''}
@@ -448,7 +449,7 @@ function funil(e) {
   const atual = e.status === 'Documentação pendente' ? 'Recebida' : e.status;
   const iA = passos.indexOf(atual);
   const fora = e.status === 'Cancelada' || e.status === 'Frustrada';
-  const emBm = !!e.faturamento;
+  const emBm = !!e.faturamento || !!e.programacao;
   const b = [];
   if (!S.ro && !emBm) {
     if (['Recebida', 'Documentação pendente', 'Frustrada', 'Cancelada'].includes(e.status)) b.push(['Liberada para programar', 'Liberar para programar', 'pri']);
@@ -460,7 +461,7 @@ function funil(e) {
   }
   return `<ol class="funil">${passos.map((p, i) => `<li class="${fora ? '' : i < iA ? 'feito' : i === iA ? 'agora' : ''}">${esc(p === 'Recebida' && e.status === 'Documentação pendente' ? 'Doc. pendente' : p)}</li>`).join('')}</ol>
     ${b.length ? `<div class="row" style="gap:6px;margin:4px 0 12px">${b.map(x => `<button class="btn sm ${x[2]}" data-st="${esc(x[0])}">${esc(x[1])}</button>`).join('')}</div>` : ''}
-    ${emBm ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : ''}`;
+    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : e.programacao ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
 }
 function docsHTML(e, docs) {
   const L = S.d.listas;
