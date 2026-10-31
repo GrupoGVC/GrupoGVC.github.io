@@ -286,7 +286,7 @@ table.itens td input,table.itens td select{min-width:70px}
 .toolbar .seg button{white-space:nowrap}
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261104"></script>
+<script src="../portal.js?v=20261105"></script>
 </head>
 <body>
 <header class="top">
@@ -299,6 +299,7 @@ table.itens td input,table.itens td select{min-width:70px}
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="fila" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/></svg><span class="t-long">Fila</span><span class="t-short">Fila</span> <span class="ct" id="ct-fila">0</span></button>
       <button role="tab" data-tab="todas" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg><span class="t-long">Todas</span><span class="t-short">Todas</span></button>
+      <button role="tab" data-tab="recorrentes" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4"/></svg><span class="t-long">Recorrentes</span><span class="t-short">Recorr.</span></button>
       <button role="tab" data-tab="consultores" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5"/><path d="M16 4.5a3 3 0 0 1 0 6M18 15c1.6.6 2.6 2.2 3 5"/></svg><span class="t-long">Consultores</span><span class="t-short">Consult.</span></button>
       <button role="tab" data-tab="documentos" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg><span class="t-long">Documentos</span><span class="t-short">Docs</span></button>
       <button role="tab" data-tab="importar" aria-selected="false" id="tab-importar" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg><span class="t-long">Importar planilha</span><span class="t-short">Importar</span></button>
@@ -316,7 +317,8 @@ const R = v => v === '' || v == null ? '—' : (+v || 0).toLocaleString('pt-BR',
 const D = iso => iso ? iso.split('-').reverse().join('/') : '';
 const hojeISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const NIVEL_LBL = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
-const TABS = ['fila', 'todas', 'consultores', 'documentos', 'importar'];
+const TABS = ['fila', 'todas', 'recorrentes', 'consultores', 'documentos', 'importar'];
+const DIAS_SEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const ABERTAS = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada', 'Frustrada'];
 const S = { tab: 'fila', d: null, ro: true, uni: '', busca: '', st: '', mes: '', inativos: false, edit: null, abrir: null };
 
@@ -396,7 +398,7 @@ function render() {
   if (!S.d) return;
   const abertas = S.d.solicitacoes.filter(s => ABERTAS.includes(s.status) && passaUni(s));
   $('#ct-fila').textContent = abertas.length;
-  ({ fila: renderFila, todas: renderTodas, consultores: renderConsultores, documentos: renderDocumentos, importar: renderImportar })[S.tab]();
+  ({ fila: renderFila, todas: renderTodas, recorrentes: renderRecorrentes, consultores: renderConsultores, documentos: renderDocumentos, importar: renderImportar })[S.tab]();
 }
 
 /* ---------- formulário da solicitação ---------- */
@@ -527,7 +529,7 @@ function abrir(id) { const s = S.d.solicitacoes.find(x => x.id === id); if (!s) 
 function linhaSol(s, comFat) {
   const c = cliDe(s.clienteId); const pend = pendentes(s.id);
   return `<tr class="click" data-sol="${esc(s.id)}" tabindex="0">
-    <td data-label="Cliente" class="full"><b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}${s.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : ''}</td>
+    <td data-label="Cliente" class="full"><b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}${s.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : s.origem === 'rotina' ? ' <span class="tag-imp">recorrente</span>' : ''}</td>
     <td data-label="Unidade">${esc(uniNome(s.unidadeId))}</td>
     <td data-label="Consultor">${esc(conNome(s.consultorId) || '—')}</td>
     <td data-label="Solicitada" class="mono">${esc(D(s.dataSolicitacao))}</td>
@@ -579,6 +581,64 @@ function ligarComum() {
   ligarForm(); ligarLinhas();
   const b = $('#busca'); if (b) b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
   const n = $('#novo'); if (n) n.onclick = () => { S.edit = novaSol(); render(); $('#form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => $('#f-cli') && $('#f-cli').focus(), 300); };
+}
+
+/* ---------- coletas recorrentes ---------- */
+function rotQuando(r) { return r.frequencia === 'Mensal' ? 'todo dia ' + r.diaMes : (r.frequencia === 'Quinzenal' ? 'a cada 15 dias, ' : 'toda ') + (DIAS_SEM[r.diaSemana] || '').toLowerCase(); }
+function renderRecorrentes() {
+  const e = S.edit; const L = S.d.listas;
+  const hoje = hojeISO();
+  const lista = (S.d.rotinas || []).filter(r => passaUni(r) && (S.inativos || r.ativo)).sort((a, b) => (b.ativo - a.ativo) || cliNome(a.clienteId).localeCompare(cliNome(b.clienteId), 'pt-BR'));
+  const futuras = id => S.d.solicitacoes.filter(x => x.rotinaId === id && x.dataPrevista >= hoje).sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista));
+  const form = !e ? '' : `<section class="panel form-panel" id="form-panel"><div class="panel-h"><div><h2>${e.id ? 'Editar coleta recorrente' : 'Nova coleta recorrente'}</h2><p class="sub">O portal cria as solicitações das próximas semanas já liberadas para programar. Mudar o dia ou a frequência refaz as que ainda não foram programadas.</p></div><button class="btn sm" id="f-cancel">Fechar</button></div>
+    <form id="rf" class="form" autocomplete="off">
+      <div class="fld full"><label for="r-cli">Cliente</label><input id="r-cli" list="dl-rcli" required value="${esc(e.clienteId ? cliRot(cliDe(e.clienteId)) : '')}" placeholder="Código UPLOG ou nome"><datalist id="dl-rcli">${S.d.clientes.filter(c => c.ativo).map(c => `<option value="${esc(cliRot(c))}">`).join('')}</datalist></div>
+      <div class="fld"><label for="r-uni">Unidade</label><select id="r-uni">${opts(S.d.unidades.map(u => [u.id, u.nome]), e.unidadeId, 'Escolha…')}</select></div>
+      <div class="fld"><label for="r-con">Consultor</label><select id="r-con">${opts(S.d.consultores.filter(c => c.ativo || c.id === e.consultorId).map(c => [c.id, c.nome]), e.consultorId, 'Sem consultor')}</select></div>
+      <div class="fld"><label for="r-serv">Serviço</label><select id="r-serv">${opts(L.servico, e.servico, '—')}</select></div>
+      <div class="fld"><label for="r-freq">Frequência</label><select id="r-freq">${opts(S.d.frequencias, e.frequencia || 'Semanal')}</select></div>
+      <div class="fld" id="r-ds-w" ${e.frequencia === 'Mensal' ? 'hidden' : ''}><label for="r-ds">Dia da semana</label><select id="r-ds">${opts(DIAS_SEM.map((d, i) => [i, d]), e.diaSemana === '' || e.diaSemana == null ? '' : e.diaSemana, 'Escolha…')}</select></div>
+      <div class="fld" id="r-dm-w" ${e.frequencia === 'Mensal' ? '' : 'hidden'}><label for="r-dm">Dia do mês</label><input id="r-dm" type="number" min="1" max="31" value="${esc(e.diaMes)}"></div>
+      <div class="fld"><label for="r-ini">A partir de</label><input id="r-ini" type="date" value="${esc(e.dataInicio || hoje)}"></div>
+      <div class="fld"><label for="r-fim">Até (opcional)</label><input id="r-fim" type="date" value="${esc(e.dataFim)}"></div>
+      <div class="fld"><label for="r-val">Valor previsto por coleta (R$)</label><input id="r-val" type="number" step="any" min="0" value="${esc(e.valorPrevisto)}"></div>
+      <div class="fld full"><label>Resíduos</label><div class="chips" id="r-res">${S.d.residuos.filter(r => r.ativo || (e.residuoIds || []).includes(r.id)).map(r => `<label class="chip"><input type="checkbox" value="${esc(r.id)}" ${(e.residuoIds || []).includes(r.id) ? 'checked' : ''}> ${esc(r.nome)}</label>`).join('')}</div></div>
+      <div class="fld full"><label for="r-desc">Descrição</label><input id="r-desc" value="${esc(e.descricao)}"></div>
+      <div class="fld full"><label for="r-obs">Observações</label><input id="r-obs" value="${esc(e.obs)}"></div>
+      <div class="row full" style="justify-content:flex-end"><button class="btn pri" id="r-salvar">Salvar e gerar</button></div>
+    </form>${e.id && e.criadoEm ? `<div class="gvc-audit" style="margin-top:10px">${Portal.auditoriaHTML(e)}</div>` : ''}</section>`;
+  $('#main').innerHTML = form + `<section class="panel">
+    <div class="panel-h"><div><h2>Coletas recorrentes</h2><p class="sub">Clientes com coleta fixa (ex.: toda sexta). As solicitações das próximas ${S.d.semanasRecorrentes || 4} semanas aparecem sozinhas na fila da Programação.</p></div></div>
+    <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar pausadas</label>
+      ${S.ro ? '' : '<button class="btn" id="r-gerar" style="margin-left:auto">Gerar agora</button><button class="btn pri" id="novo">+ Coleta recorrente</button>'}</div>
+    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Cliente</th><th>Quando</th><th>Unidade</th><th>Consultor</th><th>Período</th><th>Próximas</th><th></th></tr></thead><tbody>
+      ${lista.map(r => { const f = futuras(r.id); return `<tr class="${r.ativo ? '' : 'inativo'}"><td data-label="Cliente" class="full"><b>${esc(cliNome(r.clienteId))}</b>${r.descricao ? `<div class="sub">${esc(r.descricao)}</div>` : ''}</td>
+        <td data-label="Quando">${esc(r.frequencia)} · ${esc(rotQuando(r))}</td><td data-label="Unidade">${esc(uniNome(r.unidadeId))}</td><td data-label="Consultor">${esc(conNome(r.consultorId) || '—')}</td>
+        <td data-label="Período" class="mono">${esc(D(r.dataInicio))}${r.dataFim ? ' a ' + esc(D(r.dataFim)) : ''}</td>
+        <td data-label="Próximas">${r.ativo ? (f.length ? f.length + ' · próxima ' + esc(D(f[0].dataPrevista)) : '—') : '<span class="pill">Pausada</span>'}</td>
+        <td data-label=""><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-red="${r.id}">Editar</button>`}<button class="btn sm" data-rhist="${r.id}">Histórico</button>${S.ro ? '' : r.ativo ? `<button class="btn sm danger" data-rpausa="${r.id}">Pausar</button>` : `<button class="btn sm" data-rreat="${r.id}">Retomar</button>`}</div></td></tr>`; }).join('')}
+    </tbody></table></div>` : '<div class="empty">Nenhuma coleta recorrente.</div>'}</section>`;
+  const achar = id => S.d.rotinas.find(r => r.id === id);
+  $('#inat').onchange = ev => { S.inativos = ev.target.checked; render(); };
+  const n = $('#novo'); if (n) n.onclick = () => { S.edit = { unidadeId: S.uni || (S.d.unidades.length === 1 ? S.d.unidades[0].id : ''), frequencia: 'Semanal', residuoIds: [] }; render(); scrollTo({ top: 0 }); };
+  const g = $('#r-gerar'); if (g) g.onclick = async () => { try { const r = await Portal.api('sol.rotGerar', {}); toast(r.geradas ? r.geradas + ' solicitação(ões) gerada(s)' : 'Tudo em dia: nada novo para gerar.'); await carregar(true); } catch (er) { falha(er); } };
+  $$('[data-red]').forEach(b => b.onclick = () => { S.edit = { ...achar(b.dataset.red) }; render(); scrollTo({ top: 0 }); });
+  $$('[data-rhist]').forEach(b => b.onclick = () => Portal.mostrarHistorico('Rotinas', b.dataset.rhist, cliNome(achar(b.dataset.rhist).clienteId)));
+  $$('[data-rpausa]').forEach(b => b.onclick = async () => { if (!confirm('Pausar esta coleta recorrente? As solicitações futuras que ainda não foram programadas saem da fila.')) return;
+    try { const r = await Portal.api('sol.rotAtivo', { id: b.dataset.rpausa, ativo: false }); toast('Pausada' + (r.removidas ? ' · ' + r.removidas + ' solicitação(ões) futura(s) removida(s)' : '')); await carregar(true); } catch (er) { falha(er); } });
+  $$('[data-rreat]').forEach(b => b.onclick = async () => { try { await Portal.api('sol.rotAtivo', { id: b.dataset.rreat, ativo: true }); toast('Retomada'); await carregar(true); } catch (er) { falha(er); } });
+  if (!e) return;
+  $('#f-cancel').onclick = () => { S.edit = null; render(); };
+  $('#r-freq').onchange = ev => { const m = ev.target.value === 'Mensal'; $('#r-ds-w').hidden = m; $('#r-dm-w').hidden = !m; };
+  $('#rf').onsubmit = async ev => { ev.preventDefault();
+    const v = $('#r-cli').value.trim(); const c = S.d.clientes.find(x => cliRot(x) === v) || S.d.clientes.find(x => x.codigoUplog && x.codigoUplog === v);
+    if (!c) { toast('Escolha o cliente da lista.'); return; }
+    const reg = { id: e.id || '', clienteId: c.id, unidadeId: $('#r-uni').value, consultorId: $('#r-con').value, servico: $('#r-serv').value, frequencia: $('#r-freq').value,
+      diaSemana: $('#r-ds').value, diaMes: $('#r-dm').value, dataInicio: $('#r-ini').value, dataFim: $('#r-fim').value, valorPrevisto: $('#r-val').value,
+      residuoIds: $$('#r-res input:checked').map(x => x.value), descricao: $('#r-desc').value, obs: $('#r-obs').value };
+    const b = $('#r-salvar'); b.disabled = true;
+    try { const r = await Portal.api('sol.rotSalvar', { registro: reg }); toast('Salva' + (r.geradas ? ' · ' + r.geradas + ' solicitação(ões) gerada(s)' : '')); S.edit = null; await carregar(true); }
+    catch (er) { b.disabled = false; falha(er); } };
 }
 
 /* ---------- consultores ---------- */
