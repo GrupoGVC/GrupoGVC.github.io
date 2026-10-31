@@ -1256,6 +1256,8 @@ header {
   font-size: 0.68rem; font-weight: 700; white-space: nowrap;
 }
 .cad-row-actions { display: flex; gap: 6px; white-space: nowrap; }
+tr.cad-inativo td { opacity: .55; }
+tr.cad-inativo td:last-child { opacity: 1; }
 .cad-action-btn {
   background: transparent;
   border: 1px solid var(--border2);
@@ -1972,7 +1974,7 @@ header {
 }
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261025"></script>
+<script src="../portal.js?v=20261031"></script>
 <style>
 /* ── Portal: usuário logado e modo somente leitura ── */
 .portal-user { display:flex; align-items:center; gap:8px; margin-left:4px; }
@@ -2189,6 +2191,7 @@ body.somente-leitura #overlay .res-chip { pointer-events:none; }
         <input type="text" id="cadastros-search-input" placeholder="Nome, CNPJ, contato, resíduo..." oninput="renderCadastrosTable()">
       </div>
       <div class="filter-chips" id="cadastros-filter-chips"></div>
+      <label class="cad-contador" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="cad-inativos" onchange="mostrarInativos=this.checked;renderCadastrosTable()"> Mostrar inativos</label>
       <span class="cad-contador" id="cad-contador"></span>
       <button type="button" class="cad-action-btn" id="cad-limpar-filtros" style="display:none" onclick="limparFiltrosColunas()">✕ Limpar filtros das colunas</button>
       <button class="btn-primary so-editor" style="margin-left:auto;white-space:nowrap;flex:0 0 auto;padding:10px 18px;" onclick="openModal(null)">+ Novo cadastro</button>
@@ -5127,6 +5130,15 @@ function showRouteError(msg) {
       </div>
     </div>
 
+    <!-- CÓDIGO DO CLIENTE NO UPLOG -->
+    <div class="form-row">
+      <div class="fg">
+        <label>Código UPLOG</label>
+        <input type="text" id="f-uplog" placeholder="Código do cadastro no UPLOG" maxlength="20">
+      </div>
+      <div class="fg"></div>
+    </div>
+
     <!-- CNPJ (busca os dados na Receita Federal) + RAZÃO SOCIAL -->
     <div class="form-row">
       <div class="fg">
@@ -5274,8 +5286,10 @@ function showRouteError(msg) {
       </div>
     </div>
 
+    <div class="gvc-audit" id="modal-audit" style="margin:10px 0 0"></div>
     <div class="modal-actions">
       <button class="btn-ghost" id="btn-cancelar-modal" onclick="closeModal()">Cancelar</button>
+      <button class="btn-move" id="btn-hist-modal" onclick="abrirHistoricoCadastro()" style="display:none">🕘 Histórico</button>
       <button class="btn-move" id="btn-move-loc" onclick="startMoveLocation()" style="display:none">📍 Mover no mapa</button>
       <button class="btn-move" id="btn-mark-new-loc" onclick="marcarNoMapaNovo()" style="display:none">📍 Marcar no mapa</button>
       <button class="btn-primary so-editor" id="btn-salvar-local" onclick="savePoint()">SALVAR LOCAL</button>
@@ -5530,6 +5544,7 @@ function criarCatalogo(cfg) {
       cat.msg('');
       return true;
     } catch(e) {
+      if (e && e.erro === 'em_uso') { setSyncStatus('ok'); cat.msg(''); return e; }
       setSyncStatus(e && e.erro === 'sem_permissao' ? 'ok' : 'error');
       cat.msg('Não consegui salvar na planilha. ' + ((e && e.mensagem) || 'Verifique a conexão e tente de novo.'), false);
       return false;
@@ -5558,8 +5573,16 @@ function criarCatalogo(cfg) {
   };
 
   cat.remover = async (valor) => {
-    if (!confirm('Remover "' + valor + '" da lista de ' + cfg.rotulo + '?\n\nOs cadastros que já têm esse item continuam com ele.')) return;
+    if (!confirm('Remover "' + valor + '" da lista de ' + cfg.rotulo + '?\n\nSe ele já estiver em uso, o portal não exclui e oferece inativar.')) return;
     const ok = await cat.sync({ action: 'listaDel', nome: cfg.nome, valor });
+    if (ok && ok.erro === 'em_uso') {
+      if (!(await Portal.confirmarInativar(ok, valor))) return;
+      const r2 = await cat.sync({ action: 'listaInativar', nome: cfg.nome, valor });
+      if (!r2) return;
+      cat.salvarLocal(); cat.render();
+      cat.msg('✓ "' + valor + '" inativado: não aparece para novos cadastros, e quem já tem continua com ele.');
+      return;
+    }
     if (!ok) return;
     cat.lista = cat.lista.filter(x => x !== valor);
     cat.salvarLocal();
@@ -5612,8 +5635,9 @@ function tiposDe(p) {
   return (p && Array.isArray(p.tipos) && p.tipos.length) ? p.tipos : (p && p.tipo ? [p.tipo] : []);
 }
 function pontoVisivel(p) {
-  return tiposDe(p).some(t => activeFilters.has(t));
+  return p.ativo !== false && tiposDe(p).some(t => activeFilters.has(t));
 }
+let mostrarInativos = false;
 function temResiduos(tipos) {
   return tipos.some(t => TIPOS_COM_RESIDUOS.includes(t));
 }
@@ -6011,7 +6035,13 @@ function openModal(id, draft) {
   document.getElementById('f-razao').value = val('razaoSocial');
   document.getElementById('f-cat').value = val('cat');
   document.getElementById('f-cnpj').value = val('cnpj');
+  document.getElementById('f-uplog').value = val('codigoUplog');
   document.getElementById('f-contato-nome').value = val('contatoNome');
+  // data e hora de criação/alteração + botão Histórico (só cadastros já gravados na planilha central)
+  const audEl = document.getElementById('modal-audit');
+  if (audEl) audEl.innerHTML = id && fonte.criadoEm ? Portal.auditoriaHTML(fonte) : '';
+  const hb = document.getElementById('btn-hist-modal');
+  if (hb) hb.style.display = id && /^CAD-/.test(id) ? '' : 'none';
   document.getElementById('f-end-logradouro').value = val('logradouro');
   document.getElementById('f-end-numero').value = val('numero');
   document.getElementById('f-end-bairro').value = val('bairro');
@@ -6158,6 +6188,7 @@ function savePoint() {
     razaoSocial:  document.getElementById('f-razao').value.trim(),
     cat:          document.getElementById('f-cat').value.trim(),
     cnpj:         document.getElementById('f-cnpj').value.trim(),
+    codigoUplog:  document.getElementById('f-uplog').value.trim(),
     contatoNome:  document.getElementById('f-contato-nome').value.trim(),
     telefones,
     emails,
@@ -6175,6 +6206,9 @@ function savePoint() {
     gmaps:        '',
   });
   p.gmaps = gmapsDe(p);
+  // mantém o que só o servidor sabe (situação, data/hora, local) até a resposta da planilha chegar
+  const anterior = editingId ? points.find(x => x.id === editingId) : null;
+  if (anterior) ['ativo', 'criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor', 'localId', 'cadastroPrincipalId'].forEach(k => { if (k in anterior) p[k] = anterior[k]; });
 
   if (editingId) {
     points = points.map(x => x.id === editingId ? p : x);
@@ -6302,15 +6336,61 @@ function removeLeafletPoint(id) {
   delete leafletLayers[id];
 }
 
-function deletePoint(id) {
+// Excluir: a planilha confere antes se o cadastro já foi usado (lançamentos, cadastros auxiliares…).
+// Se foi, não exclui e oferece inativar.
+async function deletePoint(id) {
   if (somenteLeitura) { alert('Seu acesso ao Mapa Operacional é só de leitura.'); return; }
-  if (!confirm('Remover este local?')) return;
-  removeLeafletPoint(id);
-  points = points.filter(x => x.id !== id);
+  const p = points.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm('Excluir "' + (p.nome || 'este cadastro') + '"?')) return;
+  setSyncStatus('syncing');
+  try {
+    await Portal.api('mapa.delete', { id });
+    clearSyncRetry(id);
+    removeLeafletPoint(id);
+    points = points.filter(x => x.id !== id);
+    saveToStorage(); renderList(); renderHeaderStats();
+    setSyncStatus('ok');
+  } catch (e) {
+    setSyncStatus('ok');
+    if (e && e.erro === 'em_uso') {
+      if (await Portal.confirmarInativar(e, p.nome || id)) await alterarAtivo(id, false);
+    } else {
+      alert((e && e.mensagem) || 'Não consegui excluir. Verifique a internet e tente de novo.');
+    }
+  }
+}
+async function alterarAtivo(id, ativo) {
+  if (somenteLeitura) return;
+  setSyncStatus('syncing');
+  try {
+    await Portal.api(ativo ? 'mapa.reativar' : 'mapa.inativar', { id });
+    const p = points.find(x => x.id === id);
+    if (p) p.ativo = ativo;
+    applyFilters(); saveToStorage(); renderList(); renderHeaderStats();
+    setSyncStatus('ok');
+  } catch (e) { setSyncStatus('error'); alert((e && e.mensagem) || 'Não consegui alterar. Tente de novo.'); }
+}
+function abrirHistoricoCadastro() {
+  const p = points.find(x => x.id === editingId);
+  if (p) Portal.mostrarHistorico('Cadastros', p.id, p.nome || p.razaoSocial || p.id);
+}
+// A planilha devolve o código definitivo (CAD-…) e a data/hora da gravação.
+function aplicarRespostaServidor(idLocal, srv) {
+  if (!srv || !srv.id) return;
+  const p = points.find(x => x.id === idLocal);
+  if (!p) return;
+  ['ativo', 'criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor', 'localId', 'cadastroPrincipalId', 'codigoUplog'].forEach(k => { if (k in srv) p[k] = srv[k]; });
+  if (srv.id !== idLocal) {
+    removeLeafletPoint(idLocal);
+    p.id = srv.id;
+    addLeafletPoint(p);
+    if (editingId === idLocal) editingId = srv.id;
+    saveSyncQueue(getSyncQueue().map(x => x === idLocal ? srv.id : x));
+    applyFilters();
+  }
   saveToStorage();
   renderList();
-  renderHeaderStats();
-  sheetsDeleteSilent(id);
 }
 
 function flyToPoint(id) {
@@ -6336,7 +6416,7 @@ function renderList() {
   const filtered = points.filter(p => {
     if (!pontoVisivel(p)) return false;
     if (!query) return true;
-    return [p.nome, p.razaoSocial, p.cat, p.cnpj, p.contatoNome, (p.telefones||[]).join(' '), (p.emails||[]).join(' '),
+    return [p.nome, p.razaoSocial, p.cat, p.cnpj, p.codigoUplog, p.contatoNome, (p.telefones||[]).join(' '), (p.emails||[]).join(' '),
             (p.residuos||[]).join(' '), (p.equipamentos||[]).join(' ')].join(' ').toLowerCase().includes(query);
   });
 
@@ -6391,6 +6471,7 @@ const VAZIO = '(Vazio)';
 const CAD_COLUNAS = [
   { key: 'tipo',         label: 'Tipo',         valores: p => tiposDe(p).map(t => TIPOS[t].label) },
   { key: 'nome',         label: 'Nome',         valores: p => [p.nome || ''] },
+  { key: 'uplog',        label: 'Cód. UPLOG',   valores: p => [p.codigoUplog || ''] },
   { key: 'cnpj',         label: 'CNPJ',         valores: p => [p.cnpj || ''] },
   { key: 'contato',      label: 'Contato',      valores: p => [p.contatoNome || ''] },
   { key: 'telefone',     label: 'Telefone',     valores: p => p.telefones || [] },
@@ -6418,9 +6499,10 @@ function cadastrosBase() {
   const searchEl = document.getElementById('cadastros-search-input');
   const query = searchEl ? searchEl.value.toLowerCase() : '';
   return points.filter(p => {
-    if (!pontoVisivel(p)) return false;
+    const inativoVisivel = mostrarInativos && p.ativo === false && tiposDe(p).some(t => activeFilters.has(t));
+    if (!pontoVisivel(p) && !inativoVisivel) return false;
     if (!query) return true;
-    return [p.nome, p.razaoSocial, p.cat, p.cnpj, p.contatoNome, (p.telefones || []).join(' '), (p.emails || []).join(' '),
+    return [p.nome, p.razaoSocial, p.cat, p.cnpj, p.codigoUplog, p.contatoNome, (p.telefones || []).join(' '), (p.emails || []).join(' '),
             enderecoCompleto(p), (p.residuos || []).join(' '), (p.equipamentos || []).join(' '),
             tiposDe(p).map(t => TIPOS[t].label).join(' ')]
       .join(' ').toLowerCase().includes(query);
@@ -6486,9 +6568,10 @@ function renderCadastrosTable() {
     const eqTags = (p.equipamentos || []).slice(0, 2).map(e => `<span class="tag">${esc(e)}</span>`).join('') +
       ((p.equipamentos || []).length > 2 ? `<span class="tag">+${p.equipamentos.length - 2}</span>` : '');
     return `
-      <tr>
-        <td><div class="cad-tipos">${tipos.map(t => `<span class="cad-tipo-badge" style="background:${TIPOS[t].color}22;color:${TIPOS[t].color}">${TIPOS[t].icon} ${TIPOS[t].label}</span>`).join('')}</div></td>
+      <tr class="${p.ativo === false ? 'cad-inativo' : ''}">
+        <td><div class="cad-tipos">${p.ativo === false ? '<span class="cad-tipo-badge" style="background:#eee;color:#666">⏸ Inativo</span>' : ''}${tipos.map(t => `<span class="cad-tipo-badge" style="background:${TIPOS[t].color}22;color:${TIPOS[t].color}">${TIPOS[t].icon} ${TIPOS[t].label}</span>`).join('')}</div></td>
         <td><strong>${esc(p.nome)}</strong>${p.razaoSocial && p.razaoSocial !== p.nome ? `<div class="cad-sub">${esc(p.razaoSocial)}</div>` : ''}${p.cat ? `<div class="cad-sub">${esc(p.cat)}</div>` : ''}</td>
+        <td>${esc(p.codigoUplog) || '—'}</td>
         <td>${esc(p.cnpj) || '—'}</td>
         <td>${esc(p.contatoNome) || '—'}${(p.emails || []).length ? `<div class="cad-sub">${esc(p.emails[0])}${p.emails.length > 1 ? ` +${p.emails.length - 1}` : ''}</div>` : ''}</td>
         <td>${(p.telefones || []).length ? (p.telefones || []).map(esc).join('<br>') : '—'}</td>
@@ -6500,7 +6583,9 @@ function renderCadastrosTable() {
           <div class="cad-row-actions">
             <button class="cad-action-btn" onclick="openModal('${p.id}')" title="${somenteLeitura ? 'Ver cadastro' : 'Editar cadastro'}">${somenteLeitura ? '👁 Ver' : '✏ Editar'}</button>
             <button class="cad-action-btn" onclick="flyToPoint('${p.id}')" title="${temLocal(p) ? 'Ver no mapa' : 'Abrir o cadastro para marcar o local'}">📍 ${temLocal(p) ? 'Ver no mapa' : 'Marcar local'}</button>
-            <button class="cad-action-btn danger so-editor" onclick="deletePoint('${p.id}')" title="Excluir">🗑</button>
+            ${p.ativo === false
+              ? `<button class="cad-action-btn so-editor" onclick="alterarAtivo('${p.id}', true)" title="Voltar a usar este cadastro">↺ Reativar</button>`
+              : `<button class="cad-action-btn danger so-editor" onclick="deletePoint('${p.id}')" title="Excluir">🗑</button>`}
           </div>
         </td>
       </tr>
@@ -6894,6 +6979,7 @@ function collectDraftFromModal() {
     razaoSocial:  document.getElementById('f-razao').value,
     cat:          document.getElementById('f-cat').value,
     cnpj:         document.getElementById('f-cnpj').value,
+    codigoUplog:  document.getElementById('f-uplog').value,
     contatoNome:  document.getElementById('f-contato-nome').value,
     telefones:    getMultiValues('f-tels'),
     emails:       getMultiValues('f-emails'),
@@ -7683,8 +7769,10 @@ async function sheetsUpsertSilent(p) {
   if (somenteLeitura) return;
   setSyncStatus('syncing');
   try {
-    await Portal.api('mapa.upsert', { point: p });
-    clearSyncRetry(p.id); setSyncStatus('ok');
+    const idLocal = p.id;
+    const j = await Portal.api('mapa.upsert', { point: p });
+    clearSyncRetry(idLocal); setSyncStatus('ok');
+    aplicarRespostaServidor(idLocal, j && j.ponto);
   } catch(e) {
     if (vaiReenviar(e)) queueSyncRetry(p.id); else { clearSyncRetry(p.id); alert((e && e.mensagem) || 'Não foi possível salvar na planilha.'); }
     setSyncStatus('error');
