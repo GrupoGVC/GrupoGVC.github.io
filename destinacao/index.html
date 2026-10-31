@@ -235,7 +235,7 @@ nav.tabs .ic,nav.tabs .t-short{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261025"></script>
+<script src="../portal.js?v=20261031"></script>
 </head>
 <body>
 <header class="top">
@@ -278,7 +278,7 @@ nav.tabs .ic,nav.tabs .t-short{display:none}
 (function(){
 const $=s=>document.querySelector(s);
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const RESIDUOS=['NÃO RECICLÁVEL','PERIGOSO','RESÍDUO DE SAÚDE','DOMICILIAR','RESÍDUO TRITURÁVEL','ENTULHO','RCC','MADEIRA','CINZAS','ELETRÔNICO','PAPELÃO','PLÁSTICO','METAL','VIDRO','ÓLEO'];
+const RESIDUOS=[]; // vem do catálogo do Mapa Operacional (dados.residuos)
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const R=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const RP=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:5});
@@ -504,7 +504,8 @@ function renderLanc(){
   $('#main').innerHTML=`
   <section class="panel" id="form-panel">
     <div class="panel-h"><div><h2>${isEdit?'Editar lançamento':'Novo lançamento'}</h2><p class="sub">${isEdit?'Alterando um registro de '+esc(mesLbl(S.mes)):'Um lançamento por MTR. O preço vem da tabela do destinador e pode ser ajustado.'}</p></div>
-      ${isEdit?'<button class="btn sm" id="f-cancel">Cancelar edição</button>':''}</div>
+      ${isEdit?`<div class="row" style="gap:6px">${S.edit.id||S.edit._id?'<button class="btn sm" id="f-hist" type="button">Histórico</button>':''}<button class="btn sm" id="f-cancel">Cancelar edição</button></div>`:''}</div>
+    ${isEdit&&S.edit.criadoEm?`<div class="gvc-audit" style="margin:-4px 0 10px">${Portal.auditoriaHTML(S.edit)}</div>`:''}
     ${S.readOnly?'<div class="notice">Você tem acesso só de leitura. Peça acesso de editor a um administrador do portal para lançar.</div>':`
     <form id="f" class="form" autocomplete="off">
       <div class="fld full"><span class="lbl" id="lbl-neg" style="font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)">Tipo de negócio</span><div class="seg" role="radiogroup" aria-labelledby="lbl-neg" style="align-self:flex-start">${['RSS','Industrial'].map((n,i)=>`<input type="radio" name="f-neg" id="f-neg-${i}" value="${n}" ${e.negocio===n?'checked':''}><label for="f-neg-${i}">${n}</label>`).join('')}</div><div class="hint" id="h-neg"></div></div>
@@ -557,6 +558,7 @@ function bindLancForm(){
   $('#csv').onclick=baixarCsv;
   document.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=()=>{S.edit={...S.lanc.find(l=>l._id===tr.dataset.id)};renderLanc();$('#form-panel').scrollIntoView({behavior:'smooth',block:'start'})});
   if($('#f-cancel'))$('#f-cancel').onclick=()=>{S.edit=null;renderLanc()};
+  if($('#f-hist'))$('#f-hist').onclick=()=>Portal.mostrarHistorico('Lancamentos',S.edit._id,(S.edit.mtr?'MTR '+S.edit.mtr:'Lançamento sem MTR')+' · '+nomeDe(S.edit.destinador));
   if(!f)return;
   let precoManual=!!(S.edit&&S.edit._id);
   const fillRes=()=>{const d=S.dest[$('#f-dest').value];const ks=d?Object.keys(d.precos||{}):[];$('#dl-res').innerHTML=[...new Set([...ks,...RESIDUOS])].map(r=>`<option value="${esc(r)}">`).join('')};
@@ -587,8 +589,10 @@ function bindLancForm(){
     if(fx!=='')doc.valorFixo=+fx;
     const btn=$('#f-save');btn.disabled=true;
     try{const id=(S.edit&&S.edit._id)||('L'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
-      await api('salvarLancamento',{lanc:{id,...doc}});
-      S.all=S.all.filter(l=>l._id!==id);S.all.push({_id:id,...doc});recompute();
+      const resp=await api('salvarLancamento',{lanc:{id,...doc}});const nid=(resp&&resp.id)||id;
+      const quem=(Portal.usuario&&Portal.usuario.nome)||'';const agoraIso=new Date().toISOString().slice(0,19);
+      const ant=S.all.find(l=>l._id===id);
+      S.all=S.all.filter(l=>l._id!==id&&l._id!==nid);S.all.push({_id:nid,id:nid,...doc,criadoEm:ant?ant.criadoEm:agoraIso,criadoPor:ant?ant.criadoPor:quem,atualizadoEm:agoraIso,atualizadoPor:quem});recompute();
       const was=!!(S.edit&&S.edit._id);
       // mantém dados repetitivos para o próximo lançamento
       S.edit=was?null:{data:doc.data,negocio:doc.negocio,destinador:doc.destinador,residuo:doc.residuo,gerador:doc.gerador,origem:doc.origem,placa:doc.placa,transportadora:doc.transportadora,preco:doc.preco};
@@ -716,7 +720,7 @@ async function carregar(silencioso){
     if(!S.mes)S.mes=j.mes;
     S.usuario=j.usuario;S.cfg.usuario=j.usuario;salvarCfg();
     S.readOnly=j.usuario.nivel==='leitor';
-    S.dest={};(j.destinadores||[]).forEach(d=>S.dest[d.id]=d);S.fonteDest=j.fonteDestinadores||'';
+    S.dest={};(j.destinadores||[]).forEach(d=>S.dest[d.id]=d);S.fonteDest=j.fonteDestinadores||'';RESIDUOS.splice(0,RESIDUOS.length,...(j.residuos||[]));
     S.all=(j.lancamentos||[]).map(l=>({_id:l.id,...l}));
     S.locs=j.locacao||{};
     S.ready=true;mostrarUsuario();recompute();
