@@ -35,7 +35,7 @@ const MESES_JANELA = 6;
 
 const ACOES_DESTINACAO_LEITURA = ['dados'];
 const ACOES_DESTINACAO_ESCRITA = ['salvarLancamento', 'excluirLancamento', 'definirNegocioLote', 'salvarLocacao', 'salvarDestinador'];
-const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista', 'mapa.precosVenda'];
+const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista', 'mapa.precosVenda', 'mapa.geo'];
 const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa.reativar', 'mapa.listaAdd', 'mapa.listaDel', 'mapa.listaInativar', 'mapa.listaSet',
                             'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda'];
 const ACOES_SOL_LEITURA = ['sol.dados'];
@@ -98,6 +98,7 @@ function rotear_(body) {
   if (ACOES_MAPA_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'mapa')) return semPermissao_('Você não tem acesso ao Mapa Operacional.');
     if (acao === 'mapa.precosVenda') return precosVenda_(String(body.cadastroId || ''));
+    if (acao === 'mapa.geo') return mapaGeo_(body);
     return acao === 'mapa.listar' ? MAPA.listar() : MAPA.lista(body.nome);
   }
   if (ACOES_SOL_LEITURA.indexOf(acao) >= 0) {
