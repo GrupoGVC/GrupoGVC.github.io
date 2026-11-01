@@ -3,7 +3,7 @@
  * ===================================================================== */
 
 // Tabela → módulo que precisa poder ler para ver o histórico.
-const MODULO_DA_TABELA = { Cadastros: 'mapa', Residuos: 'mapa', Equipamentos: 'mapa', Lancamentos: 'destinacao', LocacaoMensal: 'frota', Veiculos: 'frota', Caixas: 'frota', TiposVeiculo: 'frota',
+const MODULO_DA_TABELA = { Cadastros: 'mapa', Unidades: 'mapa', Residuos: 'mapa', Equipamentos: 'mapa', Lancamentos: 'destinacao', LocacaoMensal: 'frota', Veiculos: 'frota', Caixas: 'frota', TiposVeiculo: 'frota',
   Solicitacoes: 'solicitacoes', Consultores: 'solicitacoes', TiposDocumento: 'solicitacoes', Faturamentos: 'faturamento',
   Viagens: 'programacao', Colaboradores: 'programacao', Adiantamentos: 'dp', Rotinas: 'solicitacoes' };
 

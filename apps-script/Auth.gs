@@ -128,7 +128,8 @@ function definirSenha_(email, codigo, senha) {
 
 /* ---------------- administração de usuários (admin do portal) ---------------- */
 function unidadesLista_() {
-  return ler_('Unidades').filter(function (x) { return x.ativo; }).map(function (x) { return { id: x.id, nome: String(x.nome) }; });
+  return ler_('Unidades').filter(function (x) { return x.ativo; }).map(function (x) { return { id: x.id, nome: String(x.nome) }; })
+    .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
 }
 function listarUsuarios_() {
   return { ok: true, modulos: MODULOS, unidades: unidadesLista_(), usuarios: ler_('Usuarios').map(function (r) {

@@ -15,7 +15,7 @@ const AUDITORIA = ['criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor'];
 // Estrutura das tabelas. texto = colunas guardadas como texto (zeros à esquerda, telefone, CNPJ…);
 // numero = colunas numéricas; data = só a data; ocultas = escondidas na planilha.
 const TABELAS = {
-  Unidades:             { prefixo: 'UNI', colunas: ['id', 'nome', 'ativo'] },
+  Unidades:             { prefixo: 'UNI', colunas: ['id', 'nome', 'ativo', 'cadastroId'] },
   Usuarios:             { prefixo: 'USU', colunas: ['id', 'email', 'nome', 'adminPortal', 'unidades', 'ativo', 'senhaHash', 'salt', 'ultimoAcesso'],
                           texto: ['email', 'unidades', 'senhaHash', 'salt'], ocultas: ['senhaHash', 'salt'], momento: ['ultimoAcesso'] },
   UsuarioModulos:       { prefixo: 'UMO', colunas: ['id', 'usuarioId', 'modulo', 'nivel'] },
@@ -93,7 +93,8 @@ const REFERENCIAS = {
                  ['PrecosCliente', 'cadastroId', 'preço(s) de venda'],
                  ['Paradas', 'clienteId', 'parada(s) de viagem na Programação'],
                  ['Viagens', 'transportadorId', 'viagem(ns) terceirizada(s) na Programação'],
-                 ['Rotinas', 'clienteId', 'coleta(s) recorrente(s)']],
+                 ['Rotinas', 'clienteId', 'coleta(s) recorrente(s)'],
+                 ['Unidades', 'cadastroId', 'unidade do grupo GVC']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
                  ['PrecosCliente', 'residuoId', 'preço(s) de venda de clientes']],
@@ -105,7 +106,9 @@ const REFERENCIAS = {
                  ['Solicitacoes', 'unidadeId', 'solicitação(ões)'],
                  ['Faturamentos', 'unidadeId', 'BM/NF no Faturamento'],
                  ['Viagens', 'unidadeId', 'viagem(ns) na Programação'],
-                 ['Colaboradores', 'unidadeId', 'pessoa(s) da equipe']],
+                 ['Colaboradores', 'unidadeId', 'pessoa(s) da equipe'],
+                 ['Adiantamentos', 'unidadeId', 'adiantamento(s) no DP'],
+                 ['Rotinas', 'unidadeId', 'coleta(s) recorrente(s)']],
   TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota']],
   Veiculos:     [['LocacaoMensal', 'veiculoId', 'mês(es) de locação'],
                  ['Viagens', 'veiculoId', 'viagem(ns) na Programação']],

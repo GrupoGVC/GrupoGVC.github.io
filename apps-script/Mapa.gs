@@ -93,6 +93,7 @@ const MAPA = {
     if (Array.isArray(p.residuos)) sincronizarResiduos_(id, p, u, opc, novo);
     // equipamentos
     if (Array.isArray(p.equipamentos)) sincronizarEquipamentos_(id, p.equipamentos, u, opc, novo);
+    sincronizarUnidades_(u);
     const nr = nomesPorId_('Residuos'), ne = nomesPorId_('Equipamentos');
     return { ok: true, id: id, ponto: pontoDe_(porId_('Cadastros', id), nr, ne) };
   },
@@ -100,10 +101,13 @@ const MAPA = {
   apagar: function (id, u) {
     const cad = porId_('Cadastros', id) || ler_('Cadastros').filter(function (x) { return String(x.idOrigem) === String(id); })[0];
     if (!cad) return { ok: true };
+    const outros = usos_('Cadastros', cad.id).filter(function (x) { return x.tabela !== 'Unidades'; });
+    if (outros.length) return respostaEmUso_('Cadastros', cad.nome || cad.id, outros);
+    const ru = liberarUnidadeDoCadastro_(cad.id, u); if (!ru.ok) return ru;
     return excluir_('Cadastros', cad.id, u, 'mapa');
   },
-  inativar: function (id, u) { if (!porId_('Cadastros', id)) return naoAchou_(); inativar_('Cadastros', id, u, 'mapa'); return { ok: true }; },
-  reativar: function (id, u) { if (!porId_('Cadastros', id)) return naoAchou_(); reativar_('Cadastros', id, u, 'mapa'); return { ok: true }; },
+  inativar: function (id, u) { if (!porId_('Cadastros', id)) return naoAchou_(); inativar_('Cadastros', id, u, 'mapa'); sincronizarUnidades_(u); return { ok: true }; },
+  reativar: function (id, u) { if (!porId_('Cadastros', id)) return naoAchou_(); reativar_('Cadastros', id, u, 'mapa'); sincronizarUnidades_(u); return { ok: true }; },
 
   listaAdd: function (nome, valor, u) {
     const cfg = MAPA_CATALOGOS[nome]; if (!cfg) return { ok: false, erro: 'dados_invalidos', mensagem: 'Lista desconhecida.' };
