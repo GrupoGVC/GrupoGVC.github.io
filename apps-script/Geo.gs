@@ -5,12 +5,11 @@
  *  - link: lê as coordenadas de um link do Google Maps (longo ou curto, maps.app.goo.gl).
  *  - reverso: endereço de um ponto (para preencher rua, bairro, cidade, UF e CEP).
  *  Só leitura: não grava nada na planilha. Resultados ficam 6 h em cache para poupar a cota diária.
- *  Links curtos (maps.app.goo.gl) precisam abrir o endereço na internet, o que exige uma autorização
- *  extra da conta dona do script. Até ela ser dada, o serviço é chamado de forma indireta (sem pedir a
- *  permissão no envio do código, para o portal não parar) e o usuário recebe a orientação de colar o link completo.
+ *  Links curtos (maps.app.goo.gl) abrem o endereço na internet (UrlFetchApp). A conta dona do script
+ *  autorizou isso uma vez no editor (função autorizarLinksGoogle, 01/11/2026).
  * ===================================================================== */
 
-function servicoLinks_() { return globalThis['Url' + 'Fetch' + 'App']; }
+function servicoLinks_() { return UrlFetchApp; }
 
 const GEO_CACHE_S = 6 * 3600;
 
@@ -144,3 +143,6 @@ function geoLink_(url) {
     return { ok: true, resultado: { nome: texto || (rev && rev.nome) || ('Coordenadas ' + c.lat + ', ' + c.lng), lat: c.lat, lng: c.lng, preciso: true, endereco: rev ? rev.endereco : null }, urlFinal: atual };
   });
 }
+
+/** Rode uma vez no editor do Apps Script (▶ Executar) se o Google pedir de novo a autorização para links. */
+function autorizarLinksGoogle() { UrlFetchApp.fetch('https://www.google.com/maps', { muteHttpExceptions: true }); Logger.log('Autorizado'); }
