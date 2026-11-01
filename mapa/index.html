@@ -1994,6 +1994,53 @@ tr.cad-inativo td:last-child { opacity: 1; }
 
 
 
+
+/* ── Mais filtros (barra lateral do mapa) e exportação ── */
+.fm-sec{padding-top:10px;padding-bottom:10px}
+.fm-toggle{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:2px 0;cursor:pointer;font-family:var(--font-mono);font-size:0.6rem;font-weight:700;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase}
+.fm-toggle:hover{color:#1d6b52}
+.fm-toggle .fm-seta{margin-left:auto;transition:transform .15s}
+.fm-toggle.aberto .fm-seta{transform:rotate(180deg)}
+.fm-n{background:#1d6b52;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;letter-spacing:0;line-height:16px}
+.fm-corpo{display:flex;flex-direction:column;gap:10px;margin-top:10px;max-height:min(36vh,340px);overflow-y:auto;overscroll-behavior:contain;padding-right:6px;margin-right:-6px}
+.fm-linha{display:flex;flex-direction:column;gap:4px}
+.fm-rot{font-size:11.5px;font-weight:600;color:#4b5a52}
+.fm-multi{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;background:#fff;border:1px solid #d8dfda;border-radius:6px;padding:6px 9px;font:500 12.5px "IBM Plex Sans",system-ui,sans-serif;color:#14211b;cursor:pointer;text-align:left}
+.fm-multi.on{border-color:#1d6b52;background:#dcefe6;color:#1d6b52;font-weight:600}
+.fm-seg{display:flex;border:1px solid #d8dfda;border-radius:6px;overflow:hidden}
+.fm-seg button{flex:1;background:#fff;border:0;border-left:1px solid #d8dfda;padding:5px 4px;font:500 11.5px "IBM Plex Sans",system-ui,sans-serif;color:#4b5a52;cursor:pointer;white-space:nowrap}
+.fm-seg button:first-child{border-left:0}
+.fm-seg button.on{background:#1d6b52;color:#fff;font-weight:600}
+.fm-checks{display:flex;flex-wrap:wrap;gap:4px 12px}
+.fm-checks label,.fm-check{display:flex;align-items:center;gap:6px;font-size:12px;color:#14211b;cursor:pointer}
+.fm-checks input,.fm-check input{width:auto;margin:0}
+.fm-perto{position:relative}
+.fm-perto input{width:100%;box-sizing:border-box;border:1px solid #d8dfda;border-radius:6px;padding:6px 9px;font:500 12.5px "IBM Plex Sans",system-ui,sans-serif}
+.fm-perto-ok{display:flex;align-items:center;gap:6px;background:#dcefe6;border:1px solid #b9dccb;border-radius:6px;padding:5px 8px;font-size:12px;color:#1d6b52;font-weight:600}
+.fm-perto-ok span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fm-perto-ok button,.fm-tag button{background:none;border:0;color:inherit;cursor:pointer;font-size:11px;padding:0 2px}
+.fm-raio{display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5a52}
+.fm-raio select{width:auto;padding:3px 6px;border:1px solid #d8dfda;border-radius:6px;font-size:12px}
+.fm-ativos{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.fm-ativos[hidden],.fm-corpo[hidden],.fm-n[hidden]{display:none}
+.fm-tag{display:inline-flex;align-items:center;gap:4px;max-width:100%;background:#dcefe6;color:#1d6b52;border-radius:12px;padding:2px 6px 2px 9px;font-size:11.5px;font-weight:600}
+.fm-limpar{background:none;border:1px solid #d8dfda;border-radius:12px;padding:2px 9px;font:600 11.5px "IBM Plex Sans",system-ui,sans-serif;color:#b42f2f;cursor:pointer}
+.fm-pop{position:fixed;z-index:20000;background:#fff;border:1px solid #d8dfda;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.16);padding:8px;display:flex;flex-direction:column;gap:6px;max-height:min(380px,calc(100vh - 24px))}
+.fm-pop-busca{width:100%;box-sizing:border-box;border:1px solid #d8dfda;border-radius:6px;padding:6px 9px;font-size:13px}
+.fm-pop-lista{overflow:auto;border:1px solid #eef1ef;border-radius:6px;padding:4px;min-height:60px}
+.fm-pop-lista label{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px;cursor:pointer;font-size:12.5px;color:#14211b}
+.fm-pop-lista label[hidden]{display:none}
+.fm-pop-lista label:hover{background:#edf1ee}
+.fm-pop-lista input{width:auto;margin:0}
+.fm-pop-lista span{flex:1;min-width:0}
+.fm-pop-lista em{font-style:normal;font-size:11px;color:#77857d}
+.fm-pop-bot{display:flex;align-items:center;gap:6px}
+.fm-pop-bot .loc-btn{padding:5px 12px}
+.item-dist{font-size:0.68rem;color:#1d6b52;font-weight:600;padding-left:30px;margin-bottom:3px}
+header.gtop .export-menu .em-info{padding:10px 14px;font-size:12px;color:#4b5a52;background:#f5f7f5;border-bottom:1px solid #d8dfda;line-height:1.45;min-width:230px}
+header.gtop .export-menu .em-info b{color:#14211b}
+header.gtop .export-menu .em-info span{color:#77857d}
+header.gtop .export-menu .em-info .em-filtro{display:inline-block;background:#fff3dc;color:#a86400;border-radius:8px;padding:0 6px;font-weight:600}
 /* ── Localização pelo Google (cadastro e busca do topo) ── */
 .loc-busca{position:relative;display:flex;gap:8px}
 .loc-busca input{flex:1;min-width:0}
@@ -2138,13 +2185,14 @@ body.somente-leitura #overlay .res-chip { pointer-events:none; }
       <div class="export-menu-wrap">
         <button class="btn sm" type="button" id="btn-export" onclick="toggleExportMenu()">↓ Exportar</button>
         <div class="export-menu" id="export-menu">
+          <div class="em-info" id="export-info"></div>
+          <button onclick="exportXLSX()">📊 Planilha Excel (.xlsx)</button>
           <button onclick="exportCSV()">📄 CSV</button>
-          <button onclick="exportXLSX()">📊 Excel (.xlsx)</button>
           <button onclick="exportPDF()">🖨 PDF (lista)</button>
           <div class="em-sep"></div>
           <button onclick="openMapPrintModal()">🗺 Print do Mapa</button>
           <div class="em-sep"></div>
-          <button onclick="exportJSON()">💾 Backup JSON</button>
+          <button onclick="exportJSON()" title="Cópia de segurança com todos os cadastros (não segue os filtros)">💾 Backup JSON (tudo)</button>
           <button class="so-editor" onclick="document.getElementById('import-json-input').click()">📂 Restaurar JSON</button>
           <input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importJSON(this)">
         </div>
@@ -2206,6 +2254,14 @@ body.somente-leitura #overlay .res-chip { pointer-events:none; }
           <span class="chip-dot" style="background:var(--tipo-reciclador)"></span>Reciclador
         </div>
       </div>
+    </div>
+
+    <div class="sidebar-section fm-sec">
+      <button type="button" class="fm-toggle" id="fm-toggle" onclick="fmAbrirFechar()" aria-expanded="false" aria-controls="fm-corpo">
+        <span>Mais filtros</span><span class="fm-n" id="fm-n" hidden></span><span class="fm-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="fm-corpo" id="fm-corpo" hidden></div>
+      <div class="fm-ativos" id="fm-ativos" hidden></div>
     </div>
 
     <div class="sidebar-section" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;">
@@ -5024,6 +5080,9 @@ function setAppView(view) {
   document.getElementById('view-btn-cadastros').setAttribute('aria-selected', view === 'cadastros' ? 'true' : 'false');
   document.getElementById('map').style.display = view === 'mapa' ? '' : 'none';
   document.getElementById('cadastros-view').style.display = view === 'cadastros' ? 'flex' : 'none';
+  // A barra da esquerda (filtros, busca e lista de locais) só serve ao mapa; em Cadastros a tabela usa a tela toda.
+  const sb = document.querySelector('.sidebar'); if (sb) sb.style.display = view === 'mapa' ? '' : 'none';
+  if (view !== 'mapa') { fmFecharPop(); if (typeof closeSidebar === 'function') closeSidebar(); }
   // Os botões de modo (Adicionar/Navegar/Rota) só fazem sentido com o mapa visível.
   const modeActions = document.getElementById('map-mode-actions');
   if (modeActions) modeActions.style.visibility = view === 'mapa' ? '' : 'hidden';
@@ -5482,6 +5541,11 @@ function showRouteError(msg) {
 </div>
 
 <script>
+// Filtros extras do mapa ("Mais filtros" da barra lateral) — ver fmCarregar()
+var FM_KEY = 'gvc_mapa_filtros_v2';
+var FM_RAIOS = [10, 25, 50, 100, 200, 500];
+var FM_INCOMPLETOS = { cnpj: 'Sem CNPJ', contato: 'Sem contato', endereco: 'Sem endereço' };
+var FM = fmCarregar();
 // ─── CONFIG ───────────────────────────────────────────────
 const TIPOS = {
   empresa:       { label: 'Unidade GVC',   icon: '🏭', color: '#00c896' },
@@ -5818,9 +5882,9 @@ const TIPOS_COM_RESIDUOS = ['destinador', 'reciclador'];
 function tiposDe(p) {
   return (p && Array.isArray(p.tipos) && p.tipos.length) ? p.tipos : (p && p.tipo ? [p.tipo] : []);
 }
-function pontoVisivel(p) {
-  return p.ativo !== false && tiposDe(p).some(t => activeFilters.has(t));
-}
+// Mapa: tipo + "Mais filtros" da barra lateral. Cadastros: só tipo e situação (a tabela tem os filtros dela).
+function pontoVisivel(p) { return tiposDe(p).some(t => activeFilters.has(t)) && passaFiltrosMapa(p); }
+function pontoBaseCadastros(p) { return p.ativo !== false && tiposDe(p).some(t => activeFilters.has(t)); }
 let mostrarInativos = false;
 function temResiduos(tipos) {
   return tipos.some(t => TIPOS_COM_RESIDUOS.includes(t));
@@ -6661,31 +6725,40 @@ function flyToPoint(id) {
 }
 
 // ─── LIST ─────────────────────────────────────────────────
-function renderList() {
-  renderCadastrosTable();
-  const query = document.getElementById('search-input').value.toLowerCase();
-  const el = document.getElementById('list-content');
-
-  const filtered = points.filter(p => {
+/** Locais da barra lateral, como aparecem na tela (filtros do mapa + busca + área visível; perto de… ordena pela distância). */
+function listaMapaFiltrada() {
+  const query = (document.getElementById('search-input')?.value || '').toLowerCase();
+  let lista = points.filter(p => {
     if (!pontoVisivel(p)) return false;
+    if (FM.area && !(temLocal(p) && map.getBounds().contains([Number(p.lat), Number(p.lng)]))) return false;
     if (!query) return true;
     return [p.nome, p.razaoSocial, p.cat, p.cnpj, p.codigoUplog, p.contatoNome, (p.telefones||[]).join(' '), (p.emails||[]).join(' '),
             (p.residuos||[]).join(' '), (p.equipamentos||[]).join(' ')].join(' ').toLowerCase().includes(query);
   });
+  if (FM.perto) lista = lista.slice().sort((a, b) => distDoCentro(a) - distDoCentro(b));
+  else lista = lista.slice().reverse(); // mais recentes primeiro
+  return lista;
+}
 
-  document.getElementById('list-count').textContent = filtered.length;
+function renderList() {
+  renderCadastrosTable();
+  const el = document.getElementById('list-content');
+  const filtered = listaMapaFiltrada();
+  fmRenderAtivos();
+  document.getElementById('list-count').textContent = fmTemFiltro() || (document.getElementById('search-input')?.value || '').trim()
+    ? filtered.length + ' de ' + points.length : filtered.length;
 
   if (filtered.length === 0) {
     el.innerHTML = `<div class="empty-state">
       <span class="empty-state-icon">${points.length === 0 ? '📍' : '🔍'}</span>
       ${points.length === 0
         ? 'Nenhum local ainda.<br>Ative <strong>Adicionar</strong><br>e clique no mapa!'
-        : 'Nenhum resultado<br>para esta busca.'}
+        : 'Nenhum resultado<br>com esses filtros.'}
     </div>`;
     return;
   }
 
-  el.innerHTML = filtered.slice().reverse().map(p => {
+  el.innerHTML = filtered.map(p => {
     const t = TIPOS[p.tipo];
     const topTags = (p.residuos || []).slice(0, 2);
     const precosT = precosDoPonto(p);
@@ -6700,12 +6773,200 @@ function renderList() {
           <div class="item-tipo-badge" style="background:${t.color}22;color:${t.color}" title="${tiposDe(p).map(x => TIPOS[x].label).join(' + ')}">${t.label.split(' ')[0].toUpperCase()}${extraIcons ? ' +' + extraIcons : ''}</div>
         </div>
         ${p.cat ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:3px;padding-left:30px">${p.cat}</div>` : ''}
+        ${FM.perto && temLocal(p) ? `<div class="item-dist">📍 ${fmtKm(distDoCentro(p))} de ${escG(FM.perto.nome)}</div>` : ''}
+        ${p.ativo === false ? '<div style="padding-left:30px;margin-bottom:3px"><span class="sem-local-badge" style="background:#eee;color:#666">⏸ Inativo</span></div>' : ''}
         ${temLocal(p) ? '' : `<div style="padding-left:30px;margin-bottom:3px"><span class="sem-local-badge" title="Sem localização no mapa: clique para abrir o cadastro e marcar o local">📍 Sem localização</span></div>`}
         ${(p.telefones||[]).length || p.contatoNome ? `<div style="font-size:0.68rem;color:var(--text-muted);padding-left:30px">${p.contatoNome ? p.contatoNome+' · ' : ''}${(p.telefones||[])[0] || ''}</div>` : ''}
         ${topTags.length ? `<div class="item-tags" style="padding-left:30px;margin-top:5px">${topTags.map(r=>{ const n = naturezaDoResiduo(p, r); return `<span class="tag${n ? ' ' + n.cls : ''}" ${n ? `title="${n.label} por kg"` : ''}>${tagTxt(r)}</span>`; }).join('')}${p.residuos.length > 2 ? `<span class="tag">+${p.residuos.length-2}</span>` : ''}</div>` : ''}
       </div>
     `;
   }).join('');
+}
+
+// ─── MAIS FILTROS DO MAPA (barra lateral) ─────────────────
+// Valem para os pontos do mapa e para a lista de locais; ficam guardados neste navegador.
+function fmNovo() { return { residuos: [], equipamentos: [], cidades: [], natureza: '', situacao: 'ativos', local: '', incompletos: [], perto: null, raio: 50, area: false, aberto: false }; }
+function fmCarregar() {
+  const f = fmNovo();
+  try { const o = JSON.parse(localStorage.getItem(FM_KEY) || 'null'); if (o && typeof o === 'object') Object.keys(f).forEach(k => { if (k in o) f[k] = o[k]; }); } catch (e) {}
+  ['residuos', 'equipamentos', 'cidades', 'incompletos'].forEach(k => { if (!Array.isArray(f[k])) f[k] = []; });
+  if (!FM_RAIOS.includes(Number(f.raio))) f.raio = 50;
+  return f;
+}
+function fmSalvar() { try { localStorage.setItem(FM_KEY, JSON.stringify(FM)); } catch (e) {} }
+const fmCidadeDe = p => [p.cidade, p.uf].filter(Boolean).join('/') || '(Sem cidade)';
+function fmSemContato(p) { return !(p.telefones || []).length && !(p.emails || []).length && !p.contatoNome; }
+function fmSemEndereco(p) { return !p.logradouro && !p.cidade; }
+function distKm(aLat, aLng, bLat, bLng) {
+  const R = 6371, r = x => x * Math.PI / 180, dLat = r(bLat - aLat), dLng = r(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function distDoCentro(p) { return FM.perto && temLocal(p) ? distKm(FM.perto.lat, FM.perto.lng, Number(p.lat), Number(p.lng)) : Infinity; }
+const fmtKm = d => (d < 10 ? d.toFixed(1) : Math.round(d)).toString().replace('.', ',') + ' km';
+
+/** Filtros extras (tipo e busca ficam fora daqui). */
+function passaFiltrosMapa(p) {
+  if (FM.situacao === 'ativos' && p.ativo === false) return false;
+  if (FM.situacao === 'inativos' && p.ativo !== false) return false;
+  if (FM.residuos.length && !(p.residuos || []).some(r => FM.residuos.includes(r))) return false;
+  if (FM.equipamentos.length && !(p.equipamentos || []).some(e => FM.equipamentos.includes(e))) return false;
+  if (FM.cidades.length && !FM.cidades.includes(fmCidadeDe(p))) return false;
+  if (FM.natureza && !(p.residuos || []).some(r => { const n = naturezaDoResiduo(p, r); return n && n.key === FM.natureza; })) return false;
+  if (FM.local === 'marcada' && !temLocal(p)) return false;
+  if (FM.local === 'sem' && temLocal(p)) return false;
+  if (FM.incompletos.length && !FM.incompletos.some(k => (k === 'cnpj' && !p.cnpj) || (k === 'contato' && fmSemContato(p)) || (k === 'endereco' && fmSemEndereco(p)))) return false;
+  if (FM.perto && !(distDoCentro(p) <= FM.raio)) return false;
+  return true;
+}
+/** Lista dos filtros ativos: [{ chave, texto }] — usada nas etiquetas e na exportação. */
+function fmDescricao() {
+  const out = [];
+  const lst = (k, rot) => { if (FM[k].length) out.push({ chave: k, texto: rot + ': ' + FM[k].join(', ') }); };
+  lst('residuos', 'Resíduo'); lst('equipamentos', 'Equipamento'); lst('cidades', 'Cidade/UF');
+  if (FM.natureza) out.push({ chave: 'natureza', texto: 'Preço: ' + (FM.natureza === 'custo' ? 'custo (destinação)' : 'receita (venda)') });
+  if (FM.situacao !== 'ativos') out.push({ chave: 'situacao', texto: 'Situação: ' + (FM.situacao === 'inativos' ? 'só inativos' : 'ativos e inativos') });
+  if (FM.local) out.push({ chave: 'local', texto: FM.local === 'sem' ? 'Só sem localização' : 'Só com localização' });
+  if (FM.incompletos.length) out.push({ chave: 'incompletos', texto: 'Dados incompletos: ' + FM.incompletos.map(k => FM_INCOMPLETOS[k]).join(' ou ') });
+  if (FM.perto) out.push({ chave: 'perto', texto: 'Até ' + FM.raio + ' km de ' + FM.perto.nome });
+  if (FM.area) out.push({ chave: 'area', texto: 'Só a área visível do mapa' });
+  return out;
+}
+function fmTemFiltro() { return fmDescricao().length > 0 || activeFilters.size < Object.keys(TIPOS).length; }
+function fmLimparChave(k) {
+  const novo = fmNovo();
+  if (k === 'perto') { FM.perto = null; } else if (k in novo) FM[k] = novo[k];
+  fmAplicar();
+}
+function fmLimparTudo() {
+  const aberto = FM.aberto; FM = fmNovo(); FM.aberto = aberto;
+  Object.keys(TIPOS).forEach(t => { if (!activeFilters.has(t)) toggleFilter(t); });
+  fmAplicar();
+}
+function fmAplicar() {
+  fmSalvar(); fmDesenharPerto(); applyFilters(); renderList(); fmRenderCorpo();
+}
+function fmAbrirFechar() { FM.aberto = !FM.aberto; fmSalvar(); fmRenderCorpo(); }
+
+function fmRenderAtivos() {
+  const el = document.getElementById('fm-ativos'); if (!el) return;
+  const d = fmDescricao();
+  const n = document.getElementById('fm-n');
+  if (n) { n.hidden = !d.length; n.textContent = d.length; }
+  const tiposOff = Object.keys(TIPOS).length - activeFilters.size;
+  el.hidden = !d.length && !tiposOff;
+  el.innerHTML = d.map(x => `<span class="fm-tag">${escG(x.texto)}<button type="button" onclick="fmLimparChave('${x.chave}')" aria-label="Tirar o filtro ${escG(x.texto)}">✕</button></span>`).join('') +
+    `<button type="button" class="fm-limpar" onclick="fmLimparTudo()">Limpar filtros</button>`;
+}
+function fmSeg(chave, opcoes) {
+  return `<div class="fm-seg" role="group">${opcoes.map(([v, rot]) => `<button type="button" class="${FM[chave] === v ? 'on' : ''}" aria-pressed="${FM[chave] === v}" onclick="FM.${chave}='${v}';fmAplicar()">${rot}</button>`).join('')}</div>`;
+}
+function fmResumoMulti(k, todos) { const v = FM[k]; return !v.length ? todos : v.length === 1 ? v[0] : v.length + ' selecionados'; }
+function fmRenderCorpo() {
+  const corpo = document.getElementById('fm-corpo'), tg = document.getElementById('fm-toggle');
+  if (!corpo) return;
+  corpo.hidden = !FM.aberto; tg.setAttribute('aria-expanded', FM.aberto ? 'true' : 'false'); tg.classList.toggle('aberto', FM.aberto);
+  fmRenderAtivos();
+  if (!FM.aberto) return;
+  const ativo = document.activeElement && document.activeElement.id === 'fm-perto-q';
+  const qPerto = document.getElementById('fm-perto-q')?.value || '';
+  corpo.innerHTML = `
+    <div class="fm-linha"><span class="fm-rot">Resíduo</span><button type="button" class="fm-multi${FM.residuos.length ? ' on' : ''}" onclick="fmAbrirMulti('residuos', this)">${escG(fmResumoMulti('residuos', 'Todos'))}<span aria-hidden="true">▾</span></button></div>
+    <div class="fm-linha"><span class="fm-rot">Equipamento</span><button type="button" class="fm-multi${FM.equipamentos.length ? ' on' : ''}" onclick="fmAbrirMulti('equipamentos', this)">${escG(fmResumoMulti('equipamentos', 'Todos'))}<span aria-hidden="true">▾</span></button></div>
+    <div class="fm-linha"><span class="fm-rot">Cidade/UF</span><button type="button" class="fm-multi${FM.cidades.length ? ' on' : ''}" onclick="fmAbrirMulti('cidades', this)">${escG(fmResumoMulti('cidades', 'Todas'))}<span aria-hidden="true">▾</span></button></div>
+    <div class="fm-linha"><span class="fm-rot">Preço por kg</span>${fmSeg('natureza', [['', 'Todos'], ['custo', '💸 Custo'], ['receita', '💰 Receita']])}</div>
+    <div class="fm-linha"><span class="fm-rot">Situação</span>${fmSeg('situacao', [['ativos', 'Ativos'], ['inativos', 'Inativos'], ['todos', 'Todos']])}</div>
+    <div class="fm-linha"><span class="fm-rot">Localização</span>${fmSeg('local', [['', 'Todos'], ['marcada', 'Marcada'], ['sem', 'Sem localização']])}</div>
+    <div class="fm-linha"><span class="fm-rot">Dados incompletos</span><div class="fm-checks">${Object.entries(FM_INCOMPLETOS).map(([k, rot]) =>
+      `<label><input type="checkbox" ${FM.incompletos.includes(k) ? 'checked' : ''} onchange="FM.incompletos=this.checked?[...FM.incompletos,'${k}']:FM.incompletos.filter(x=>x!=='${k}');fmAplicar()"> ${rot}</label>`).join('')}</div></div>
+    <div class="fm-linha"><span class="fm-rot">Perto de</span>
+      ${FM.perto ? `<div class="fm-perto-ok"><span>📍 ${escG(FM.perto.nome)}</span><button type="button" onclick="fmLimparChave('perto')" aria-label="Tirar o filtro de distância">✕</button></div>` : `
+      <div class="fm-perto"><input id="fm-perto-q" type="text" autocomplete="off" placeholder="Cadastro ou endereço (Google)" value="${escG(qPerto)}" oninput="fmPertoInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();fmPertoBuscar(this.value)}" onblur="setTimeout(()=>{const d=document.getElementById('fm-perto-dd');if(d)d.style.display='none'},200)">
+        <div id="fm-perto-dd" class="loc-dd"></div></div>`}
+      <label class="fm-raio">Raio <select onchange="FM.raio=Number(this.value);fmAplicar()">${FM_RAIOS.map(r => `<option value="${r}" ${FM.raio === r ? 'selected' : ''}>${r} km</option>`).join('')}</select></label></div>
+    <label class="fm-check"><input type="checkbox" ${FM.area ? 'checked' : ''} onchange="FM.area=this.checked;fmAplicar()"> Só o que está na área visível do mapa</label>`;
+  if (ativo) { const i = document.getElementById('fm-perto-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+}
+
+/* lista de escolha (resíduo / equipamento / cidade), parecida com o filtro do Excel */
+function fmFecharPop() { const p = document.getElementById('fm-pop'); if (p) p.remove(); document.removeEventListener('mousedown', fmForaPop, true); }
+function fmForaPop(e) { const p = document.getElementById('fm-pop'); if (p && !p.contains(e.target) && !e.target.closest('.fm-multi')) fmFecharPop(); }
+function fmValoresDe(k) {
+  const cont = new Map();
+  points.filter(p => p.ativo !== false || FM.situacao !== 'ativos').forEach(p => {
+    const vs = k === 'residuos' ? (p.residuos || []) : k === 'equipamentos' ? (p.equipamentos || []) : [fmCidadeDe(p)];
+    new Set(vs).forEach(v => cont.set(v, (cont.get(v) || 0) + 1));
+  });
+  FM[k].forEach(v => { if (!cont.has(v)) cont.set(v, 0); });
+  return [...cont.entries()].sort((a, b) => a[0] === '(Sem cidade)' ? 1 : b[0] === '(Sem cidade)' ? -1 : a[0].localeCompare(b[0], 'pt-BR'));
+}
+function fmAbrirMulti(k, btn) {
+  if (document.getElementById('fm-pop')?.dataset.k === k) { fmFecharPop(); return; }
+  fmFecharPop();
+  const vals = fmValoresDe(k), sel = new Set(FM[k]);
+  const rot = { residuos: 'resíduos', equipamentos: 'equipamentos', cidades: 'cidades' }[k];
+  const pop = document.createElement('div');
+  pop.id = 'fm-pop'; pop.className = 'fm-pop'; pop.dataset.k = k; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Escolher ' + rot);
+  pop.innerHTML = `<input type="search" class="fm-pop-busca" placeholder="Pesquisar ${rot}" aria-label="Pesquisar ${rot}">
+    <div class="fm-pop-lista">${vals.map(([v, n], i) => `<label data-t="${escG(v.toLowerCase())}"><input type="checkbox" data-i="${i}" ${sel.has(v) ? 'checked' : ''}><span>${escG(v)}</span><em>${n}</em></label>`).join('') || '<div class="loc-buscando">Nenhum valor cadastrado.</div>'}</div>
+    <div class="fm-pop-bot"><button type="button" class="fm-limpar" data-l>Limpar</button><span style="flex:1"></span><button type="button" class="loc-btn" data-ok>Aplicar</button></div>`;
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect(), w = Math.min(280, innerWidth - 16);
+  pop.style.width = w + 'px';
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+  const alturaMax = Math.min(380, innerHeight - 24);
+  pop.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - alturaMax - 8)) + 'px';
+  const busca = pop.querySelector('.fm-pop-busca');
+  busca.oninput = () => { const q = busca.value.trim().toLowerCase(); pop.querySelectorAll('.fm-pop-lista label').forEach(l => l.hidden = !!q && !l.dataset.t.includes(q)); };
+  pop.querySelectorAll('[data-i]').forEach(c => c.onchange = () => { const v = vals[+c.dataset.i][0]; c.checked ? sel.add(v) : sel.delete(v); });
+  pop.querySelector('[data-l]').onclick = () => { FM[k] = []; fmFecharPop(); fmAplicar(); };
+  pop.querySelector('[data-ok]').onclick = () => { FM[k] = vals.map(x => x[0]).filter(v => sel.has(v)); fmFecharPop(); fmAplicar(); };
+  pop.addEventListener('keydown', e => { if (e.key === 'Escape') { fmFecharPop(); btn.focus(); } });
+  document.addEventListener('mousedown', fmForaPop, true);
+  busca.focus();
+}
+
+/* "Perto de": um cadastro com localização ou um endereço do Google */
+let fmPertoTimer = null, fmPertoSeq = 0, pertoCirculo = null;
+function fmPertoInput(v) {
+  clearTimeout(fmPertoTimer);
+  v = String(v || '').trim();
+  if (v.length < 2) { fmPertoDD([]); return; }
+  const c = coordsDoTexto(v);
+  if (c) { fmPertoDD([{ nome: 'Coordenadas ' + c.lat + ', ' + c.lng, lat: c.lat, lng: c.lng }]); return; }
+  const n = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const loc = points.filter(p => temLocal(p) && n(p.nome).includes(n(v))).slice(0, 5).map(p => ({ nome: p.nome, lat: Number(p.lat), lng: Number(p.lng), sub: 'cadastro' }));
+  fmPertoDD(loc, v.length >= 4);
+  if (v.length >= 4) fmPertoTimer = setTimeout(() => fmPertoBuscar(v, loc), 700);
+}
+async function fmPertoBuscar(v, loc) {
+  v = String(v || '').trim(); if (!v) return;
+  const seq = ++fmPertoSeq;
+  if (ehLinkMaps(v)) { const r = await geoGoogle({ tipo: 'link', url: v }); if (seq === fmPertoSeq && r.ok) fmPertoEscolher({ nome: r.resultado.nome, lat: r.resultado.lat, lng: r.resultado.lng }); return; }
+  const r = await geoGoogle({ tipo: 'buscar', q: v });
+  if (seq !== fmPertoSeq) return;
+  const g = r.ok ? r.resultados.map(x => ({ nome: x.nome, lat: x.lat, lng: x.lng, sub: 'Google', google: true })) : [];
+  fmPertoDD([...(loc || []), ...g], false, r.ok ? (g.length ? '' : 'O Google não achou esse endereço.') : r.mensagem);
+}
+function fmPertoDD(itens, buscando, aviso) {
+  const dd = document.getElementById('fm-perto-dd'); if (!dd) return;
+  dd._itens = itens;
+  if (!itens.length && !buscando && !aviso) { dd.style.display = 'none'; return; }
+  dd.innerHTML = itens.map((x, i) => `<button type="button" class="loc-item${x.google ? ' g' : ''}" onmousedown="event.preventDefault();fmPertoEscolher(document.getElementById('fm-perto-dd')._itens[${i}])"><span>${escG(x.nome)}</span>${x.sub ? `<em>${escG(x.sub)}</em>` : ''}</button>`).join('') +
+    (buscando ? '<div class="loc-buscando">Buscando no Google…</div>' : '') + (aviso ? `<div class="loc-buscando">${escG(aviso)}</div>` : '');
+  dd.style.display = 'block';
+}
+function fmPertoEscolher(x) {
+  if (!x) return;
+  fmPertoSeq++;
+  FM.perto = { nome: String(x.nome).split(' - ')[0], lat: Number(x.lat), lng: Number(x.lng) };
+  fmAplicar();
+  if (pertoCirculo && appView === 'mapa') map.fitBounds(pertoCirculo.getBounds(), { padding: [30, 30] });
+}
+function fmDesenharPerto() {
+  if (pertoCirculo) { map.removeLayer(pertoCirculo); pertoCirculo = null; }
+  if (!FM.perto) return;
+  pertoCirculo = L.circle([FM.perto.lat, FM.perto.lng], { radius: FM.raio * 1000, color: '#1d6b52', weight: 1.5, fillColor: '#1d6b52', fillOpacity: 0.05, dashArray: '6 6', interactive: false }).addTo(map);
 }
 
 // ─── CADASTROS VIEW ───────────────────────────────────────
@@ -6753,7 +7014,7 @@ function cadastrosBase() {
   const query = searchEl ? searchEl.value.toLowerCase() : '';
   return points.filter(p => {
     const inativoVisivel = mostrarInativos && p.ativo === false && tiposDe(p).some(t => activeFilters.has(t));
-    if (!pontoVisivel(p) && !inativoVisivel) return false;
+    if (!pontoBaseCadastros(p) && !inativoVisivel) return false;
     if (!query) return true;
     return [p.nome, p.razaoSocial, p.cat, p.cnpj, p.codigoUplog, p.contatoNome, (p.telefones || []).join(' '), (p.emails || []).join(' '),
             enderecoCompleto(p), (p.residuos || []).join(' '), (p.equipamentos || []).join(' '),
@@ -6776,12 +7037,8 @@ function renderCadastrosHead() {
   if (limpar) limpar.style.display = (Object.keys(cadColFiltros).length || cadOrdem) ? '' : 'none';
 }
 
-function renderCadastrosTable() {
-  const tbody = document.getElementById('cadastros-table-body');
-  const emptyEl = document.getElementById('cadastros-empty');
-  if (!tbody || !emptyEl) return; // view ainda não está no DOM nesta carga
-  renderCadastrosHead();
-
+/** Linhas da tabela de Cadastros como aparecem na tela (busca, tipo, inativos, filtros e ordem das colunas). */
+function cadastrosFiltradosOrdenados() {
   let filtered = cadastrosBase().filter(p => passaFiltroColuna(p));
   if (cadOrdem) {
     const col = CAD_COLUNAS.find(c => c.key === cadOrdem.key);
@@ -6794,6 +7051,14 @@ function renderCadastrosTable() {
   } else {
     filtered = filtered.slice().reverse(); // mais recentes primeiro
   }
+  return filtered;
+}
+function renderCadastrosTable() {
+  const tbody = document.getElementById('cadastros-table-body');
+  const emptyEl = document.getElementById('cadastros-empty');
+  if (!tbody || !emptyEl) return; // view ainda não está no DOM nesta carga
+  renderCadastrosHead();
+  const filtered = cadastrosFiltradosOrdenados();
 
   const contador = document.getElementById('cad-contador');
   if (contador) contador.textContent = `${filtered.length} de ${points.length}`;
@@ -6991,7 +7256,10 @@ function loadPoints() {
 
 points.forEach(addLeafletPoint);
 renderCadastrosFilterChips();
+applyFilters();
 renderList();
+fmRenderCorpo(); fmDesenharPerto();
+map.on('moveend', () => { if (FM.area) renderList(); });
 renderHeaderStats();
 
 // (Os pontos vêm da planilha pelo portal — não há mais pontos de exemplo locais.)
@@ -7282,8 +7550,8 @@ function coordsDoTexto(t) {
   const lat = Number(m[1].replace(',', '.')), lng = Number(m[2].replace(',', '.'));
   return (Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng)) ? { lat, lng } : null;
 }
-const ehLinkMaps = t => /^(https?:\/\/)?([a-z0-9-]+\.)*(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|goo\.gl\/|maps\.app\.goo\.gl|g\.co\/)/i.test(String(t || '').trim());
-const escG = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+function ehLinkMaps(t) { return /^(https?:\/\/)?([a-z0-9-]+\.)*(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|goo\.gl\/|maps\.app\.goo\.gl|g\.co\/)/i.test(String(t || '').trim()); }
+function escG(t) { return String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
 async function geoGoogle(dados) {
   try { return await Portal.api('mapa.geo', dados); }
   catch (e) { return { ok: false, mensagem: (e && e.mensagem) || 'Sem conexão com o portal. Tente de novo.' }; }
@@ -7462,7 +7730,49 @@ document.getElementById('f-loc-search')?.addEventListener('blur', () => { setTim
 
 // ─── EXPORT ───────────────────────────────────────────────
 function toggleExportMenu() {
-  document.getElementById('export-menu').classList.toggle('open');
+  const m = document.getElementById('export-menu');
+  m.classList.toggle('open');
+  if (m.classList.contains('open')) {
+    const t = telaExportacao(), info = document.getElementById('export-info');
+    if (info) info.innerHTML = `Vão sair <b>${t.lista.length} de ${t.total}</b> cadastros${t.filtros.length ? ' <span class="em-filtro">com filtro</span>' : ''}<br><span>conforme a tela ${t.tela === 'Cadastros' ? 'de Cadastros' : 'do Mapa'}</span>`;
+  }
+}
+
+// ─── O QUE SAI NA EXPORTAÇÃO: exatamente o que está na tela ───
+function descreverFiltrosCadastros() {
+  const out = [];
+  const q = (document.getElementById('cadastros-search-input')?.value || '').trim();
+  if (q) out.push('Busca: "' + q + '"');
+  const todosTipos = Object.keys(TIPOS);
+  if (activeFilters.size < todosTipos.length) out.push('Tipos: ' + todosTipos.filter(t => activeFilters.has(t)).map(t => TIPOS[t].label).join(', '));
+  if (mostrarInativos) out.push('Inclui inativos');
+  Object.entries(cadColFiltros).forEach(([k, set]) => { const c = CAD_COLUNAS.find(x => x.key === k); out.push((c ? c.label : k) + ': ' + [...set].join(', ')); });
+  if (cadOrdem) { const c = CAD_COLUNAS.find(x => x.key === cadOrdem.key); out.push('Ordenado por ' + (c ? c.label : cadOrdem.key) + (cadOrdem.dir > 0 ? ' (A → Z)' : ' (Z → A)')); }
+  return out;
+}
+function descreverFiltrosMapa() {
+  const out = [];
+  const todosTipos = Object.keys(TIPOS);
+  if (activeFilters.size < todosTipos.length) out.push('Tipos: ' + todosTipos.filter(t => activeFilters.has(t)).map(t => TIPOS[t].label).join(', '));
+  const q = (document.getElementById('search-input')?.value || '').trim();
+  if (q) out.push('Busca: "' + q + '"');
+  fmDescricao().forEach(x => out.push(x.texto));
+  return out;
+}
+function telaExportacao() {
+  if (appView === 'cadastros') return { tela: 'Cadastros', lista: cadastrosFiltradosOrdenados(), total: points.length, filtros: descreverFiltrosCadastros() };
+  return { tela: 'Mapa', lista: listaMapaFiltrada(), total: points.length, filtros: descreverFiltrosMapa() };
+}
+function nomeArquivoExport(t, ext) {
+  return `GVC_Cadastros_${new Date().toISOString().slice(0, 10)}${t.filtros.length ? '_filtrado' : ''}.${ext}`;
+}
+function linhasFiltrosExport(t) {
+  const rows = [{ 'Item': 'Exportado em', 'Valor': new Date().toLocaleString('pt-BR') },
+                { 'Item': 'Tela', 'Valor': t.tela === 'Cadastros' ? 'Cadastros (tabela)' : 'Mapa (lista da barra lateral)' },
+                { 'Item': 'Cadastros exportados', 'Valor': t.lista.length + ' de ' + t.total }];
+  if (!t.filtros.length) rows.push({ 'Item': 'Filtros', 'Valor': 'Nenhum: todos os cadastros ativos' });
+  t.filtros.forEach((f, i) => rows.push({ 'Item': i ? '' : 'Filtros', 'Valor': f }));
+  return rows;
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('.export-menu-wrap')) {
@@ -7470,10 +7780,13 @@ document.addEventListener('click', e => {
   }
 });
 
-function getExportRows() {
-  return points.map(p => ({
+function getExportRows(lista) {
+  const comDist = !!FM.perto && appView === 'mapa';
+  return (lista || points).map(p => Object.assign({
     'Tipo':          tiposDe(p).map(t => TIPOS[t]?.label || t).join(', '),
+    'Situação':      p.ativo === false ? 'Inativo' : 'Ativo',
     'Nome':          p.nome || '',
+    'Cód. UPLOG':    p.codigoUplog || '',
     'Razão social':  p.razaoSocial || '',
     'Categoria':     p.cat || '',
     'CNPJ':          p.cnpj || '',
@@ -7481,6 +7794,7 @@ function getExportRows() {
     'Telefone':      (p.telefones || []).join('; '),
     'Email':         (p.emails || []).join('; '),
     'Endereço':      enderecoCompleto(p),
+    'Cidade/UF':     [p.cidade, p.uf].filter(Boolean).join('/'),
     'Observações':   p.obs || '',
     'Equipamentos':  (p.equipamentos || []).join('; '),
     'Resíduos':      (p.residuos || []).join(', '),
@@ -7491,13 +7805,13 @@ function getExportRows() {
     'Latitude':      temLocal(p) ? p.lat : '',
     'Longitude':     temLocal(p) ? p.lng : '',
     'Google Maps':   gmapsDe(p),
-  }));
+  }, comDist ? { ['Distância de ' + FM.perto.nome + ' (km)']: temLocal(p) ? Math.round(distDoCentro(p) * 10) / 10 : '' } : {}));
 }
 
 // Uma linha por resíduo de cada cadastro (mesma estrutura da aba ResiduosCadastro da planilha).
-function getExportResiduosRows() {
+function getExportResiduosRows(lista) {
   const out = [];
-  points.forEach(p => (p.residuos || []).forEach(r => {
+  (lista || points).forEach(p => (p.residuos || []).forEach(r => {
     const n = naturezaDoResiduo(p, r);
     const v = precosDoPonto(p)[r];
     out.push({ 'Cadastro': p.nome || '', 'CNPJ': p.cnpj || '', 'Tipo': tiposDe(p).map(t => TIPOS[t]?.label || t).join(', '),
@@ -7512,8 +7826,9 @@ function larguraColunas(rows) {
 }
 
 function exportCSV() {
-  const rows = getExportRows();
-  if (!rows.length) return alert('Nenhum ponto cadastrado.');
+  const t = telaExportacao();
+  const rows = getExportRows(t.lista);
+  if (!rows.length) return alert('Nenhum cadastro na tela para exportar. Confira os filtros.');
   const headers = Object.keys(rows[0]);
   const csv = [
     headers.join(';'),
@@ -7521,69 +7836,58 @@ function exportCSV() {
   ].join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `GVC_Pontos_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = nomeArquivoExport(t, 'csv');
   a.click();
   document.getElementById('export-menu').classList.remove('open');
 }
 
 function exportXLSX() {
-  const rows = getExportRows();
-  if (!rows.length) return alert('Nenhum ponto cadastrado.');
+  const t = telaExportacao();
+  const rows = getExportRows(t.lista);
+  if (!rows.length) return alert('Nenhum cadastro na tela para exportar. Confira os filtros.');
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = larguraColunas(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Pontos GVC');
-  const resRows = getExportResiduosRows();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cadastros');
+  const resRows = getExportResiduosRows(t.lista);
   if (resRows.length) {
     const ws2 = XLSX.utils.json_to_sheet(resRows);
     ws2['!cols'] = larguraColunas(resRows);
     XLSX.utils.book_append_sheet(wb, ws2, 'Resíduos e preços');
   }
-  XLSX.writeFile(wb, `GVC_Pontos_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const fRows = linhasFiltrosExport(t);
+  const ws3 = XLSX.utils.json_to_sheet(fRows); ws3['!cols'] = [{ wch: 22 }, { wch: 90 }];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Filtros');
+  XLSX.writeFile(wb, nomeArquivoExport(t, 'xlsx'));
   document.getElementById('export-menu').classList.remove('open');
 }
 
 function exportPDF() {
-  const rows = getExportRows();
-  if (!rows.length) return alert('Nenhum ponto cadastrado.');
+  const t = telaExportacao();
+  const rows = getExportRows(t.lista);
+  if (!rows.length) return alert('Nenhum cadastro na tela para exportar. Confira os filtros.');
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-  // Header
-  doc.setFillColor(10, 13, 15);
-  doc.rect(0, 0, 297, 297, 'F');
-  doc.setTextColor(0, 200, 150);
-  doc.setFontSize(16); doc.setFont('helvetica','bold');
-  doc.text('Grupo GVC — Mapa Operacional', 14, 16);
-  doc.setFontSize(9); doc.setTextColor(150,160,170);
-  doc.text(`Exportado em ${new Date().toLocaleDateString('pt-BR')} · ${rows.length} locais`, 14, 23);
-
-  const cols = ['Tipo','Nome','Categoria','CNPJ','Telefone','Email','Latitude','Longitude','Google Maps'];
-  const body = rows.map(r => cols.map(c => String(r[c] ?? '')));
-
+  doc.setTextColor(20, 33, 27);
+  doc.setFontSize(15); doc.setFont('helvetica', 'bold');
+  doc.text('Grupo GVC — Mapa Operacional · Cadastros', 14, 15);
+  doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 105, 98);
+  doc.text(`Exportado em ${new Date().toLocaleString('pt-BR')} · ${t.lista.length} de ${t.total} cadastros (tela ${t.tela === 'Cadastros' ? 'de Cadastros' : 'do Mapa'})`, 14, 21);
+  const filtrosTxt = t.filtros.length ? 'Filtros: ' + t.filtros.join(' · ') : 'Sem filtro: todos os cadastros ativos';
+  const linhasF = doc.splitTextToSize(filtrosTxt, 268);
+  doc.text(linhasF.slice(0, 3), 14, 26);
+  const cols = ['Tipo', 'Nome', 'Cód. UPLOG', 'CNPJ', 'Contato', 'Telefone', 'Cidade/UF', 'Resíduos', 'Equipamentos'];
   doc.autoTable({
-    startY: 28,
+    startY: 27 + Math.min(3, linhasF.length) * 3.6,
     head: [cols],
-    body,
-    styles: {
-      font: 'helvetica', fontSize: 7.5, cellPadding: 3,
-      textColor: [220,228,236], fillColor: [17,21,25],
-      lineColor: [37,45,54], lineWidth: 0.3,
-    },
-    headStyles: {
-      fillColor: [0,80,55], textColor: [0,200,150],
-      fontStyle: 'bold', fontSize: 8,
-    },
-    alternateRowStyles: { fillColor: [24,29,34] },
-    columnStyles: {
-      0: {cellWidth: 22}, 1: {cellWidth: 40}, 2: {cellWidth: 22},
-      3: {cellWidth: 30}, 4: {cellWidth: 22}, 5: {cellWidth: 35},
-      6: {cellWidth: 18}, 7: {cellWidth: 18}, 8: {cellWidth: 45},
-    },
+    body: rows.map(r => cols.map(c => String(r[c] ?? ''))),
+    styles: { font: 'helvetica', fontSize: 7, cellPadding: 2, textColor: [20, 33, 27], lineColor: [216, 223, 218], lineWidth: 0.2, overflow: 'linebreak' },
+    headStyles: { fillColor: [29, 107, 82], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+    alternateRowStyles: { fillColor: [245, 247, 245] },
+    columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 42 }, 2: { cellWidth: 18 }, 3: { cellWidth: 28 }, 4: { cellWidth: 26 }, 5: { cellWidth: 26 }, 6: { cellWidth: 28 }, 7: { cellWidth: 46 }, 8: { cellWidth: 30 } },
     margin: { left: 14, right: 14 },
   });
-
-  doc.save(`GVC_Pontos_${new Date().toISOString().slice(0,10)}.pdf`);
+  doc.save(nomeArquivoExport(t, 'pdf'));
   document.getElementById('export-menu').classList.remove('open');
 }
 
@@ -7771,6 +8075,7 @@ function closeSidebar() {
 }
 
 function mobileNav(tab) {
+  if (appView !== 'mapa' && tab !== 'export') setAppView('mapa'); // Mapa, Adicionar, Locais e Rota são do mapa
   // Update active state
   document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('mnav-' + tab);
