@@ -83,7 +83,9 @@ function geoReverso_(lat, lng) {
   return geoCache_('r:' + lat.toFixed(5) + ',' + lng.toFixed(5), function () {
     const r = Maps.newGeocoder().setLanguage('pt-BR').reverseGeocode(lat, lng);
     if (r.status === 'OVER_QUERY_LIMIT') throw new Error('OVER_QUERY_LIMIT');
-    const res = (r.results || [])[0];
+    // prefere o endereço de rua; deixa por último os "plus codes" (ex.: 5H3F+99) e os genéricos (só cidade)
+    const nota = function (x) { const t = x.types || []; return t.indexOf('plus_code') >= 0 ? 0 : t.indexOf('street_address') >= 0 || t.indexOf('premise') >= 0 ? 4 : t.indexOf('route') >= 0 ? 3 : t.indexOf('establishment') >= 0 || t.indexOf('point_of_interest') >= 0 ? 2 : 1; };
+    const res = (r.results || []).slice().sort(function (a, b) { return nota(b) - nota(a); })[0];
     return { ok: true, resultado: res ? geoResultado_(res) : null };
   });
 }
