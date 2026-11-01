@@ -76,8 +76,26 @@ function dados_(mes, u) {
   const residuos = ler_('Residuos').filter(function (x) { return x.ativo; }).map(function (x) { return String(x.nome).toUpperCase(); }).sort();
   return { ok: true, usuario: { email: u.email, nome: u.nome, nivel: u.nivel }, mes: mes, ultimoMes: ultimo,
            destinadores: destinadoresControle_(), fonteDestinadores: 'mapa', residuos: residuos,
+           veiculos: veiculosControle_(u), geradores: geradoresControle_(),
            lancamentos: lanc.filter(function (l) { return janela.indexOf(l.mes) >= 0; }), locacao: locacao };
 }
+
+/* Opções do lançamento: placas = veículos ativos da Frota (sem os devolvidos), da unidade de quem lança;
+   geradores = cadastros ativos do Mapa marcados como Cliente ou Unidade GVC. */
+function veiculosControle_(u) {
+  const tipos = nomesPorId_('TiposVeiculo');
+  return ler_('Veiculos').filter(function (v) { return v.ativo && String(v.situacao) !== 'Devolvido' && veUnidade_(u, v.unidadeId); })
+    .map(function (v) { return { placa: normPlaca_(v.placa), tipo: tipos[v.tipoVeiculoId] || '', propriedade: String(v.propriedade || ''), situacao: String(v.situacao || '') }; })
+    .sort(function (a, b) { return a.placa.localeCompare(b.placa); });
+}
+function geradoresControle_() {
+  return ler_('Cadastros').filter(function (c) { const t = separar_(c.tipos); return c.ativo && (t.indexOf('cliente') >= 0 || t.indexOf('empresa') >= 0); })
+    .map(function (c) { const loc = localPrincipal_(c.id) || {};
+      return { id: c.id, nome: String(c.nome || c.razaoSocial || c.id).trim().toUpperCase(), cidade: String(loc.cidade || '').toUpperCase(), uf: String(loc.uf || '').toUpperCase(),
+               unidade: separar_(c.tipos).indexOf('empresa') >= 0 }; })
+    .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+}
+function normPlaca_(p) { return String(p || '').replace(/[\s-]/g, '').toUpperCase(); }
 
 function normNegocio_(v) {
   const t = String(v || '').trim().toUpperCase();
@@ -106,6 +124,17 @@ function salvarLancamento_(l, u) {
   const rotulo = (campos.mtr ? 'MTR ' + campos.mtr : 'sem MTR') + ' · ' + dest.nome;
   const atual = l.id ? acharLanc_(l.id) : null;
   if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Este lançamento é de outra unidade.');
+  // placa e gerador vêm das listas (Frota e Mapa); um lançamento antigo pode manter o valor que já tinha
+  campos.placa = normPlaca_(campos.placa);
+  if (campos.placa && !(atual && normPlaca_(atual.placa) === campos.placa) &&
+      !veiculosControle_(u).some(function (v) { return v.placa === campos.placa; }))
+    return { ok: false, erro: 'dados_invalidos', mensagem: 'A placa ' + campos.placa + ' não está entre os veículos ativos da Frota. Escolha uma da lista (ou cadastre o veículo na Frota).' };
+  const gerNorm = semAcento_(campos.gerador).trim();
+  if (gerNorm && !(atual && semAcento_(atual.gerador).trim() === gerNorm)) {
+    const g = geradoresControle_().filter(function (x) { return semAcento_(x.nome) === gerNorm; })[0];
+    if (!g) return { ok: false, erro: 'dados_invalidos', mensagem: 'O gerador "' + campos.gerador + '" não é um cliente ou unidade GVC ativo no Mapa Operacional. Escolha um da lista.' };
+    campos.gerador = g.nome;
+  }
   if (atual) {
     if (!atual.ativo) campos.ativo = true;
     atualizar_('Lancamentos', atual.id, campos, u, 'destinacao', { registroNome: rotulo });
