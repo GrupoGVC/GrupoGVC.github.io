@@ -1993,6 +1993,35 @@ tr.cad-inativo td:last-child { opacity: 1; }
 <style>
 
 
+
+/* ── Localização pelo Google (cadastro e busca do topo) ── */
+.loc-busca{position:relative;display:flex;gap:8px}
+.loc-busca input{flex:1;min-width:0}
+.loc-btn{flex:0 0 auto;border:1px solid #1d6b52;background:#1d6b52;color:#fff;border-radius:8px;padding:0 12px;font:600 12.5px "IBM Plex Sans",system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.loc-btn:hover{filter:brightness(1.08)}
+.loc-dd{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #d8dfda;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.14);z-index:9999;max-height:260px;overflow-y:auto}
+.loc-item{display:flex;flex-direction:column;gap:1px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #eef1ef;padding:8px 12px;cursor:pointer;font:500 13px "IBM Plex Sans",system-ui,sans-serif;color:#14211b}
+.loc-item em{font-style:normal;font-size:11.5px;color:#77857d}
+.loc-item.g span::before{content:"G";display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#e8f0fe;color:#1a73e8;font:700 10px system-ui;margin-right:6px;vertical-align:1px}
+.loc-item.pin span{color:#1d6b52;font-weight:600}
+.loc-item:hover,.loc-item:focus-visible{background:#edf1ee;outline:none}
+.loc-buscando{padding:9px 12px;font-size:12.5px;color:#77857d}
+.loc-ajuda{font-size:11.5px;color:#77857d;margin-top:5px;line-height:1.35}
+.loc-ajuda .mono{font-family:"IBM Plex Mono",monospace}
+.loc-status{margin-top:6px;font-size:12.5px;padding:6px 10px;border-radius:6px;background:#edf1ee;color:#4b5a52}
+.loc-status.erro{background:#fde8e6;color:#b42f2f}.loc-status.aviso{background:#fff3dc;color:#a86400}.loc-status.ok{background:#e2f4e7;color:#1d7a3e}
+.loc-ok{margin-top:6px;padding:6px 10px;background:#dcefe6;border:1px solid #b9dccb;border-radius:6px;font-size:12.5px;color:#1d6b52;align-items:center;gap:8px;flex-wrap:wrap}
+.loc-ok > span:nth-child(2){flex:1;min-width:140px}
+.loc-fill{border:1px solid #1d6b52;background:#fff;color:#1d6b52;border-radius:6px;padding:3px 8px;font:600 12px "IBM Plex Sans",system-ui,sans-serif;cursor:pointer}
+.loc-fill:disabled{opacity:.6}
+.loc-x{background:none;border:none;color:#77857d;cursor:pointer;font-size:.85rem}
+.loc-mini{height:190px;margin-top:8px;border:1px solid #d8dfda;border-radius:8px;overflow:hidden;z-index:0}
+.mini-pin{width:26px;height:26px;margin-top:2px;background:#1d6b52;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:grab}
+.busca-pop{display:flex;flex-direction:column;gap:6px;min-width:200px}
+.busca-pop span{font-size:11.5px;color:#77857d}
+#geocoder-input{background:rgba(255,255,255,.97) !important;color:#14211b !important;border-color:#d8dfda !important}
+#geocoder-dropdown{background:#fff !important;border-color:#d8dfda !important;box-shadow:0 10px 30px rgba(0,0,0,.14) !important;backdrop-filter:none !important;max-height:340px;overflow-y:auto !important}
+@media (max-width:560px){.loc-busca{flex-wrap:wrap}.loc-btn{width:100%;padding:8px 12px}}
 /* seletor de parada da rota */
 #picker-overlay .pk-box{background:#fff !important;border-color:#d8dfda !important;box-shadow:0 12px 40px rgba(0,0,0,.18) !important}
 #picker-overlay .pk-box > div{border-color:#e6ebe7 !important}
@@ -2216,7 +2245,7 @@ body.somente-leitura #overlay .res-chip { pointer-events:none; }
           font-size:1rem; pointer-events:none; opacity:0.6;
         ">🔍</span>
         <input id="geocoder-input" type="text" autocomplete="off"
-          placeholder="Buscar endereço, cidade, bairro..."
+          placeholder="Buscar no Google ou colar link do Google Maps…"
           oninput="onGeocoderInput(this.value)"
           style="
             width:100%; padding:10px 36px 10px 38px;
@@ -5420,29 +5449,25 @@ function showRouteError(msg) {
     </div>
 
 
-    <!-- LOCALIZAÇÃO -->
+    <!-- LOCALIZAÇÃO (busca no Google, link do Google Maps ou coordenadas) -->
     <div class="fg" id="loc-field-wrap">
-      <label>Localização</label>
-      <div style="position:relative;">
-        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:0.85rem;pointer-events:none;opacity:0.5;">📍</span>
+      <label for="f-loc-search">Localização</label>
+      <div class="loc-busca">
         <input type="text" id="f-loc-search" autocomplete="off"
-          placeholder="Buscar cidade, endereço, CEP..."
-          oninput="onModalLocInput(this.value)"
-          style="padding-left:32px;"
-        >
-        <div id="f-loc-dropdown" style="
-          display:none; position:absolute; top:calc(100% + 4px); left:0; right:0;
-          background:#111519; border:1px solid #252d36; border-radius:8px;
-          box-shadow:0 6px 24px rgba(0,0,0,0.6); z-index:9999;
-          max-height:200px; overflow-y:auto;
-        "></div>
+          placeholder="Endereço, lugar ou CEP — ou cole o link do Google Maps"
+          oninput="onModalLocInput(this.value)" onkeydown="onModalLocKey(event)">
+        <button type="button" class="loc-btn" onclick="buscarLocModalAgora()">Buscar no Google</button>
+        <div id="f-loc-dropdown" class="loc-dd" role="listbox"></div>
       </div>
-      <div id="f-loc-confirmed" style="display:none;margin-top:6px;padding:6px 10px;
-        background:rgba(0,200,150,0.08);border:1px solid rgba(0,200,150,0.3);
-        border-radius:6px;font-size:0.75rem;color:#00c896;display:none;align-items:center;gap:6px;">
+      <div class="loc-ajuda">Busca no Google · aceita link do Google Maps (inclusive o do botão “Compartilhar” do celular) ou coordenadas como <span class="mono">-12.84, -38.42</span>.</div>
+      <div class="loc-status" id="f-loc-status" role="status" hidden></div>
+      <div id="f-loc-confirmed" class="loc-ok" style="display:none">
         <span>✓</span><span id="f-loc-confirmed-text"></span>
-        <button onclick="clearModalLoc()" style="margin-left:auto;background:none;border:none;color:#5a6577;cursor:pointer;font-size:0.8rem;">✕</button>
+        <button type="button" id="f-loc-fill" class="loc-fill so-editor" onclick="preencherEnderecoGoogle()" hidden>Preencher endereço com o do Google</button>
+        <button type="button" class="loc-x" onclick="clearModalLoc()" title="Desfazer a localização escolhida" aria-label="Desfazer a localização escolhida">✕</button>
       </div>
+      <div id="f-loc-mini" class="loc-mini" hidden></div>
+      <div class="loc-ajuda" id="f-loc-mini-hint" hidden>Arraste o marcador para ajustar o ponto exato.</div>
     </div>
 
     <div class="gvc-audit" id="modal-audit" style="margin:10px 0 0"></div>
@@ -6232,22 +6257,22 @@ function openModal(id, draft) {
   setEquipamentosAberto(currentEquipamentos.size > 0); // sem equipamento → fica recolhido
 
   // Reset location search state (a menos que já venha de um clique no mapa, ver abaixo)
-  modalNewLat = null; modalNewLng = null;
+  modalNewLat = null; modalNewLng = null; modalLocEndereco = null; modalLocSeq++;
   const locSearch = document.getElementById('f-loc-search');
   if (locSearch) locSearch.value = '';
   const locConf = document.getElementById('f-loc-confirmed');
   if (locConf) locConf.style.display = 'none';
+  locStatus(''); closeModalLocDD(); esconderMiniMapa();
 
   if (!id && pendingLatLng) {
     // Veio de um clique no mapa (fluxo normal de "+ Adicionar", ou retomando um
     // rascunho de cadastro depois de "📍 Marcar no mapa") — localização já definida.
-    modalNewLat = pendingLatLng.lat;
-    modalNewLng = pendingLatLng.lng;
-    if (locConf) {
-      document.getElementById('f-loc-confirmed-text').textContent =
-        `${pendingLatLng.lat.toFixed(4)}, ${pendingLatLng.lng.toFixed(4)}`;
-      locConf.style.display = 'flex';
-    }
+    const pl = pendingLatLng;
+    setTimeout(() => setModalLoc(pl.lat, pl.lng, pl.nome || 'Ponto marcado no mapa', pl.endereco || null), 0);
+    modalNewLat = pl.lat; modalNewLng = pl.lng;
+  } else if (id) {
+    const atual = points.find(x => x.id === id);
+    if (atual && temLocal(atual)) setTimeout(() => mostrarMiniMapaAtual(atual), 0);
   }
 
   // "Mover no mapa" só faz sentido editando um local já salvo;
@@ -6985,71 +7010,49 @@ document.addEventListener('keydown', e => {
 let geocoderTimer = null;
 let geocoderMarker = null;
 
+let geocoderSeq = 0;
 function onGeocoderInput(val) {
   const clear = document.getElementById('geocoder-clear');
   if (clear) clear.style.display = val ? 'block' : 'none';
   clearTimeout(geocoderTimer);
-  if (!val || val.length < 2) { closeGeocoderDD(); return; }
-
-  const q = val.toLowerCase();
-
-  // Local results first (cities + map points)
-  const cityMatches = CIDADES_BR
-    .filter(c => c.n.toLowerCase().includes(q))
-    .slice(0, 5)
+  const v = String(val || '').trim();
+  if (!v || v.length < 2) { closeGeocoderDD(); return; }
+  const c = coordsDoTexto(v);
+  if (c) { showGeocoderDD([{ label: '📍 Ir para ' + c.lat + ', ' + c.lng, name: 'Coordenadas ' + c.lat + ', ' + c.lng, lat: c.lat, lng: c.lng, zoom: 17, endereco: null }], false); return; }
+  if (ehLinkMaps(v)) { showGeocoderDD([], true, 'Lendo o link do Google Maps…'); geocoderTimer = setTimeout(() => geocoderLink(v), 250); return; }
+  const n = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const nq = n(v);
+  const cityMatches = CIDADES_BR.filter(c => n(c.n).includes(nq)).slice(0, 4)
     .map(c => ({ label: '🏙 ' + c.n, name: c.n, lat: c.lat, lng: c.lng, zoom: 11 }));
-
-  const pinMatches = points
-    .filter(p => temLocal(p) && (p.nome + ' ' + (p.cat||'')).toLowerCase().includes(q))
-    .slice(0, 3)
-    .map(p => ({ label: TIPOS[p.tipo].icon + ' ' + p.nome, name: p.nome, lat: p.lat, lng: p.lng, zoom: 14, pin: true }));
-
-  const localResults = [...pinMatches, ...cityMatches];
-  showGeocoderDD(localResults, true);
-
-  // Nominatim in background
-  if (val.length >= 4) {
-    geocoderTimer = setTimeout(async () => {
-      try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val+', Brasil')}&limit=5&addressdetails=1`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-        const data = await res.json();
-        if (!data.length) return;
-        const geoResults = data.map(r => ({
-          label: '📍 ' + r.display_name.split(',').slice(0,2).join(',').trim(),
-          name: r.display_name.split(',').slice(0,2).join(',').trim(),
-          lat: parseFloat(r.lat), lng: parseFloat(r.lon), zoom: 14
-        }));
-        // Merge avoiding duplicates
-        const merged = [...pinMatches, ...cityMatches];
-        geoResults.forEach(g => {
-          if (!merged.find(x => Math.abs(x.lat - g.lat) < 0.01)) merged.push(g);
-        });
-        showGeocoderDD(merged.slice(0, 8), false);
-      } catch(e) {}
-    }, 500);
-  }
+  const pinMatches = points.filter(p => temLocal(p) && n(p.nome + ' ' + (p.cat || '')).includes(nq)).slice(0, 3)
+    .map(p => ({ label: (TIPOS[p.tipo] ? TIPOS[p.tipo].icon + ' ' : '') + p.nome, name: p.nome, id: p.id, lat: Number(p.lat), lng: Number(p.lng), zoom: 14, pin: true }));
+  const locais = [...pinMatches, ...cityMatches];
+  showGeocoderDD(locais, v.length >= 4);
+  if (v.length >= 4) geocoderTimer = setTimeout(async () => {
+    const seq = ++geocoderSeq;
+    const r = await geoGoogle({ tipo: 'buscar', q: v });
+    if (seq !== geocoderSeq || document.getElementById('geocoder-input').value.trim() !== v) return;
+    if (!r.ok) { showGeocoderDD(locais, false, r.mensagem); return; }
+    const g = r.resultados.map(x => ({ label: '📍 ' + x.nome, name: x.nome, lat: x.lat, lng: x.lng, zoom: x.preciso ? 17 : 14, endereco: x.endereco, google: true }));
+    showGeocoderDD([...pinMatches, ...g, ...cityMatches].slice(0, 9), false, g.length ? '' : 'O Google não achou esse endereço.');
+  }, 700);
+}
+async function geocoderLink(url) {
+  const seq = ++geocoderSeq;
+  const r = await geoGoogle({ tipo: 'link', url });
+  if (seq !== geocoderSeq) return;
+  if (!r.ok) { showGeocoderDD([], false, r.mensagem); return; }
+  const x = r.resultado;
+  showGeocoderDD([{ label: '📍 ' + x.nome, name: x.nome, lat: x.lat, lng: x.lng, zoom: 17, endereco: x.endereco, google: true }], false);
+  selectGeocoderResult(0);
 }
 
-function showGeocoderDD(results, loading) {
+function showGeocoderDD(results, loading, aviso) {
   const dd = document.getElementById('geocoder-dropdown');
-  if (!results.length && !loading) { dd.style.display = 'none'; return; }
-
-  let html = '';
-  if (!results.length && loading) {
-    html = `<div style="padding:12px 14px;color:#5a6577;font-size:0.8rem;">Buscando...</div>`;
-  } else {
-    html = results.map((r, i) => `
-      <div onmousedown="event.preventDefault();selectGeocoderResult(${i})"
-        data-idx="${i}"
-        style="padding:10px 14px;cursor:pointer;font-size:0.82rem;color:#dde4ec;
-               border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.1s;
-               ${r.pin ? 'color:#00c896;' : ''}"
-        onmouseover="this.style.background='rgba(255,255,255,0.06)'"
-        onmouseout="this.style.background=''"
-      >${r.label}</div>
-    `).join('');
-  }
+  if (!results.length && !loading && !aviso) { dd.style.display = 'none'; return; }
+  const html = results.map((r, i) => `<button type="button" class="loc-item${r.pin ? ' pin' : ''}${r.google ? ' g' : ''}" data-idx="${i}" onmousedown="event.preventDefault();selectGeocoderResult(${i})"><span>${escG(r.label)}</span></button>`).join('')
+    + (loading ? '<div class="loc-buscando">Buscando no Google…</div>' : '')
+    + (aviso ? `<div class="loc-buscando">${escG(aviso)}</div>` : '');
   dd.innerHTML = html;
   dd.style.display = 'block';
   dd._results = results;
@@ -7069,7 +7072,7 @@ function selectGeocoderResult(i) {
 
   // If it's a map pin, just fly to it
   if (r.pin) {
-    const p = points.find(x => x.nome === r.name);
+    const p = points.find(x => x.id === r.id) || points.find(x => x.nome === r.name);
     if (p) {
       map.flyTo([r.lat, r.lng], r.zoom, { duration: 1 });
       setTimeout(() => leafletLayers[p.id]?.marker.openPopup(), 1100);
@@ -7092,6 +7095,18 @@ function selectGeocoderResult(i) {
       className:'', iconSize:[14,14], iconAnchor:[7,7]
     })
   }).addTo(map);
+  geocoderMarker._busca = r;
+  geocoderMarker.bindPopup(`<div class="busca-pop"><b>${escG(r.name)}</b><span>${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}</span>
+    ${somenteLeitura ? '' : '<button type="button" class="popup-edit-btn" onclick="cadastrarNoPontoBuscado()">＋ Cadastrar neste local</button>'}</div>`, { className: 'gvc-popup', autoPanPaddingTopLeft: [16, 70] });
+  setTimeout(() => geocoderMarker && geocoderMarker.openPopup(), 1050);
+}
+/** Novo cadastro no ponto achado na busca do topo (já com o endereço do Google para oferecer). */
+function cadastrarNoPontoBuscado() {
+  if (somenteLeitura || !geocoderMarker) return;
+  const r = geocoderMarker._busca;
+  map.closePopup();
+  pendingLatLng = L.latLng(r.lat, r.lng); pendingLatLng.nome = r.name; pendingLatLng.endereco = r.endereco || null;
+  openModal(null);
 }
 
 function closeGeocoderDD() {
@@ -7259,105 +7274,190 @@ function cancelLocationPicking() {
   }
 }
 
-// ─── MODAL LOCATION SEARCH ────────────────────────────────
-let modalLocTimer = null;
+// ─── LOCALIZAÇÃO PELO GOOGLE ──────────────────────────────
+// Busca no Google (via portal, sem chave de API), link do Google Maps (longo ou curto) e coordenadas.
+function coordsDoTexto(t) {
+  const m = String(t || '').trim().match(/^(-?\d{1,2}(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:[.,]\d+)?)$/);
+  if (!m) return null;
+  const lat = Number(m[1].replace(',', '.')), lng = Number(m[2].replace(',', '.'));
+  return (Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng)) ? { lat, lng } : null;
+}
+const ehLinkMaps = t => /^(https?:\/\/)?([a-z0-9-]+\.)*(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|goo\.gl\/|maps\.app\.goo\.gl|g\.co\/)/i.test(String(t || '').trim());
+const escG = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+async function geoGoogle(dados) {
+  try { return await Portal.api('mapa.geo', dados); }
+  catch (e) { return { ok: false, mensagem: (e && e.mensagem) || 'Sem conexão com o portal. Tente de novo.' }; }
+}
+
+let modalLocTimer = null, modalLocSeq = 0;
 let modalNewLat = null;
 let modalNewLng = null;
+let modalLocEndereco = null;   // endereço do Google do ponto escolhido (null = buscar pelo ponto)
+let miniMapa = null, miniMarcador = null;
+
+function locStatus(msg, tipo) {
+  const el = document.getElementById('f-loc-status'); if (!el) return;
+  el.hidden = !msg; el.textContent = msg || ''; el.className = 'loc-status' + (tipo ? ' ' + tipo : '');
+}
+function itensLocais(q) {
+  const n = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const nq = n(q);
+  const pins = points.filter(p => temLocal(p) && p.id !== editingId && n(p.nome + ' ' + (p.cat || '')).includes(nq)).slice(0, 3)
+    .map(p => ({ label: (TIPOS[p.tipo] ? TIPOS[p.tipo].icon + ' ' : '') + p.nome, sub: 'cadastro no mapa', name: p.nome, lat: Number(p.lat), lng: Number(p.lng), endereco: null }));
+  const cids = CIDADES_BR.filter(c => n(c.n).includes(nq)).slice(0, 3)
+    .map(c => ({ label: '🏙 ' + c.n, sub: 'centro da cidade', name: c.n, lat: c.lat, lng: c.lng, endereco: null }));
+  return [...pins, ...cids];
+}
 
 function onModalLocInput(val) {
-  modalNewLat = null;
-  modalNewLng = null;
   clearTimeout(modalLocTimer);
-
-  const confirmed = document.getElementById('f-loc-confirmed');
-  if (confirmed) confirmed.style.display = 'none';
-
-  if (!val || val.length < 2) { closeModalLocDD(); return; }
-
-  const q = val.toLowerCase();
-  const cityMatches = CIDADES_BR
-    .filter(c => c.n.toLowerCase().includes(q)).slice(0, 5)
-    .map(c => ({ label: '🏙 ' + c.n, name: c.n, lat: c.lat, lng: c.lng, zoom: 12 }));
-  const pinMatches = points
-    .filter(p => temLocal(p) && (p.nome + ' ' + (p.cat||'')).toLowerCase().includes(q) && p.id !== editingId)
-    .slice(0, 2)
-    .map(p => ({ label: TIPOS[p.tipo].icon + ' ' + p.nome, name: p.nome, lat: p.lat, lng: p.lng, zoom: 14 }));
-
-  showModalLocDD([...pinMatches, ...cityMatches]);
-
-  if (val.length >= 4) {
-    modalLocTimer = setTimeout(async () => {
-      try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val+', Brasil')}&limit=5`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-        const data = await res.json();
-        const geoResults = data.map(r => ({
-          label: '📍 ' + r.display_name.split(',').slice(0,2).join(',').trim(),
-          name: r.display_name.split(',').slice(0,2).join(',').trim(),
-          lat: parseFloat(r.lat), lng: parseFloat(r.lon), zoom: 15
-        }));
-        const merged = [...pinMatches, ...cityMatches];
-        geoResults.forEach(g => {
-          if (!merged.find(x => Math.abs(x.lat - g.lat) < 0.01)) merged.push(g);
-        });
-        showModalLocDD(merged.slice(0, 8));
-      } catch(e) {}
-    }, 500);
-  }
+  locStatus('');
+  const v = String(val || '').trim();
+  if (!v) { closeModalLocDD(); return; }
+  const c = coordsDoTexto(v);
+  if (c) { showModalLocDD([{ label: '📍 Usar estas coordenadas', sub: c.lat + ', ' + c.lng, name: 'Coordenadas ' + c.lat + ', ' + c.lng, lat: c.lat, lng: c.lng, endereco: null }]); return; }
+  if (ehLinkMaps(v)) { closeModalLocDD(); modalLocTimer = setTimeout(() => lerLinkModal(v), 250); return; }
+  if (v.length < 2) { closeModalLocDD(); return; }
+  const locais = itensLocais(v);
+  showModalLocDD(locais, v.length >= 4);
+  if (v.length >= 4) modalLocTimer = setTimeout(() => buscarGoogleModal(v, locais), 700);
+}
+function onModalLocKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); const dd = document.getElementById('f-loc-dropdown');
+    if (dd._results && dd._results.length && dd.style.display !== 'none' && !dd._buscando) selectModalLoc(0); else buscarLocModalAgora(); }
+  if (e.key === 'Escape') closeModalLocDD();
+}
+function buscarLocModalAgora() {
+  const v = document.getElementById('f-loc-search').value.trim();
+  if (!v) { locStatus('Digite o endereço, o nome do lugar ou o CEP, ou cole o link do Google Maps.', 'aviso'); return; }
+  clearTimeout(modalLocTimer);
+  const c = coordsDoTexto(v);
+  if (c) { setModalLoc(c.lat, c.lng, 'Coordenadas ' + c.lat + ', ' + c.lng, null); return; }
+  if (ehLinkMaps(v)) { lerLinkModal(v); return; }
+  buscarGoogleModal(v, itensLocais(v));
+}
+async function buscarGoogleModal(q, locais) {
+  const seq = ++modalLocSeq;
+  showModalLocDD(locais, true);
+  const r = await geoGoogle({ tipo: 'buscar', q });
+  if (seq !== modalLocSeq || document.getElementById('f-loc-search').value.trim() !== q) return;
+  if (!r.ok) { showModalLocDD(locais); locStatus(r.mensagem, 'erro'); return; }
+  const g = r.resultados.map(x => ({ label: x.nome, sub: x.preciso ? 'Google · endereço exato' : 'Google · aproximado', name: x.nome, lat: x.lat, lng: x.lng, endereco: x.endereco, google: true }));
+  showModalLocDD([...g, ...locais]);
+  if (!g.length) locStatus('O Google não achou esse endereço. Tente com cidade e UF, o CEP, ou cole o link do Google Maps.', 'aviso');
+}
+async function lerLinkModal(url) {
+  const seq = ++modalLocSeq;
+  locStatus('Lendo o link do Google Maps…');
+  const r = await geoGoogle({ tipo: 'link', url });
+  if (seq !== modalLocSeq) return;
+  if (!r.ok) { locStatus(r.mensagem, 'erro'); return; }
+  const x = r.resultado;
+  setModalLoc(x.lat, x.lng, x.nome, x.endereco || null);
+  locStatus('');
 }
 
-function showModalLocDD(results) {
+function showModalLocDD(results, buscando) {
   const dd = document.getElementById('f-loc-dropdown');
   if (!dd) return;
-  if (!results.length) { dd.style.display = 'none'; return; }
-  dd._results = results;
-  dd.innerHTML = results.map((r, i) => `
-    <div onmousedown="event.preventDefault();selectModalLoc(${i})"
-      style="padding:9px 12px;cursor:pointer;font-size:0.8rem;color:#dde4ec;
-             border-bottom:1px solid #1f262e;transition:background 0.1s;"
-      onmouseover="this.style.background='#181d22'"
-      onmouseout="this.style.background=''"
-    >${r.label}</div>
-  `).join('');
+  dd._results = results; dd._buscando = !!buscando;
+  if (!results.length && !buscando) { dd.style.display = 'none'; return; }
+  dd.innerHTML = results.map((r, i) => `<button type="button" class="loc-item${r.google ? ' g' : ''}" onmousedown="event.preventDefault();selectModalLoc(${i})">
+      <span>${escG(r.label)}</span>${r.sub ? `<em>${escG(r.sub)}</em>` : ''}</button>`).join('') +
+    (buscando ? '<div class="loc-buscando">Buscando no Google…</div>' : '');
   dd.style.display = 'block';
 }
-
 function selectModalLoc(i) {
   const dd = document.getElementById('f-loc-dropdown');
   const r = dd._results && dd._results[i];
   if (!r) return;
+  modalLocSeq++;
+  setModalLoc(r.lat, r.lng, r.name, r.endereco || null);
+}
 
-  modalNewLat = r.lat;
-  modalNewLng = r.lng;
-
+/** Define o ponto do cadastro (sem salvar ainda) e mostra no mini mapa. */
+function setModalLoc(lat, lng, nome, endereco) {
+  modalNewLat = Number(lat); modalNewLng = Number(lng);
+  modalLocEndereco = endereco || null;
   document.getElementById('f-loc-search').value = '';
-  closeModalLocDD();
+  closeModalLocDD(); locStatus('');
+  mostrarLocConfirmada(nome + ` (${modalNewLat.toFixed(5)}, ${modalNewLng.toFixed(5)})`);
+  mostrarMiniMapa(modalNewLat, modalNewLng, 16);
+}
+function mostrarLocConfirmada(txt) {
+  const conf = document.getElementById('f-loc-confirmed');
+  document.getElementById('f-loc-confirmed-text').textContent = txt;
+  conf.style.display = 'flex';
+  const fill = document.getElementById('f-loc-fill');
+  if (fill) fill.hidden = somenteLeitura || modalNewLat === null || !camposEnderecoVazios().length;
+}
+const CAMPOS_END = [['logradouro', 'f-end-logradouro', 'Rua'], ['numero', 'f-end-numero', 'Número'], ['bairro', 'f-end-bairro', 'Bairro'],
+                    ['cidade', 'f-end-cidade', 'Cidade'], ['uf', 'f-end-uf', 'UF'], ['cep', 'f-end-cep', 'CEP']];
+function camposEnderecoVazios() { return CAMPOS_END.filter(([, id]) => !document.getElementById(id).value.trim()); }
 
-  const confirmed = document.getElementById('f-loc-confirmed');
-  const confirmedText = document.getElementById('f-loc-confirmed-text');
-  if (confirmed && confirmedText) {
-    confirmedText.textContent = r.name + ` (${r.lat.toFixed(4)}, ${r.lng.toFixed(4)})`;
-    confirmed.style.display = 'flex';
+function mostrarMiniMapa(lat, lng, zoom) {
+  const el = document.getElementById('f-loc-mini'); if (!el) return;
+  el.hidden = false; document.getElementById('f-loc-mini-hint').hidden = somenteLeitura;
+  if (!miniMapa) {
+    miniMapa = L.map(el, { zoomControl: true, attributionControl: false, scrollWheelZoom: 'center' });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(miniMapa);
   }
+  if (miniMarcador) miniMapa.removeLayer(miniMarcador);
+  miniMarcador = L.marker([lat, lng], { draggable: !somenteLeitura, autoPan: true, title: 'Arraste para ajustar',
+    icon: L.divIcon({ className: '', html: '<div class="mini-pin"></div>', iconSize: [26, 34], iconAnchor: [13, 32] }) }).addTo(miniMapa);
+  miniMarcador.on('dragend', () => {
+    const ll = miniMarcador.getLatLng();
+    modalNewLat = ll.lat; modalNewLng = ll.lng; modalLocEndereco = null;
+    mostrarLocConfirmada(`Ajustado no mapa (${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)})`);
+  });
+  miniMapa.setView([lat, lng], zoom || 16);
+  setTimeout(() => { miniMapa.invalidateSize(); miniMapa.setView([lat, lng], zoom || 16); }, 80);
+}
+function esconderMiniMapa() {
+  const el = document.getElementById('f-loc-mini'); if (el) el.hidden = true;
+  const h = document.getElementById('f-loc-mini-hint'); if (h) h.hidden = true;
+}
+
+/** Preenche só os campos de endereço vazios, depois de confirmar com o usuário. */
+async function preencherEnderecoGoogle() {
+  if (modalNewLat === null) return;
+  const btn = document.getElementById('f-loc-fill');
+  let end = modalLocEndereco;
+  if (!end) {
+    btn.disabled = true; btn.textContent = 'Buscando endereço…';
+    const r = await geoGoogle({ tipo: 'reverso', lat: modalNewLat, lng: modalNewLng });
+    btn.disabled = false; btn.textContent = 'Preencher endereço com o do Google';
+    if (!r.ok || !r.resultado) { locStatus(r.ok ? 'O Google não tem endereço para esse ponto.' : r.mensagem, 'erro'); return; }
+    end = modalLocEndereco = r.resultado.endereco;
+  }
+  const vaz = camposEnderecoVazios().filter(([k]) => end[k]);
+  if (!vaz.length) { locStatus('Os campos de endereço já estão preenchidos (ou o Google não tem esses dados).', 'aviso'); return; }
+  const lista = vaz.map(([k, , rot]) => `• ${rot}: ${end[k]}`).join('\n');
+  if (!confirm('Preencher os campos de endereço vazios com o endereço do Google?\n\n' + lista + '\n\nOs campos que você já preencheu não mudam.')) return;
+  vaz.forEach(([k, id]) => { const el = document.getElementById(id); el.value = k === 'uf' ? String(end[k]).toUpperCase() : end[k]; el.dispatchEvent(new Event('input')); });
+  mostrarLocConfirmada(document.getElementById('f-loc-confirmed-text').textContent);
+  locStatus('Endereço preenchido. Confira e salve.', 'ok');
 }
 
 function clearModalLoc() {
-  modalNewLat = null;
-  modalNewLng = null;
-  const confirmed = document.getElementById('f-loc-confirmed');
-  if (confirmed) confirmed.style.display = 'none';
+  modalNewLat = null; modalNewLng = null; modalLocEndereco = null; modalLocSeq++;
+  document.getElementById('f-loc-confirmed').style.display = 'none';
   document.getElementById('f-loc-search').value = '';
+  locStatus('');
+  // cadastro já salvo com local: volta a mostrar o ponto atual
+  const atual = editingId && points.find(x => x.id === editingId);
+  if (atual && temLocal(atual)) mostrarMiniMapaAtual(atual); else esconderMiniMapa();
+}
+function mostrarMiniMapaAtual(p) {
+  mostrarMiniMapa(Number(p.lat), Number(p.lng), 16);
+  modalNewLat = null; modalNewLng = null; // só muda se arrastar ou escolher outro ponto
 }
 
 function closeModalLocDD() {
   const dd = document.getElementById('f-loc-dropdown');
   if (dd) dd.style.display = 'none';
 }
-
-// Close dropdown when clicking outside
-document.getElementById('f-loc-search')?.addEventListener('blur', () => {
-  setTimeout(closeModalLocDD, 200);
-});
+document.getElementById('f-loc-search')?.addEventListener('blur', () => { setTimeout(closeModalLocDD, 200); });
 
 
 // ─── EXPORT ───────────────────────────────────────────────
