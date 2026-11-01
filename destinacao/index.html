@@ -105,6 +105,41 @@ svg text{fill:var(--ink-3);font:11px var(--f-body)}
 .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{font-weight:600;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:8px 10px;background:var(--sunken);border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+th .fh{all:unset;display:inline-flex;align-items:center;gap:5px;cursor:pointer;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;border-radius:4px;padding:2px 4px;margin:-2px -4px}
+th .fh:hover{color:var(--ink);background:var(--line-soft)}
+th .fh:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+th .fh .fi{display:inline-grid;place-items:center;width:16px;height:16px;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+th .fh .fi svg{width:11px;height:11px}
+th .fh.on{color:var(--accent)}
+th .fh.on .fi{border-color:var(--accent);background:var(--accent-soft)}
+th.num .fh{flex-direction:row}
+.fpop{position:absolute;z-index:60;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:8px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;text-transform:none;letter-spacing:0}
+.fpop .fp-ord{display:flex;flex-direction:column;border-bottom:1px solid var(--line-soft);padding-bottom:6px}
+.fpop .fp-o{all:unset;cursor:pointer;padding:6px 8px;border-radius:4px}
+.fpop .fp-o:hover,.fpop .fp-o:focus-visible{background:var(--sunken)}
+.fpop .fp-busca{width:100%;box-sizing:border-box}
+.fpop .fp-lista{max-height:240px;overflow:auto;border:1px solid var(--line-soft);border-radius:4px;padding:4px}
+.fpop .fp-lista label{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px;cursor:pointer;font-weight:500}
+.fpop .fp-lista label[hidden]{display:none}
+.fpop .fp-lista label:hover{background:var(--sunken)}
+.fpop .fp-lista input{width:auto;margin:0}
+.fpop .fp-lista span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fpop .fp-lista em{font-style:normal;color:var(--ink-3);font-size:12px}
+.fpop .fp-all{border-bottom:1px solid var(--line-soft);border-radius:0 !important}
+.fpop .fp-bot{display:flex;gap:6px;align-items:center}
+.filtro-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px;padding:6px 10px;border-radius:var(--r);background:var(--accent-soft);font-size:13px}
+.filtro-info span{flex:1}
+td.empty{text-align:center;color:var(--ink-3);padding:18px}
+.exp-wrap{position:relative}
+.exp-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 30px rgba(0,0,0,.14);min-width:240px;display:flex;flex-direction:column;overflow:hidden}
+.exp-menu[hidden]{display:none}
+.exp-menu .exp-info{padding:10px 14px;font-size:12px;color:var(--ink-2);background:var(--sunken);border-bottom:1px solid var(--line);line-height:1.45}
+.exp-menu .exp-info b{color:var(--ink)}
+.exp-menu .exp-info .tag-f{display:inline-block;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:0 6px;font-weight:600}
+.exp-menu button{background:none;border:0;border-bottom:1px solid var(--line-soft);padding:10px 14px;text-align:left;font:500 13px var(--f-body);color:var(--ink);cursor:pointer}
+.exp-menu button:last-child{border-bottom:0}
+.exp-menu button:hover,.exp-menu button:focus-visible{background:var(--accent-soft);color:var(--accent);outline:none}
+#u-nivel{display:none!important}
 td{padding:7px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap;vertical-align:middle}
 tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -171,7 +206,7 @@ td input,td select{padding:5px 8px;font-size:13px}
 .seg{display:inline-flex;background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
 .seg button,.seg label{border:0;background:transparent;color:var(--ink-2);font:600 13px var(--f-body);padding:7px 14px;border-radius:6px;cursor:pointer;white-space:nowrap}
 .seg button[aria-pressed="true"],.seg input:checked+label{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
-.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;padding:0;margin:0}
 .seg input:focus-visible+label{outline:2px solid var(--accent);outline-offset:1px}
 .pill.neg-rss{background:color-mix(in srgb,var(--s-loc) 16%,transparent);color:var(--s-loc)}
 .pill.neg-ind{background:color-mix(in srgb,var(--s-dest) 15%,transparent);color:var(--s-dest)}
@@ -392,7 +427,112 @@ function pendencias(lanc){
 
 const negPill=n=>n==='RSS'?'<span class="pill neg-rss">RSS</span>':n==='Industrial'?'<span class="pill neg-ind">Industrial</span>':'<span class="pill neg-none">sem tipo</span>';
 function bindNeg(){document.querySelectorAll('[data-neg]').forEach(b=>b.onclick=()=>{S.neg=b.dataset.neg;renderPainel();bindNeg()});
-  document.querySelectorAll('[data-negsel]').forEach(tr=>tr.onclick=()=>{const n=tr.dataset.negsel;if(n){S.neg=n;renderPainel();bindNeg()}else{S.f={dest:'',res:'',q:'',neg:'none'};setTab('lanc')}})}
+  document.querySelectorAll('[data-negsel]').forEach(tr=>tr.onclick=()=>{const n=tr.dataset.negsel;if(n){S.neg=n;renderPainel();bindNeg()}else{S.f={dest:'',res:'',q:'',neg:''};S.filtros.lanc={neg:new Set(['Sem tipo'])};delete S.ordem.lanc;setTab('lanc')}})}
+/* ---------- filtro por coluna, como no Excel ---------- */
+// S.filtros[aba][coluna] = Set dos valores que aparecem; S.ordem[aba] = { k, dir }.
+S.filtros = S.filtros || {}; S.ordem = S.ordem || {};
+const txtCol = (c, x) => { const v = c.v(x); return v === '' || v == null ? (c.vazio || '(Vazias)') : String(v); };
+const cmpCol = (c, a, b) => { if (c.ord) { const x = c.ord(a), y = c.ord(b); return typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true }); } return c.num ? (Number(c.v(a)) || 0) - (Number(c.v(b)) || 0) : txtCol(c, a).localeCompare(txtCol(c, b), 'pt-BR', { numeric: true }); };
+function passaFiltros(aba, cols, x, exceto) {
+  const f = S.filtros[aba] || {};
+  return cols.every(c => c.k === exceto || !f[c.k] || f[c.k].has(txtCol(c, x)));
+}
+function aplicarFiltros(aba, cols, linhas) {
+  let out = linhas.filter(x => passaFiltros(aba, cols, x));
+  const o = S.ordem[aba]; const c = o && cols.find(y => y.k === o.k);
+  if (c) out = out.slice().sort((a, b) => o.dir * cmpCol(c, a, b));
+  return out;
+}
+const nFiltros = aba => Object.keys(S.filtros[aba] || {}).length + (S.ordem[aba] ? 1 : 0);
+const ICO_FILTRO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12l-4.6 5.4V13l-2.8-1.4V8.4z" fill="currentColor"/></svg>';
+const ICO_SETA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function cabFiltro(aba, cols, extra) {
+  const f = S.filtros[aba] || {}, o = S.ordem[aba];
+  return '<tr>' + cols.map(c => {
+    const on = !!f[c.k], ord = o && o.k === c.k ? (o.dir > 0 ? ' ↑' : ' ↓') : '';
+    return `<th class="${c.num ? 'num' : ''}${c.cls ? ' ' + c.cls : ''}"><button type="button" class="fh${on || ord ? ' on' : ''}" data-fcol="${c.k}" aria-haspopup="dialog" aria-label="Filtrar ou ordenar a coluna ${esc(c.label)}${on ? ' (filtro ativo)' : ''}">${esc(c.label)}${ord}<span class="fi">${on ? ICO_FILTRO : ICO_SETA}</span></button></th>`;
+  }).join('') + (extra || '') + '</tr>';
+}
+function infoFiltros(aba, nVis, nTotal) {
+  return nFiltros(aba) ? `<div class="filtro-info"><span>${nVis} de ${nTotal} ${nTotal === 1 ? 'linha' : 'linhas'} com os filtros das colunas</span><button type="button" class="btn sm" id="limpar-filtros">Limpar filtros</button></div>` : '';
+}
+function fecharFiltro() { const p = document.getElementById('fpop'); if (p) p.remove(); document.removeEventListener('mousedown', fecharFora, true); document.removeEventListener('keydown', escFiltro, true); }
+function fecharFora(ev) { const p = document.getElementById('fpop'); if (p && !p.contains(ev.target) && !ev.target.closest('[data-fcol]')) fecharFiltro(); }
+function escFiltro(ev) { if (ev.key === 'Escape') { const k = (document.getElementById('fpop') || {}).dataset; fecharFiltro(); const b = k && document.querySelector(`[data-fcol="${k.col}"]`); if (b) b.focus(); } }
+function ligarFiltros(aba, cols, base) {
+  document.querySelectorAll('[data-fcol]').forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    const ja = document.getElementById('fpop'); if (ja && ja.dataset.col === b.dataset.fcol) { fecharFiltro(); return; }
+    abrirFiltro(aba, cols.find(c => c.k === b.dataset.fcol), cols, base, b);
+  });
+  const lf = $('#limpar-filtros'); if (lf) lf.onclick = () => { delete S.filtros[aba]; delete S.ordem[aba]; renderLanc(); };
+}
+function abrirFiltro(aba, col, cols, base, btn) {
+  fecharFiltro();
+  // valores possíveis: linhas que passam pelos filtros das OUTRAS colunas (igual ao Excel)
+  const cont = new Map(), rep = new Map();
+  base.filter(x => passaFiltros(aba, cols, x, col.k)).forEach(x => { const t = txtCol(col, x); cont.set(t, (cont.get(t) || 0) + 1); if (!rep.has(t)) rep.set(t, col.ord ? col.ord(x) : t); });
+  const vazio = col.vazio || '(Vazias)';
+  const valores = [...cont.keys()].sort((a, b) => { if (a === vazio) return 1; if (b === vazio) return -1;
+    if (col.ord) { const x = rep.get(a), y = rep.get(b); return typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true }); }
+    return col.num ? Number(a) - Number(b) : a.localeCompare(b, 'pt-BR', { numeric: true }); });
+  const atual = (S.filtros[aba] || {})[col.k];
+  const sel = new Set(valores.filter(v => !atual || atual.has(v)));
+  const az = col.num ? ['Menor → maior', 'Maior → menor'] : ['A → Z', 'Z → A'];
+  const p = document.createElement('div');
+  p.id = 'fpop'; p.className = 'fpop'; p.dataset.col = col.k; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Filtro da coluna ' + col.label);
+  p.innerHTML = `<div class="fp-ord"><button type="button" class="fp-o" data-o="1">↑ Ordenar ${az[0]}</button><button type="button" class="fp-o" data-o="-1">↓ Ordenar ${az[1]}</button></div>
+    <input type="search" class="fp-busca" placeholder="Pesquisar" aria-label="Pesquisar valores de ${esc(col.label)}">
+    <div class="fp-lista">
+      <label class="fp-all"><input type="checkbox" data-all> <span>(Selecionar tudo)</span></label>
+      ${valores.map((v, i) => `<label data-txt="${esc(v.toLowerCase())}"><input type="checkbox" data-i="${i}" ${sel.has(v) ? 'checked' : ''}> <span>${esc(v)}</span><em>${cont.get(v)}</em></label>`).join('') || '<div class="sub" style="padding:6px">Nenhum valor.</div>'}
+    </div>
+    <div class="fp-bot"><button type="button" class="btn sm" data-limpar ${atual || (S.ordem[aba] && S.ordem[aba].k === col.k) ? '' : 'disabled'}>Limpar</button><span style="flex:1"></span><button type="button" class="btn sm" data-cancel>Cancelar</button><button type="button" class="btn sm pri" data-ok>OK</button></div>`;
+  document.body.appendChild(p);
+  // posição: logo abaixo do cabeçalho, sem sair da tela
+  const r = btn.getBoundingClientRect(), w = Math.min(290, window.innerWidth - 16);
+  p.style.width = w + 'px';
+  p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + window.scrollX + 'px';
+  p.style.top = r.bottom + 4 + window.scrollY + 'px';
+  const busca = p.querySelector('.fp-busca'), all = p.querySelector('[data-all]'), ok = p.querySelector('[data-ok]');
+  const caixas = [...p.querySelectorAll('[data-i]')];
+  const visiveis = () => caixas.filter(c => !c.closest('label').hidden);
+  const atualizar = () => {
+    const vis = visiveis(), n = vis.filter(c => c.checked).length;
+    all.checked = vis.length > 0 && n === vis.length; all.indeterminate = n > 0 && n < vis.length;
+    ok.disabled = n === 0;
+  };
+  caixas.forEach(c => c.onchange = () => { const v = valores[+c.dataset.i]; c.checked ? sel.add(v) : sel.delete(v); atualizar(); });
+  all.onchange = () => { visiveis().forEach(c => { c.checked = all.checked; const v = valores[+c.dataset.i]; all.checked ? sel.add(v) : sel.delete(v); }); atualizar(); };
+  busca.oninput = () => {
+    const q = busca.value.trim().toLowerCase();
+    caixas.forEach(c => { const l = c.closest('label'); l.hidden = !!q && !l.dataset.txt.includes(q); if (q) c.checked = !l.hidden; });
+    if (!q) caixas.forEach(c => c.checked = sel.has(valores[+c.dataset.i]));
+    atualizar();
+  };
+  const aplicar = () => {
+    const q = busca.value.trim();
+    const escolhidos = q ? visiveis().filter(c => c.checked).map(c => valores[+c.dataset.i]) : valores.filter(v => sel.has(v));
+    S.filtros[aba] = S.filtros[aba] || {};
+    if (escolhidos.length === valores.length && !q) delete S.filtros[aba][col.k];
+    else S.filtros[aba][col.k] = new Set(escolhidos);
+    if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba];
+    fecharFiltro(); renderLanc();
+  };
+  ok.onclick = aplicar;
+  busca.onkeydown = ev => { if (ev.key === 'Enter' && !ok.disabled) aplicar(); };
+  p.querySelector('[data-cancel]').onclick = () => { fecharFiltro(); btn.focus(); };
+  p.querySelector('[data-limpar]').onclick = () => {
+    if (S.filtros[aba]) { delete S.filtros[aba][col.k]; if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba]; }
+    if (S.ordem[aba] && S.ordem[aba].k === col.k) delete S.ordem[aba];
+    fecharFiltro(); renderLanc();
+  };
+  p.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { S.ordem[aba] = { k: col.k, dir: +b.dataset.o }; fecharFiltro(); renderLanc(); });
+  atualizar();
+  document.addEventListener('mousedown', fecharFora, true); document.addEventListener('keydown', escFiltro, true);
+  busca.focus();
+}
+
 /* ---------- render ---------- */
 function bars(rows,color,fmt,tipFn){
   if(!rows.length)return '<div class="empty">Nada lançado neste mês.</div>';
@@ -486,20 +626,36 @@ function renderPainel(){
   </section>`;
 }
 
-function lancFiltrados(){
+const COLS_LANC=[
+  {k:'data',label:'Data',v:l=>fmtData(l.data),ord:l=>l.data||''},
+  {k:'mtr',label:'MTR',v:l=>l.mtr},
+  {k:'dest',label:'Destinador',v:l=>nomeDe(l.destinador)},
+  {k:'neg',label:'Negócio',v:l=>l.negocio||'Sem tipo'},
+  {k:'ger',label:'Gerador',v:l=>l.gerador},
+  {k:'orig',label:'Origem',v:l=>l.origem,cls:'hide-m'},
+  {k:'res',label:'Resíduo',v:l=>l.residuo},
+  {k:'placa',label:'Placa',v:l=>l.placa},
+  {k:'kg',label:'kg',v:l=>l.kg!=null&&l.kg!==''?N(l.kg):'',ord:l=>+l.kg||0,num:true},
+  {k:'preco',label:'R$/kg',v:l=>l.valorFixo?'fechado':N(l.preco,3),ord:l=>l.valorFixo?-1:+l.preco||0,num:true,cls:'hide-m'},
+  {k:'valor',label:'Valor',v:l=>(tipoDe(l.destinador)==='receita'?'+ ':'')+R(l.valor),ord:l=>+l.valor||0,num:true}];
+/** Lançamentos do mês com a busca (sem os filtros das colunas). */
+function lancBase(){
   const q=S.f.q.trim().toUpperCase();
-  return S.lanc.filter(l=>(!S.f.dest||l.destinador===S.f.dest)&&(!S.f.res||l.residuo===S.f.res)&&(!S.f.neg||(S.f.neg==='none'?!l.negocio:l.negocio===S.f.neg))&&(!q||[l.mtr,l.gerador,l.placa,l.origem,l.ticket].some(x=>String(x||'').toUpperCase().includes(q))))
+  return S.lanc.filter(l=>!q||[l.mtr,l.gerador,l.placa,l.origem,l.ticket].some(x=>String(x||'').toUpperCase().includes(q)))
     .sort((a,b)=>(a.data||'9999').localeCompare(b.data||'9999')||nomeDe(a.destinador).localeCompare(nomeDe(b.destinador)));
 }
+const temFiltroLanc=()=>!!S.f.q.trim()||Object.keys(S.filtros.lanc||{}).length>0;
+function lancFiltrados(){ return aplicarFiltros('lanc',COLS_LANC,lancBase()); }
 function destOptions(sel,blank){const ds=Object.entries(S.dest).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
   return (blank?`<option value="">${blank}</option>`:'')+['custo','receita'].map(t=>`<optgroup label="${t==='custo'?'Destinação (custo)':'Recicláveis (receita)'}">${ds.filter(([id,d])=>d.tipo===t&&(d.ativo!==false||id===sel)).map(([id,d])=>`<option value="${esc(id)}" ${id===sel?'selected':''}>${esc(d.nome)}</option>`).join('')}</optgroup>`).join('')}
 
 function renderLanc(){
   const e=S.edit||{};const isEdit=!!e._id;
-  const lst=lancFiltrados();const tot=lst.reduce((s,l)=>s+(+l.valor||0)*(tipoDe(l.destinador)==='receita'?-1:1),0);
+  fecharFiltro();
+  const base=lancBase();const lst=lancFiltrados();const tot=lst.reduce((s,l)=>s+(+l.valor||0)*(tipoDe(l.destinador)==='receita'?-1:1),0);
   const resSet=[...new Set(S.lanc.map(l=>l.residuo).filter(Boolean))].sort();
-  const geradores=[...new Set(S.lanc.map(l=>l.gerador).filter(Boolean))].sort();
-  const placas=[...new Set([...S.lanc.map(l=>l.placa),...((S.loc?.veiculos)||[]).map(v=>v.placa)].filter(Boolean))].sort();
+  const geradores=S.geradores||[];
+  const placas=S.veiculos||[];
   const origens=[...new Set(S.lanc.map(l=>l.origem).filter(Boolean))].sort();
   $('#main').innerHTML=`
   <section class="panel" id="form-panel">
@@ -514,9 +670,9 @@ function renderLanc(){
       <div class="fld full"><label for="f-res">Resíduo / material</label><input id="f-res" list="dl-res" value="${esc(e.residuo||'')}" required><datalist id="dl-res"></datalist></div>
       <div class="fld"><label for="f-mtr">Nº MTR</label><div class="inp-btn"><input id="f-mtr" class="mono" inputmode="numeric" value="${esc(e.mtr||'')}"><button type="button" class="btn scan-btn" id="f-scan" aria-label="Escanear código de barras do MTR" title="Escanear código do MTR"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg></button></div><div class="hint" id="h-mtr"></div></div>
       <div class="fld"><label for="f-ticket">Ticket (opcional)</label><input id="f-ticket" class="mono" value="${esc(e.ticket||'')}"></div>
-      <div class="fld full"><label for="f-ger">Gerador</label><input id="f-ger" list="dl-ger" value="${esc(e.gerador||'')}"><datalist id="dl-ger">${geradores.map(g=>`<option value="${esc(g)}">`).join('')}</datalist></div>
+      <div class="fld full"><label for="f-ger">Gerador</label><input id="f-ger" list="dl-ger" value="${esc(e.gerador||'')}" placeholder="Digite para buscar…"><datalist id="dl-ger">${geradores.map(g=>`<option value="${esc(g.nome)}">${esc([g.unidade?'Unidade GVC':'Cliente',[g.cidade,g.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '))}</option>`).join('')}</datalist><div class="hint" id="h-ger">Clientes e unidades GVC ativos no Mapa Operacional.</div></div>
       <div class="fld full"><label for="f-orig">Local de origem</label><input id="f-orig" list="dl-orig" value="${esc(e.origem||'')}"><datalist id="dl-orig">${origens.map(g=>`<option value="${esc(g)}">`).join('')}</datalist></div>
-      <div class="fld"><label for="f-placa">Placa</label><input id="f-placa" class="mono" list="dl-placa" value="${esc(e.placa||'')}"><datalist id="dl-placa">${placas.map(g=>`<option value="${esc(g)}">`).join('')}</datalist></div>
+      <div class="fld"><label for="f-placa">Placa</label><input id="f-placa" class="mono" list="dl-placa" value="${esc(e.placa||'')}" placeholder="Escolha…"><datalist id="dl-placa">${placas.map(v=>`<option value="${esc(v.placa)}">${esc([v.tipo,v.propriedade==='Locada'?'locado':'',v.situacao!=='Em operação'?v.situacao:''].filter(Boolean).join(' · '))}</option>`).join('')}</datalist><div class="hint" id="h-placa">Veículos ativos da Frota.</div></div>
       <div class="fld"><label for="f-transp">Transportadora</label><input id="f-transp" value="${esc(e.transportadora||'RETEC')}"></div>
       <div class="fld"><label for="f-kg">Quantidade (kg)</label><input id="f-kg" type="number" step="any" min="0" inputmode="decimal" value="${esc(e.kg??'')}"></div>
       <div class="fld"><label for="f-preco">Preço (R$/kg)</label><input id="f-preco" type="number" step="any" min="0" inputmode="decimal" value="${esc(e.preco??'')}"><div class="hint" id="h-preco"></div></div>
@@ -529,17 +685,17 @@ function renderLanc(){
     </form>`}
   </section>
   <section class="panel">
-    <div class="panel-h"><div><h2>Lançamentos de ${esc(mesLbl(S.mes))}</h2><p class="sub">${lst.length} de ${S.lanc.length} · saldo filtrado ${R(tot)} (custos − receitas) · clique numa linha para editar</p></div>
-      <button class="btn sm" id="csv">Baixar CSV do mês</button></div>
-    <div class="filters">
-      <select id="flt-dest" aria-label="Filtrar destinador">${destOptions(S.f.dest,'Todos os destinadores')}</select>
-      <select id="flt-res" aria-label="Filtrar resíduo"><option value="">Todos os resíduos</option>${resSet.map(r=>`<option ${r===S.f.res?'selected':''}>${esc(r)}</option>`).join('')}</select>
-      <select id="flt-neg" aria-label="Filtrar tipo de negócio">${[['','Todos os tipos de negócio'],['RSS','RSS'],['Industrial','Industrial'],['none','Sem tipo']].map(([v,t])=>`<option value="${v}" ${S.f.neg===v?'selected':''}>${t}</option>`).join('')}</select>
-      <input id="flt-q" type="search" placeholder="Buscar MTR, gerador, placa…" value="${esc(S.f.q)}" aria-label="Buscar">
+    <div class="panel-h"><div><h2>Lançamentos de ${esc(mesLbl(S.mes))}</h2><p class="sub">${lst.length} de ${S.lanc.length} · saldo filtrado ${R(tot)} (custos − receitas) · clique numa linha para editar · filtre pelo cabeçalho de cada coluna</p></div>
+      <div class="exp-wrap"><button class="btn sm" id="exp-btn" type="button" aria-haspopup="menu" aria-expanded="false" ${lst.length?'':'disabled'}>↓ Exportar</button>
+        <div class="exp-menu" id="exp-menu" role="menu" hidden><div class="exp-info" id="exp-info"></div>
+          <button type="button" role="menuitem" data-exp="xlsx">📊 Planilha Excel (.xlsx)</button><button type="button" role="menuitem" data-exp="csv">📄 CSV</button><button type="button" role="menuitem" data-exp="pdf">🖨 PDF</button></div></div></div>
+    <div class="filters" style="grid-template-columns:minmax(0,1fr)">
+      <input id="flt-q" type="search" placeholder="Buscar MTR, gerador, placa, origem, ticket…" value="${esc(S.f.q)}" aria-label="Buscar">
     </div>
-    ${!S.readOnly&&lst.length&&(S.f.dest||S.f.res||S.f.q||S.f.neg)?`<div class="bulk" id="bulk"><span>Definir o tipo de negócio dos <b>${lst.length}</b> lançamento(s) filtrados:</span><button type="button" class="btn sm" data-lote="RSS">RSS</button><button type="button" class="btn sm" data-lote="Industrial">Industrial</button></div>`:''}
-    ${lst.length?`<div class="tbl-wrap rtw" style="max-height:620px"><table class="rt"><thead><tr><th>Data</th><th>MTR</th><th>Destinador</th><th>Negócio</th><th>Gerador</th><th class="hide-m">Origem</th><th>Resíduo</th><th>Placa</th><th class="num">kg</th><th class="num hide-m">R$/kg</th><th class="num">Valor</th></tr></thead><tbody>
-    ${lst.map(l=>{const t=tipoDe(l.destinador);return `<tr class="click" data-id="${esc(l._id)}"><td>${fmtData(l.data)}</td><td class="mono">${esc(l.mtr||'—')}</td><td class="full"><span class="pill ${t}">${esc(nomeDe(l.destinador))}</span></td><td>${negPill(l.negocio)}</td><td>${esc(l.gerador)}</td><td class="hide-m">${esc(l.origem)}</td><td>${esc(l.residuo)}</td><td class="mono">${esc(l.placa)}</td><td class="num">${l.kg!=null&&l.kg!==''?N(l.kg):'—'}</td><td class="num hide-m">${l.valorFixo?'fechado':N(l.preco,3)}</td><td class="num strong-m">${t==='receita'?'+ ':''}${R(l.valor)}</td></tr>`}).join('')}
+    ${infoFiltros('lanc',lst.length,base.length)}
+    ${!S.readOnly&&lst.length&&temFiltroLanc()?`<div class="bulk" id="bulk"><span>Definir o tipo de negócio dos <b>${lst.length}</b> lançamento(s) filtrados:</span><button type="button" class="btn sm" data-lote="RSS">RSS</button><button type="button" class="btn sm" data-lote="Industrial">Industrial</button></div>`:''}
+    ${base.length?`<div class="tbl-wrap rtw" style="max-height:620px"><table class="rt"><thead>${cabFiltro('lanc',COLS_LANC)}</thead><tbody>
+    ${lst.map(l=>{const t=tipoDe(l.destinador);return `<tr class="click" data-id="${esc(l._id)}"><td>${fmtData(l.data)}</td><td class="mono">${esc(l.mtr||'—')}</td><td class="full"><span class="pill ${t}">${esc(nomeDe(l.destinador))}</span></td><td>${negPill(l.negocio)}</td><td>${esc(l.gerador)}</td><td class="hide-m">${esc(l.origem)}</td><td>${esc(l.residuo)}</td><td class="mono">${esc(l.placa)}</td><td class="num">${l.kg!=null&&l.kg!==''?N(l.kg):'—'}</td><td class="num hide-m">${l.valorFixo?'fechado':N(l.preco,3)}</td><td class="num strong-m">${t==='receita'?'+ ':''}${R(l.valor)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">Nenhum lançamento com os filtros das colunas.</td></tr>'}
     </tbody></table></div>`:`<div class="empty">${S.lanc.length?'Nenhum lançamento com esses filtros.':'Nenhum lançamento em '+esc(mesLbl(S.mes))+'. Use o formulário acima para lançar a primeira viagem.'}</div>`}
   </section>`;
   bindLancForm();
@@ -547,15 +703,13 @@ function renderLanc(){
 function defaultDate(){return hoje.slice(0,7)===S.mes?hoje:S.mes+'-01'}
 function bindLancForm(){
   const f=$('#f');
-  $('#flt-dest').onchange=e=>{S.f.dest=e.target.value;renderLanc()};
-  $('#flt-res').onchange=e=>{S.f.res=e.target.value;renderLanc()};
-  $('#flt-neg').onchange=e=>{S.f.neg=e.target.value;renderLanc()};
+  if(document.querySelector('[data-fcol]'))ligarFiltros('lanc',COLS_LANC,lancBase());
+  ligarExportacao();
   document.querySelectorAll('[data-lote]').forEach(b=>b.onclick=()=>{const neg=b.dataset.lote;const ids=lancFiltrados().map(l=>l._id);const bk=$('#bulk');
     bk.innerHTML=`<span>Marcar <b>${ids.length}</b> lançamento(s) como <b>${esc(neg)}</b>?</span><button type="button" class="btn sm pri" id="lote-sim">Sim, marcar</button><button type="button" class="btn sm" id="lote-nao">Cancelar</button>`;
     $('#lote-nao').onclick=()=>renderLanc();
     $('#lote-sim').onclick=async()=>{$('#lote-sim').disabled=true;try{const r=await api('definirNegocioLote',{ids,negocio:neg});const set=new Set(ids);S.all.forEach(l=>{if(set.has(l._id))l.negocio=neg});recompute();toast(r.alterados+' lançamento(s) marcados como '+neg);renderLanc()}catch(er){falha(er);renderLanc()}}});
   $('#flt-q').oninput=e=>{S.f.q=e.target.value;clearTimeout(bindLancForm.h);bindLancForm.h=setTimeout(()=>{const p=e.target.selectionStart;renderLanc();const q=$('#flt-q');q.focus();q.setSelectionRange(p,p)},250)};
-  $('#csv').onclick=baixarCsv;
   document.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=()=>{S.edit={...S.lanc.find(l=>l._id===tr.dataset.id)};renderLanc();$('#form-panel').scrollIntoView({behavior:'smooth',block:'start'})});
   if($('#f-cancel'))$('#f-cancel').onclick=()=>{S.edit=null;renderLanc()};
   if($('#f-hist'))$('#f-hist').onclick=()=>Portal.mostrarHistorico('Lancamentos',S.edit._id,(S.edit.mtr?'MTR '+S.edit.mtr:'Lançamento sem MTR')+' · '+nomeDe(S.edit.destinador));
@@ -574,12 +728,29 @@ function bindLancForm(){
   $('#f-res').oninput=()=>{precoManual=false;autoPreco();calc();if(/SAÚDE|SAUDE/i.test($('#f-res').value)&&!document.querySelector('input[name="f-neg"]:checked')){$('#f-neg-0').checked=true;const h=$('#h-neg');h.className='hint';h.textContent='Marcado como RSS por ser resíduo de saúde. Troque se não for.'}};
   $('#f-preco').oninput=()=>{precoManual=true;calc()};
   $('#f-kg').oninput=calc;$('#f-vfix').oninput=calc;$('#f-mtr').oninput=chkMtr;
+  const semAc=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+  const nPlaca=t=>String(t||'').replace(/[\s-]/g,'').toUpperCase();
+  const orig0={placa:nPlaca(S.edit&&S.edit._id?S.edit.placa:''),ger:semAc(S.edit&&S.edit._id?S.edit.gerador:'')};
+  let origemAuto='';
+  const acharGer=()=>(S.geradores||[]).find(g=>semAc(g.nome)===semAc($('#f-ger').value));
+  $('#f-ger').addEventListener('input',()=>{const g=acharGer();const h=$('#h-ger');h.className='hint';h.textContent=g?[g.unidade?'Unidade GVC':'Cliente',[g.cidade,g.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '):'Clientes e unidades GVC ativos no Mapa Operacional.';
+    const o=$('#f-orig');if(g&&g.cidade&&(!o.value.trim()||o.value===origemAuto)){o.value=g.cidade;origemAuto=g.cidade}});
+  $('#f-placa').addEventListener('input',()=>{const v=(S.veiculos||[]).find(x=>x.placa===nPlaca($('#f-placa').value));const h=$('#h-placa');h.className='hint';h.textContent=v?[v.tipo,v.propriedade,v.situacao].filter(Boolean).join(' · '):'Veículos ativos da Frota.'});
+  f.validarListas=()=>{
+    const p=nPlaca($('#f-placa').value);
+    if(p&&p!==orig0.placa&&!(S.veiculos||[]).some(v=>v.placa===p)){const h=$('#h-placa');h.className='hint crit';h.textContent='Escolha uma placa da lista (veículos ativos da Frota).';$('#f-placa').focus();return 'A placa '+p+' não está entre os veículos ativos da Frota.'}
+    const gv=semAc($('#f-ger').value);
+    if(gv&&gv!==orig0.ger&&!acharGer()){const h=$('#h-ger');h.className='hint crit';h.textContent='Escolha um gerador da lista (clientes e unidades GVC do Mapa).';$('#f-ger').focus();return 'Escolha o gerador na lista.'}
+    const g=acharGer();if(g)$('#f-ger').value=g.nome;
+    return '';
+  };
   $('#f-scan').onclick=()=>abrirLeitor(cod=>{$('#f-mtr').value=cod;chkMtr();const nx=$('#f-ger');if(nx&&!nx.value)nx.focus()});
   if($('#f-del'))$('#f-del').onclick=()=>{$('#del-zone').innerHTML=`<span class="confirm">Excluir este lançamento? <button type="button" class="btn sm danger" id="del-yes">Sim, excluir</button><button type="button" class="btn sm" id="del-no">Não</button></span>`;
     $('#del-no').onclick=()=>renderLanc();
     $('#del-yes').onclick=async()=>{try{await api('excluirLancamento',{id:S.edit._id});S.all=S.all.filter(l=>l._id!==S.edit._id);recompute();S.edit=null;toast('Lançamento excluído');renderLanc()}catch(err){falha(err)}}};
   f.onsubmit=async ev=>{ev.preventDefault();
     const dest=$('#f-dest').value;if(!dest){toast('Escolha o destinador');return}
+    const errLista=f.validarListas();if(errLista){toast(errLista);return}
     const negEl=document.querySelector('input[name="f-neg"]:checked');if(!negEl){const h=$('#h-neg');h.className='hint crit';h.textContent='Escolha RSS ou Industrial.';$('#f-neg-0').focus();toast('Escolha o tipo de negócio');return}
     const data=$('#f-data').value;const fx=$('#f-vfix').value;
     const doc={data,mes:data?data.slice(0,7):S.mes,mtr:$('#f-mtr').value.replace(/\s/g,''),ticket:$('#f-ticket').value.trim(),destinador:dest,negocio:negEl.value,
@@ -601,12 +772,85 @@ function bindLancForm(){
 }
 function falha(err){console.error(err);if(err&&err.erro==='sem_permissao'){S.readOnly=true;toast('Seu acesso é só de leitura');render()}else toast((err&&err.mensagem)||'Não foi possível salvar. Verifique a internet e tente de novo.')}
 
-async function baixarCsv(){
-  const cols=['data','mtr','ticket','destinador','tipo','negocio','gerador','origem','residuo','transportadora','placa','kg','preco','valor','obs'];
-  const rows=lancFiltrados().map(l=>cols.map(c=>{let v=c==='destinador'?nomeDe(l.destinador):c==='tipo'?tipoDe(l.destinador):l[c];
-    if(typeof v==='number')v=String(v).replace('.',',');v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';'));
-  const csv='﻿'+cols.join(';')+'\n'+rows.join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`destinacao-${S.mes}.csv`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+/* ---------- exportar: o que está na tela (busca + filtros das colunas, na ordem da tela) ---------- */
+const LIB_XLSX='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const LIB_PDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const LIB_PDF_TAB='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.1/jspdf.plugin.autotable.min.js';
+function carregarScript(src){return new Promise((ok,er)=>{const ja=document.querySelector(`script[data-src="${src}"]`);if(ja){if(ja.dataset.ok)ok();else{ja.addEventListener('load',()=>ok());ja.addEventListener('error',()=>er(new Error('lib')))}return}
+  const sc=document.createElement('script');sc.src=src;sc.dataset.src=src;sc.onload=()=>{sc.dataset.ok='1';ok()};sc.onerror=()=>er(new Error('lib'));document.head.appendChild(sc)})}
+function filtrosLancTexto(){
+  const out=[];const q=S.f.q.trim();if(q)out.push('Busca: "'+q+'"');
+  Object.entries(S.filtros.lanc||{}).forEach(([k,set])=>{const c=COLS_LANC.find(x=>x.k===k);out.push((c?c.label:k)+': '+[...set].join(', '))});
+  const o=S.ordem.lanc;if(o){const c=COLS_LANC.find(x=>x.k===o.k);out.push('Ordenado por '+(c?c.label:o.k)+(o.dir>0?' (crescente)':' (decrescente)'))}
+  return out;
+}
+function dadosExportacao(){
+  const lst=lancFiltrados();
+  const linhas=lst.map(l=>{const t=tipoDe(l.destinador);return{
+    'Data':fmtDataLonga(l.data),'MTR':l.mtr||'','Ticket':l.ticket||'','Destinador':nomeDe(l.destinador),'Tipo':t==='receita'?'Receita':'Custo',
+    'Negócio':l.negocio||'Sem tipo','Gerador':l.gerador||'','Origem':l.origem||'','Resíduo':l.residuo||'','Transportadora':l.transportadora||'',
+    'Placa':l.placa||'','kg':l.kg===''||l.kg==null?'':+l.kg,'R$/kg':l.valorFixo?'':+l.preco||0,'Valor fechado':l.valorFixo?+l.valorFixo:'',
+    'Valor (R$)':+l.valor||0,'Observação':l.obs||''}});
+  const kg=lst.reduce((s,l)=>s+(+l.kg||0),0),custo=lst.filter(l=>tipoDe(l.destinador)!=='receita').reduce((s,l)=>s+(+l.valor||0),0),
+        rec=lst.filter(l=>tipoDe(l.destinador)==='receita').reduce((s,l)=>s+(+l.valor||0),0);
+  const filtros=filtrosLancTexto();
+  return{lst,linhas,tot:{kg,custo,rec,saldo:custo-rec},filtros,nome:`destinacao-${S.mes}${filtros.length?'-filtrado':''}`};
+}
+function fmtDataLonga(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):(d||'')}
+function baixarBlob(blob,nome){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+function exportarCsv(){
+  const d=dadosExportacao();if(!d.linhas.length)return toast('Nenhum lançamento na tela para exportar.');
+  const cols=Object.keys(d.linhas[0]);
+  const cel=v=>{if(typeof v==='number')v=String(v).replace('.',',');v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const tot=['TOTAL','','','','','','','','','','',d.tot.kg,'','',d.tot.saldo,'custos '+R(d.tot.custo)+' − receitas '+R(d.tot.rec)];
+  const csv='﻿'+[cols.join(';'),...d.linhas.map(r=>cols.map(c=>cel(r[c])).join(';')),tot.map(cel).join(';')].join('\n');
+  baixarBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),d.nome+'.csv');
+}
+async function exportarXlsx(){
+  const d=dadosExportacao();if(!d.linhas.length)return toast('Nenhum lançamento na tela para exportar.');
+  try{await carregarScript(LIB_XLSX)}catch(e){return toast('Não consegui carregar o gerador de planilhas. Verifique a internet.')}
+  const ws=XLSX.utils.json_to_sheet(d.linhas);
+  XLSX.utils.sheet_add_json(ws,[{'Data':'TOTAL','kg':d.tot.kg,'Valor (R$)':d.tot.saldo,'Observação':'saldo = custos − receitas'}],{origin:-1,skipHeader:true,header:Object.keys(d.linhas[0])});
+  const cols=Object.keys(d.linhas[0]);ws['!cols']=cols.map(k=>({wch:Math.min(45,Math.max(8,k.length+2,...d.linhas.map(r=>String(r[k]??'').length+1)))}));
+  // formato de número nas colunas de valor
+  const rng=XLSX.utils.decode_range(ws['!ref']);cols.forEach((k,ci)=>{const fmt=k==='kg'?'#,##0.##':k==='R$/kg'?'0.000':/Valor/.test(k)?'"R$" #,##0.00':null;if(!fmt)return;
+    for(let r=1;r<=rng.e.r;r++){const c=ws[XLSX.utils.encode_cell({r,c:ci})];if(c&&c.t==='n')c.z=fmt}});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Lançamentos');
+  const fr=[{'Item':'Mês','Valor':mesLbl(S.mes)},{'Item':'Exportado em','Valor':new Date().toLocaleString('pt-BR')},{'Item':'Lançamentos exportados','Valor':d.lst.length+' de '+S.lanc.length},
+    {'Item':'Peso total (kg)','Valor':d.tot.kg},{'Item':'Custos (R$)','Valor':d.tot.custo},{'Item':'Receitas (R$)','Valor':d.tot.rec},{'Item':'Saldo (custos − receitas)','Valor':d.tot.saldo}];
+  if(!d.filtros.length)fr.push({'Item':'Filtros','Valor':'Nenhum: todos os lançamentos do mês'});
+  d.filtros.forEach((f,i)=>fr.push({'Item':i?'':'Filtros','Valor':f}));
+  const ws2=XLSX.utils.json_to_sheet(fr);ws2['!cols']=[{wch:26},{wch:90}];XLSX.utils.book_append_sheet(wb,ws2,'Filtros');
+  XLSX.writeFile(wb,d.nome+'.xlsx');
+}
+async function exportarPdf(){
+  const d=dadosExportacao();if(!d.linhas.length)return toast('Nenhum lançamento na tela para exportar.');
+  try{await carregarScript(LIB_PDF);await carregarScript(LIB_PDF_TAB)}catch(e){return toast('Não consegui carregar o gerador de PDF. Verifique a internet.')}
+  const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(20,33,27);doc.text('Controle de Destinação · '+mesLbl(S.mes),14,15);
+  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(90,105,98);
+  doc.text(`Exportado em ${new Date().toLocaleString('pt-BR')} · ${d.lst.length} de ${S.lanc.length} lançamentos · ${N(d.tot.kg)} kg · custos ${R(d.tot.custo)} · receitas ${R(d.tot.rec)} · saldo ${R(d.tot.saldo)}`,14,21);
+  const ft=doc.splitTextToSize(d.filtros.length?'Filtros: '+d.filtros.join(' · '):'Sem filtro: todos os lançamentos do mês',268);doc.text(ft.slice(0,3),14,26);
+  const cols=['Data','MTR','Destinador','Negócio','Gerador','Origem','Resíduo','Placa','kg','R$/kg','Valor (R$)'];
+  const body=d.lst.map(l=>{const t=tipoDe(l.destinador);return[fmtDataLonga(l.data),l.mtr||'',nomeDe(l.destinador),l.negocio||'Sem tipo',l.gerador||'',l.origem||'',l.residuo||'',l.placa||'',
+    l.kg!=null&&l.kg!==''?N(l.kg):'',l.valorFixo?'fechado':N(l.preco,3),(t==='receita'?'+ ':'')+R(l.valor)]});
+  body.push(['TOTAL','','','','','','','',N(d.tot.kg),'','saldo '+R(d.tot.saldo)]);
+  doc.autoTable({startY:27+Math.min(3,ft.length)*3.6,head:[cols],body,
+    styles:{font:'helvetica',fontSize:7,cellPadding:1.8,textColor:[20,33,27],lineColor:[216,223,218],lineWidth:0.2},
+    headStyles:{fillColor:[29,107,82],textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,247,245]},
+    columnStyles:{8:{halign:'right'},9:{halign:'right'},10:{halign:'right'}},margin:{left:14,right:14},
+    didParseCell:h=>{if(h.section==='body'&&h.row.index===body.length-1){h.cell.styles.fontStyle='bold';h.cell.styles.fillColor=[220,239,230]}}});
+  doc.save(d.nome+'.pdf');
+}
+function ligarExportacao(){
+  const b=$('#exp-btn'),m=$('#exp-menu');if(!b||!m)return;
+  const fechar=()=>{m.hidden=true;b.setAttribute('aria-expanded','false');document.removeEventListener('mousedown',fora,true)};
+  const fora=e=>{if(!e.target.closest('.exp-wrap'))fechar()};
+  b.onclick=()=>{if(!m.hidden)return fechar();const d=dadosExportacao();
+    $('#exp-info').innerHTML=`Vão sair <b>${d.lst.length} de ${S.lanc.length}</b> lançamentos de ${esc(mesLbl(S.mes))}${d.filtros.length?' <span class="tag-f">com filtro</span>':''}`;
+    m.hidden=false;b.setAttribute('aria-expanded','true');document.addEventListener('mousedown',fora,true);m.querySelector('button').focus()};
+  m.onkeydown=e=>{if(e.key==='Escape'){fechar();b.focus()}};
+  m.querySelectorAll('[data-exp]').forEach(x=>x.onclick=()=>{fechar();({xlsx:exportarXlsx,csv:exportarCsv,pdf:exportarPdf})[x.dataset.exp]()});
 }
 
 /* ---------- frota ---------- */
@@ -715,6 +959,7 @@ async function carregar(silencioso){
     S.readOnly=j.usuario.nivel==='leitor';
     S.dest={};(j.destinadores||[]).forEach(d=>S.dest[d.id]=d);S.fonteDest=j.fonteDestinadores||'';RESIDUOS.splice(0,RESIDUOS.length,...(j.residuos||[]));
     S.all=(j.lancamentos||[]).map(l=>({_id:l.id,...l}));
+    S.veiculos=j.veiculos||[];S.geradores=j.geradores||[];
     S.locs=j.locacao||{};
     S.ready=true;mostrarUsuario();recompute();
     setSync(true,(S.readOnly?'Somente leitura · ':'')+'Atualizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
