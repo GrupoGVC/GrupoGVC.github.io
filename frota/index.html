@@ -105,6 +105,31 @@ svg text{fill:var(--ink-3);font:11px var(--f-body)}
 .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{font-weight:600;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:8px 10px;background:var(--sunken);border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+th .fh{all:unset;display:inline-flex;align-items:center;gap:5px;cursor:pointer;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;border-radius:4px;padding:2px 4px;margin:-2px -4px}
+th .fh:hover{color:var(--ink);background:var(--line-soft)}
+th .fh:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+th .fh .fi{display:inline-grid;place-items:center;width:16px;height:16px;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+th .fh .fi svg{width:11px;height:11px}
+th .fh.on{color:var(--accent)}
+th .fh.on .fi{border-color:var(--accent);background:var(--accent-soft)}
+th.num .fh{flex-direction:row}
+.fpop{position:absolute;z-index:60;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:8px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;text-transform:none;letter-spacing:0}
+.fpop .fp-ord{display:flex;flex-direction:column;border-bottom:1px solid var(--line-soft);padding-bottom:6px}
+.fpop .fp-o{all:unset;cursor:pointer;padding:6px 8px;border-radius:4px}
+.fpop .fp-o:hover,.fpop .fp-o:focus-visible{background:var(--sunken)}
+.fpop .fp-busca{width:100%;box-sizing:border-box}
+.fpop .fp-lista{max-height:240px;overflow:auto;border:1px solid var(--line-soft);border-radius:4px;padding:4px}
+.fpop .fp-lista label{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px;cursor:pointer;font-weight:500}
+.fpop .fp-lista label[hidden]{display:none}
+.fpop .fp-lista label:hover{background:var(--sunken)}
+.fpop .fp-lista input{width:auto;margin:0}
+.fpop .fp-lista span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fpop .fp-lista em{font-style:normal;color:var(--ink-3);font-size:12px}
+.fpop .fp-all{border-bottom:1px solid var(--line-soft);border-radius:0 !important}
+.fpop .fp-bot{display:flex;gap:6px;align-items:center}
+.filtro-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px;padding:6px 10px;border-radius:var(--r);background:var(--accent-soft);font-size:13px}
+.filtro-info span{flex:1}
+td.empty{text-align:center;color:var(--ink-3);padding:18px}
 td{padding:7px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap;vertical-align:middle}
 tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -338,10 +363,143 @@ function setTab(t) {
 document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function render() {
   if (!S.d) return;
+  fecharFiltro();
   $('#ct-vei').textContent = S.d.veiculos.filter(v => v.ativo && passaUni(v)).length;
   $('#ct-cx').textContent = S.d.caixas.filter(c => c.ativo && passaUni(c)).length;
   ({ veiculos: renderVeiculos, locacao: renderLocacao, caixas: renderCaixas, tipos: renderTipos })[S.tab]();
 }
+
+/* ---------- filtro por coluna, como no Excel ---------- */
+// S.filtros[aba][coluna] = Set dos valores que aparecem; S.ordem[aba] = { k, dir }.
+S.filtros = {}; S.ordem = {};
+const txtCol = (c, x) => { const v = c.v(x); return v === '' || v == null ? (c.vazio || '(Vazias)') : String(v); };
+const cmpCol = (c, a, b) => c.num ? (Number(c.v(a)) || 0) - (Number(c.v(b)) || 0) : txtCol(c, a).localeCompare(txtCol(c, b), 'pt-BR', { numeric: true });
+function passaFiltros(aba, cols, x, exceto) {
+  const f = S.filtros[aba] || {};
+  return cols.every(c => c.k === exceto || !f[c.k] || f[c.k].has(txtCol(c, x)));
+}
+function aplicarFiltros(aba, cols, linhas) {
+  let out = linhas.filter(x => passaFiltros(aba, cols, x));
+  const o = S.ordem[aba]; const c = o && cols.find(y => y.k === o.k);
+  if (c) out = out.slice().sort((a, b) => o.dir * cmpCol(c, a, b));
+  return out;
+}
+const nFiltros = aba => Object.keys(S.filtros[aba] || {}).length + (S.ordem[aba] ? 1 : 0);
+const ICO_FILTRO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12l-4.6 5.4V13l-2.8-1.4V8.4z" fill="currentColor"/></svg>';
+const ICO_SETA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function cabFiltro(aba, cols, extra) {
+  const f = S.filtros[aba] || {}, o = S.ordem[aba];
+  return '<tr>' + cols.map(c => {
+    const on = !!f[c.k], ord = o && o.k === c.k ? (o.dir > 0 ? ' ↑' : ' ↓') : '';
+    return `<th class="${c.num ? 'num' : ''}"><button type="button" class="fh${on || ord ? ' on' : ''}" data-fcol="${c.k}" aria-haspopup="dialog" aria-label="Filtrar ou ordenar a coluna ${esc(c.label)}${on ? ' (filtro ativo)' : ''}">${esc(c.label)}${ord}<span class="fi">${on ? ICO_FILTRO : ICO_SETA}</span></button></th>`;
+  }).join('') + (extra || '') + '</tr>';
+}
+function infoFiltros(aba, nVis, nTotal) {
+  return nFiltros(aba) ? `<div class="filtro-info"><span>${nVis} de ${nTotal} ${nTotal === 1 ? 'linha' : 'linhas'} com os filtros das colunas</span><button type="button" class="btn sm" id="limpar-filtros">Limpar filtros</button></div>` : '';
+}
+function fecharFiltro() { const p = document.getElementById('fpop'); if (p) p.remove(); document.removeEventListener('mousedown', fecharFora, true); document.removeEventListener('keydown', escFiltro, true); }
+function fecharFora(ev) { const p = document.getElementById('fpop'); if (p && !p.contains(ev.target) && !ev.target.closest('[data-fcol]')) fecharFiltro(); }
+function escFiltro(ev) { if (ev.key === 'Escape') { const k = (document.getElementById('fpop') || {}).dataset; fecharFiltro(); const b = k && document.querySelector(`[data-fcol="${k.col}"]`); if (b) b.focus(); } }
+function ligarFiltros(aba, cols, base) {
+  document.querySelectorAll('[data-fcol]').forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    const ja = document.getElementById('fpop'); if (ja && ja.dataset.col === b.dataset.fcol) { fecharFiltro(); return; }
+    abrirFiltro(aba, cols.find(c => c.k === b.dataset.fcol), cols, base, b);
+  });
+  const lf = $('#limpar-filtros'); if (lf) lf.onclick = () => { delete S.filtros[aba]; delete S.ordem[aba]; render(); };
+}
+function abrirFiltro(aba, col, cols, base, btn) {
+  fecharFiltro();
+  // valores possíveis: linhas que passam pelos filtros das OUTRAS colunas (igual ao Excel)
+  const cont = new Map();
+  base.filter(x => passaFiltros(aba, cols, x, col.k)).forEach(x => { const t = txtCol(col, x); cont.set(t, (cont.get(t) || 0) + 1); });
+  const vazio = col.vazio || '(Vazias)';
+  const valores = [...cont.keys()].sort((a, b) => a === vazio ? 1 : b === vazio ? -1 : col.num ? Number(a) - Number(b) : a.localeCompare(b, 'pt-BR', { numeric: true }));
+  const atual = (S.filtros[aba] || {})[col.k];
+  const sel = new Set(valores.filter(v => !atual || atual.has(v)));
+  const az = col.num ? ['Menor → maior', 'Maior → menor'] : ['A → Z', 'Z → A'];
+  const p = document.createElement('div');
+  p.id = 'fpop'; p.className = 'fpop'; p.dataset.col = col.k; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Filtro da coluna ' + col.label);
+  p.innerHTML = `<div class="fp-ord"><button type="button" class="fp-o" data-o="1">↑ Ordenar ${az[0]}</button><button type="button" class="fp-o" data-o="-1">↓ Ordenar ${az[1]}</button></div>
+    <input type="search" class="fp-busca" placeholder="Pesquisar" aria-label="Pesquisar valores de ${esc(col.label)}">
+    <div class="fp-lista">
+      <label class="fp-all"><input type="checkbox" data-all> <span>(Selecionar tudo)</span></label>
+      ${valores.map((v, i) => `<label data-txt="${esc(v.toLowerCase())}"><input type="checkbox" data-i="${i}" ${sel.has(v) ? 'checked' : ''}> <span>${esc(v)}</span><em>${cont.get(v)}</em></label>`).join('') || '<div class="sub" style="padding:6px">Nenhum valor.</div>'}
+    </div>
+    <div class="fp-bot"><button type="button" class="btn sm" data-limpar ${atual || (S.ordem[aba] && S.ordem[aba].k === col.k) ? '' : 'disabled'}>Limpar</button><span style="flex:1"></span><button type="button" class="btn sm" data-cancel>Cancelar</button><button type="button" class="btn sm pri" data-ok>OK</button></div>`;
+  document.body.appendChild(p);
+  // posição: logo abaixo do cabeçalho, sem sair da tela
+  const r = btn.getBoundingClientRect(), w = Math.min(290, window.innerWidth - 16);
+  p.style.width = w + 'px';
+  p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + window.scrollX + 'px';
+  p.style.top = r.bottom + 4 + window.scrollY + 'px';
+  const busca = p.querySelector('.fp-busca'), all = p.querySelector('[data-all]'), ok = p.querySelector('[data-ok]');
+  const caixas = [...p.querySelectorAll('[data-i]')];
+  const visiveis = () => caixas.filter(c => !c.closest('label').hidden);
+  const atualizar = () => {
+    const vis = visiveis(), n = vis.filter(c => c.checked).length;
+    all.checked = vis.length > 0 && n === vis.length; all.indeterminate = n > 0 && n < vis.length;
+    ok.disabled = n === 0;
+  };
+  caixas.forEach(c => c.onchange = () => { const v = valores[+c.dataset.i]; c.checked ? sel.add(v) : sel.delete(v); atualizar(); });
+  all.onchange = () => { visiveis().forEach(c => { c.checked = all.checked; const v = valores[+c.dataset.i]; all.checked ? sel.add(v) : sel.delete(v); }); atualizar(); };
+  busca.oninput = () => {
+    const q = busca.value.trim().toLowerCase();
+    caixas.forEach(c => { const l = c.closest('label'); l.hidden = !!q && !l.dataset.txt.includes(q); if (q) c.checked = !l.hidden; });
+    if (!q) caixas.forEach(c => c.checked = sel.has(valores[+c.dataset.i]));
+    atualizar();
+  };
+  const aplicar = () => {
+    const q = busca.value.trim();
+    const escolhidos = q ? visiveis().filter(c => c.checked).map(c => valores[+c.dataset.i]) : valores.filter(v => sel.has(v));
+    S.filtros[aba] = S.filtros[aba] || {};
+    if (escolhidos.length === valores.length && !q) delete S.filtros[aba][col.k];
+    else S.filtros[aba][col.k] = new Set(escolhidos);
+    if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba];
+    fecharFiltro(); render();
+  };
+  ok.onclick = aplicar;
+  busca.onkeydown = ev => { if (ev.key === 'Enter' && !ok.disabled) aplicar(); };
+  p.querySelector('[data-cancel]').onclick = () => { fecharFiltro(); btn.focus(); };
+  p.querySelector('[data-limpar]').onclick = () => {
+    if (S.filtros[aba]) { delete S.filtros[aba][col.k]; if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba]; }
+    if (S.ordem[aba] && S.ordem[aba].k === col.k) delete S.ordem[aba];
+    fecharFiltro(); render();
+  };
+  p.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { S.ordem[aba] = { k: col.k, dir: +b.dataset.o }; fecharFiltro(); render(); });
+  atualizar();
+  document.addEventListener('mousedown', fecharFora, true); document.addEventListener('keydown', escFiltro, true);
+  busca.focus();
+}
+const COLS = {
+  veiculos: [
+    { k: 'placa', label: 'Placa', v: v => v.placa },
+    { k: 'tipo', label: 'Tipo', v: v => tipoDe(v.tipoVeiculoId).nome },
+    { k: 'cnh', label: 'CNH', v: v => tipoDe(v.tipoVeiculoId).categoriaCnh },
+    { k: 'prop', label: 'Propriedade', v: v => v.propriedade },
+    { k: 'loc', label: 'Locadora', v: v => cadNome(v.locadoraId) },
+    { k: 'uni', label: 'Unidade', v: v => uniNome(v.unidadeId), vazio: 'Sem unidade' },
+    { k: 'sit', label: 'Situação', v: v => v.ativo ? v.situacao : 'Inativo' }],
+  caixas: [
+    { k: 'num', label: 'Número', v: c => c.numero },
+    { k: 'cap', label: 'm³', v: c => c.capacidade, num: true },
+    { k: 'prop', label: 'Propriedade', v: c => c.propriedade },
+    { k: 'uni', label: 'Unidade', v: c => uniNome(c.unidadeId), vazio: 'Sem unidade' },
+    { k: 'sit', label: 'Situação', v: c => c.ativo ? c.situacao : 'Inativa' },
+    { k: 'onde', label: 'Onde está', v: c => cadNome(c.cadastroAtualId) }],
+  tipos: [
+    { k: 'nome', label: 'Tipo', v: t => t.nome },
+    { k: 'cnh', label: 'CNH exigida', v: t => t.categoriaCnh, vazio: 'Não definida' },
+    { k: 'cx', label: 'Caixas (m³)', v: t => t.capacidadesCaixa },
+    { k: 'n', label: 'Veículos', v: t => t.veiculos, num: true }],
+  locacao: [
+    { k: 'uso', label: 'Em uso', v: l => l.uso ? 'Sim' : 'Não' },
+    { k: 'nome', label: 'Placa / caixa', v: l => l.nome },
+    { k: 'tipo', label: 'Tipo', v: l => l.tipo },
+    { k: 'prop', label: 'Propriedade', v: l => l.prop },
+    { k: 'loc', label: 'Locadora', v: l => l.loc },
+    { k: 'uni', label: 'Unidade', v: l => uniNome(l.uni), vazio: 'Sem unidade' }],
+};
 
 /* ---------- excluir / inativar / histórico (iguais em todas as abas) ---------- */
 async function excluir(tabela, id, nome) {
@@ -402,19 +560,21 @@ function formVeiculo() {
     </form>${rodapeForm(e)}</section>`;
 }
 function renderVeiculos() {
-  const lista = S.d.veiculos.filter(v => (S.inativos || v.ativo) && passaUni(v) &&
+  const base = S.d.veiculos.filter(v => (S.inativos || v.ativo) && passaUni(v) &&
     passaBusca([v.placa, tipoDe(v.tipoVeiculoId).nome, cadNome(v.locadoraId), v.situacao, v.modelo, v.propriedade].join(' ')))
     .sort((a, b) => (b.ativo - a.ativo) || a.placa.localeCompare(b.placa));
+  const lista = aplicarFiltros('veiculos', COLS.veiculos, base);
   $('#main').innerHTML = formVeiculo() + `<section class="panel">
     <div class="panel-h"><div><h2>Veículos</h2><p class="sub">Próprios e locados, por unidade. Veículo devolvido ou parado não aparece para a Programação.</p></div></div>
-    ${toolbar('+ Veículo')}
-    ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Placa</th><th>Tipo</th><th>CNH</th><th>Propriedade</th><th>Locadora</th><th>Unidade</th><th>Situação</th><th></th></tr></thead><tbody>
+    ${toolbar('+ Veículo')}${infoFiltros('veiculos', lista.length, base.length)}
+    ${base.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('veiculos', COLS.veiculos, '<th></th>')}</thead><tbody>
     ${lista.map(v => { const t = tipoDe(v.tipoVeiculoId); return `<tr class="${v.ativo ? '' : 'inativo'}">
       <td class="mono"><b>${esc(v.placa)}</b>${v.modelo ? `<div class="sub" style="margin:0">${esc(v.modelo)}${v.ano ? ' · ' + esc(v.ano) : ''}</div>` : ''}</td>
       <td>${esc(t.nome || '—')}</td><td>${t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '—'}</td>
       <td>${esc(v.propriedade)}</td><td>${esc(cadNome(v.locadoraId) || '—')}</td><td>${uniCell(v.unidadeId)}</td>
-      <td>${v.ativo ? situPill(v.situacao) : '<span class="pill">Inativo</span>'}</td><td>${botoes(v)}</td></tr>`; }).join('')}
+      <td>${v.ativo ? situPill(v.situacao) : '<span class="pill">Inativo</span>'}</td><td>${botoes(v)}</td></tr>`; }).join('') || '<tr><td colspan="8" class="empty">Nenhum veículo com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhum veículo com esses filtros.</div>'}</section>`;
+  ligarFiltros('veiculos', COLS.veiculos, base);
   ligarToolbar(() => ({ placa: '', tipoVeiculoId: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Em operação', modelo: '', ano: '', obs: '' }));
   ligarAcoes('Veiculos', S.d.veiculos, v => v.placa);
   if (!S.edit) return;
@@ -448,19 +608,21 @@ function formCaixa() {
     </form>${rodapeForm(e)}</section>`;
 }
 function renderCaixas() {
-  const lista = S.d.caixas.filter(c => (S.inativos || c.ativo) && passaUni(c) &&
+  const base = S.d.caixas.filter(c => (S.inativos || c.ativo) && passaUni(c) &&
     passaBusca([c.numero, c.capacidade + ' m3', cadNome(c.locadoraId), cadNome(c.cadastroAtualId), c.situacao].join(' ')))
     .sort((a, b) => (b.ativo - a.ativo) || String(a.numero).localeCompare(String(b.numero), 'pt-BR', { numeric: true }));
+  const lista = aplicarFiltros('caixas', COLS.caixas, base);
   $('#main').innerHTML = formCaixa() + `<section class="panel">
     <div class="panel-h"><div><h2>Caixas estacionárias</h2><p class="sub">Onde cada caixa está. Na Programação, a entrega, a retirada e a troca de caixa vão atualizar isso sozinhas.</p></div></div>
-    ${toolbar('+ Caixa')}
-    ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Número</th><th class="num">m³</th><th>Propriedade</th><th>Unidade</th><th>Situação</th><th>Onde está</th><th></th></tr></thead><tbody>
+    ${toolbar('+ Caixa')}${infoFiltros('caixas', lista.length, base.length)}
+    ${base.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('caixas', COLS.caixas, '<th></th>')}</thead><tbody>
     ${lista.map(c => `<tr class="${c.ativo ? '' : 'inativo'}">
       <td class="mono"><b>${esc(c.numero)}</b></td><td class="num">${esc(c.capacidade)}</td>
       <td>${esc(c.propriedade)}${c.locadoraId ? `<div class="sub" style="margin:0">${esc(cadNome(c.locadoraId))}</div>` : ''}</td>
       <td>${uniCell(c.unidadeId)}</td><td>${c.ativo ? situPill(c.situacao) : '<span class="pill">Inativa</span>'}</td>
-      <td class="wrap">${esc(cadNome(c.cadastroAtualId) || '—')}</td><td>${botoes(c)}</td></tr>`).join('')}
+      <td class="wrap">${esc(cadNome(c.cadastroAtualId) || '—')}</td><td>${botoes(c)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhuma caixa com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhuma caixa com esses filtros. Cadastre as caixas em "+ Caixa".</div>'}</section>`;
+  ligarFiltros('caixas', COLS.caixas, base);
   ligarToolbar(() => ({ numero: '', capacidade: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Na base', cadastroAtualId: '', obs: '' }));
   ligarAcoes('Caixas', S.d.caixas, c => nomeCaixa(c.numero));
   if (!S.edit) return;
@@ -477,7 +639,8 @@ function renderCaixas() {
 /* ---------- tipos de veículo ---------- */
 function renderTipos() {
   const e = S.edit;
-  const lista = S.d.tipos.filter(t => (S.inativos || t.ativo) && passaBusca(t.nome)).sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const base = S.d.tipos.filter(t => (S.inativos || t.ativo) && passaBusca(t.nome)).sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const lista = aplicarFiltros('tipos', COLS.tipos, base);
   $('#main').innerHTML = (e ? `<section class="panel form-panel" id="form-panel">
     <div class="panel-h"><div><h2>${e.id ? 'Editar tipo ' + esc(e.nome) : 'Novo tipo de veículo'}</h2><p class="sub">A categoria de CNH é a mínima exigida para dirigir este tipo. Confira com o DP antes de usar.</p></div><button class="btn sm" id="f-cancel" type="button">Cancelar</button></div>
     <form id="f" class="form" autocomplete="off">
@@ -487,11 +650,12 @@ function renderTipos() {
       <div class="row" style="grid-column:1/-1;justify-content:flex-end"><button class="btn pri" id="f-save" type="submit">${e.id ? 'Salvar alterações' : 'Cadastrar tipo'}</button></div>
     </form>${rodapeForm(e)}</section>` : '') + `<section class="panel">
     <div class="panel-h"><div><h2>Tipos de veículo</h2><p class="sub">Lista usada no cadastro de veículos. Tipo que já tem veículo não pode ser excluído, só inativado.</p></div></div>
-    ${toolbar('+ Tipo')}
-    <div class="tbl-wrap"><table><thead><tr><th>Tipo</th><th>CNH exigida</th><th>Caixas (m³)</th><th class="num">Veículos</th><th></th></tr></thead><tbody>
+    ${toolbar('+ Tipo')}${infoFiltros('tipos', lista.length, base.length)}
+    <div class="tbl-wrap"><table><thead>${cabFiltro('tipos', COLS.tipos, '<th></th>')}</thead><tbody>
     ${lista.map(t => `<tr class="${t.ativo ? '' : 'inativo'}"><td><b>${esc(t.nome)}</b></td><td>${t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '<span class="sem-uni">não definida</span>'}</td>
-      <td>${esc(t.capacidadesCaixa || '—')}</td><td class="num">${t.veiculos}</td><td>${botoes(t)}</td></tr>`).join('')}
+      <td>${esc(t.capacidadesCaixa || '—')}</td><td class="num">${t.veiculos}</td><td>${botoes(t)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum tipo com os filtros das colunas.</td></tr>'}
     </tbody></table></div></section>`;
+  ligarFiltros('tipos', COLS.tipos, base);
   ligarToolbar(() => ({ nome: '', categoriaCnh: '', capacidadesCaixa: '' }));
   ligarAcoes('TiposVeiculo', S.d.tipos, t => t.nome);
   if (!e) return;
@@ -519,6 +683,8 @@ function renderLocacao() {
   const linhas = [...veis.map(v => ({ k: 'V' + v.id, nome: v.placa, tipo: tipoDe(v.tipoVeiculoId).nome || '', prop: v.propriedade, loc: cadNome(v.locadoraId), uni: v.unidadeId })),
                   ...cxs.map(c => ({ k: 'C' + c.id, nome: nomeCaixa(c.numero), tipo: 'Caixa ' + c.capacidade + ' m³', prop: c.propriedade, loc: cadNome(c.locadoraId), uni: c.unidadeId }))];
   linhas.sort((a, b) => (a.prop === 'Locada' ? 0 : 1) - (b.prop === 'Locada' ? 0 : 1) || a.loc.localeCompare(b.loc) || a.nome.localeCompare(b.nome));
+  linhas.forEach(l => { l.uso = !!(d.m[l.k] && d.m[l.k].uso); });
+  const vis = aplicarFiltros('locacao', COLS.locacao, linhas);
   const total = linhas.reduce((s, l) => s + (d.m[l.k] && d.m[l.k].uso ? +d.m[l.k].valor || 0 : 0), 0);
   const nUso = linhas.filter(l => d.m[l.k] && d.m[l.k].uso).length;
   const ant = itensDoMes(addMes(S.mes, -1));
@@ -530,14 +696,16 @@ function renderLocacao() {
       <span class="sub" style="margin:0 0 0 auto">${nUso} em uso · total</span><span class="loc-total">${R(total)}</span>
       ${S.ro ? '' : `<button class="btn pri" id="salvar" ${d.sujo ? '' : 'disabled'}>Salvar ${esc(mesLbl(S.mes))}</button>`}
     </div>
-    ${linhas.length ? `<div class="tbl-wrap"><table><thead><tr><th>Em uso</th><th>Placa / caixa</th><th>Tipo</th><th>Propriedade</th><th>Locadora</th><th>Unidade</th><th class="num">Valor no mês (R$)</th></tr></thead><tbody>
-    ${linhas.map(l => { const x = d.m[l.k] || { uso: false, valor: 0 }; return `<tr>
+    ${infoFiltros('locacao', vis.length, linhas.length)}
+    ${linhas.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('locacao', COLS.locacao, '<th class="num">Valor no mês (R$)</th>')}</thead><tbody>
+    ${vis.map(l => { const x = d.m[l.k] || { uso: false, valor: 0 }; return `<tr>
       <td><input type="checkbox" data-uso="${l.k}" ${x.uso ? 'checked' : ''} ${S.ro ? 'disabled' : ''} aria-label="Em uso no mês: ${esc(l.nome)}" style="width:auto"></td>
       <td class="mono"><b>${esc(l.nome)}</b></td><td>${esc(l.tipo)}</td><td>${esc(l.prop)}</td><td>${esc(l.loc || '—')}</td><td>${uniCell(l.uni)}</td>
-      <td class="num">${l.prop === 'Locada' ? `<input type="number" step="any" min="0" data-val="${l.k}" value="${x.uso ? esc(x.valor) : ''}" ${S.ro || !x.uso ? 'disabled' : ''} style="width:130px;text-align:right" aria-label="Valor de ${esc(l.nome)}">` : '<span class="sub">própria</span>'}</td></tr>`; }).join('')}
+      <td class="num">${l.prop === 'Locada' ? `<input type="number" step="any" min="0" data-val="${l.k}" value="${x.uso ? esc(x.valor) : ''}" ${S.ro || !x.uso ? 'disabled' : ''} style="width:130px;text-align:right" aria-label="Valor de ${esc(l.nome)}">` : '<span class="sub">própria</span>'}</td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Nenhum item com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhum veículo ou caixa locada nesta unidade. Cadastre em Veículos e Caixas.</div>'}
     ${d.sujo ? '<p class="hint warn" id="aviso-sujo" style="margin-top:8px">Alterações ainda não salvas.</p>' : ''}
   </section>`;
+  ligarFiltros('locacao', COLS.locacao, linhas);
   $('#m-prev').onclick = () => { if (d.sujo && !confirm('Sair sem salvar as alterações deste mês?')) return; S.mes = addMes(S.mes, -1); S.locDraft = null; render(); };
   $('#m-next').onclick = () => { if (d.sujo && !confirm('Sair sem salvar as alterações deste mês?')) return; S.mes = addMes(S.mes, 1); S.locDraft = null; render(); };
   document.querySelectorAll('[data-uso]').forEach(c => c.onchange = () => { const k = c.dataset.uso; d.m[k] = d.m[k] || { valor: 0 }; d.m[k].uso = c.checked; d.sujo = true; render(); });
@@ -572,7 +740,6 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
   await carregar();
 })();
 })();
-
 </script>
 </body>
 </html>
