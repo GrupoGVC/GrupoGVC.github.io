@@ -285,6 +285,15 @@ table.itens td input,table.itens td select{min-width:70px}
 .al.ok{border-color:var(--ok)}
 .toolbar .seg{max-width:100%;overflow-x:auto;scrollbar-width:thin}
 .toolbar .seg button{white-space:nowrap}
+.inds{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.ind{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;font:inherit;color:inherit;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ind:hover{border-color:var(--ink-3)}
+.ind .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.ind .v{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:24px;line-height:1.15;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ind .d{font-size:12px;color:var(--ink-2)}
+.ind.txt .v{font-size:19px;line-height:1.5}
+.ind.crit .v{color:var(--crit)} .ind.warn .v{color:var(--warn)} .ind.zero .v{color:var(--ink-3)}
+.ind[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261106"></script>
@@ -322,7 +331,7 @@ const NIVEL_LBL = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' }
 const TABS = ['fila', 'todas', 'recorrentes', 'consultores', 'documentos', 'importar'];
 const DIAS_SEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const ABERTAS = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada', 'Frustrada'];
-const S = { tab: 'fila', d: null, ro: true, uni: '', busca: '', st: '', mes: '', inativos: false, edit: null, abrir: null };
+const S = { tab: 'fila', d: null, ro: true, uni: '', busca: '', st: '', mes: '', inativos: false, edit: null, abrir: null, mesCon: '', indCon: '' };
 
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 3600); }
 function setSync(ok, txt) { const s = $('#sync'); s.classList.toggle('on', ok); s.querySelector('span').textContent = txt; }
@@ -693,28 +702,75 @@ async function excluirCad(tabela, x) {
   try { await Portal.api('sol.excluirCadastro', { tabela, id: x.id }); toast('Excluído'); await carregar(true); }
   catch (e) { if (e && e.erro === 'em_uso') { if (await Portal.confirmarInativar(e, x.nome)) { await Portal.api('sol.ativoCadastro', { tabela, id: x.id, ativo: false }); toast('Inativado'); await carregar(true); } } else falha(e); }
 }
+const EM_ANDAMENTO = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada'];
+const REALIZADAS = ['Realizada', 'BM enviado', 'NF emitida'];
 function renderConsultores() {
   // só consulta: o cadastro (e o acesso ao portal) fica no módulo Pessoas
-  const lista = S.d.consultores.filter(c => S.inativos || c.ativo).sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
-  const qtd = id => S.d.solicitacoes.filter(s => s.consultorId === id).length;
+  if (!S.mesCon) S.mesCon = hojeISO().slice(0, 7);
+  const mes = S.mesCon;
+  const MESES_N = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const mesLbl = MESES_N[+mes.slice(5, 7) - 1] + ' ' + mes.slice(0, 4);
+  const sols = S.d.solicitacoes.filter(x => passaUni(x));
+  const doMes = sols.filter(x => (x.dataSolicitacao || '').startsWith(mes) && x.status !== 'Cancelada');
+  const real = sols.filter(x => REALIZADAS.includes(x.status) && (x.dataColeta || '').startsWith(mes));
+  const and = sols.filter(x => EM_ANDAMENTO.includes(x.status));
+  const por = (l, id) => l.filter(x => x.consultorId === id);
+  const M = {}; S.d.consultores.forEach(c => { const dm = por(doMes, c.id);
+    M[c.id] = { mes: dm.length, and: por(and, c.id).length, real: por(real, c.id).length, valor: dm.reduce((t, x) => t + (+x.valorPrevisto || 0), 0), total: por(sols, c.id).length }; });
+  const m = id => M[id] || { mes: 0, and: 0, real: 0, valor: 0, total: 0 };
+  const ativos = S.d.consultores.filter(c => c.ativo);
+  const top = S.d.consultores.filter(c => m(c.id).mes > 0).sort((a, b) => m(b.id).mes - m(a.id).mes || m(b.id).valor - m(a.id).valor)[0];
+  const IND = {
+    mes: { k: 'Com solicitações no mês', f: c => m(c.id).mes > 0 },
+    and: { k: 'Com solicitações em andamento', f: c => m(c.id).and > 0 },
+    real: { k: 'Com coletas realizadas no mês', f: c => m(c.id).real > 0 },
+    valor: { k: 'Com valor previsto no mês', f: c => m(c.id).valor > 0 },
+    top: { k: 'Destaque do mês', f: c => top && c.id === top.id },
+  };
+  if (S.indCon && !IND[S.indCon]) S.indCon = '';
+  const fInd = S.indCon ? IND[S.indCon].f : () => true;
+  const lista = S.d.consultores.filter(c => (S.inativos || c.ativo) && fInd(c)).sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const semCon = doMes.filter(x => !x.consultorId).length;
+  const comCon = doMes.length - semCon;
+  const card = (id, k, v, d, vazio) => `<button type="button" class="ind ${vazio ? 'zero' : ''} ${id === 'top' ? 'txt' : ''}" data-ind="${id}" aria-pressed="${!!id && S.indCon === id}"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span><span class="d">${esc(d)}</span></button>`;
+  const soma = l => l.filter(x => x.consultorId).reduce((t, x) => t + (+x.valorPrevisto || 0), 0);
+  const inds = `<div class="inds" role="group" aria-label="Indicadores dos consultores">
+    ${card('', 'Consultores ativos', ativos.length, (S.d.consultores.length - ativos.length) + ' inativo(s)', !ativos.length)}
+    ${card('mes', 'Solicitações no mês', comCon, semCon ? semCon + ' sem consultor' : 'todas com consultor', !comCon)}
+    ${card('and', 'Em andamento', and.filter(x => x.consultorId).length, 'recebidas, liberadas e programadas', !and.filter(x => x.consultorId).length)}
+    ${card('real', 'Realizadas no mês', real.filter(x => x.consultorId).length, 'coletas feitas em ' + mesLbl, !real.filter(x => x.consultorId).length)}
+    ${card('valor', 'Valor previsto no mês', R(soma(doMes)), 'solicitações com consultor', !soma(doMes))}
+    ${card('top', 'Destaque do mês', top ? (top.nome.split(' ').length > 1 ? top.nome.split(' ')[0] + ' ' + top.nome.split(' ').slice(-1)[0] : top.nome) : '—', top ? m(top.id).mes + ' solicitação(ões) · ' + R(m(top.id).valor) : 'nenhuma solicitação no mês', !top)}
+  </div>`;
   const TC = Portal.tabela('sol-con', [
     { k: 'nome', label: 'Nome', v: c => c.nome }, { k: 'email', label: 'E-mail', v: c => c.email }, { k: 'tel', label: 'Telefone', v: c => c.telefone },
-    { k: 'qtd', label: 'Solicitações', v: c => String(qtd(c.id)), ord: c => qtd(c.id), num: true },
-  ], { titulo: 'Consultores', arquivo: 'consultores', unidade: 'consultores', aoMudar: render,
-    extrasExport: [{ label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }], filtrosExtras: () => filtrosTopo(S.inativos && 'Mostrando os inativos') });
+    { k: 'mes', label: 'No mês', v: c => String(m(c.id).mes), ord: c => m(c.id).mes, x: c => m(c.id).mes, num: true },
+    { k: 'and', label: 'Em andamento', v: c => String(m(c.id).and), ord: c => m(c.id).and, x: c => m(c.id).and, num: true },
+    { k: 'real', label: 'Realizadas', v: c => String(m(c.id).real), ord: c => m(c.id).real, x: c => m(c.id).real, num: true },
+    { k: 'valor', label: 'Valor previsto (R$)', v: c => R(m(c.id).valor), ord: c => m(c.id).valor, x: c => m(c.id).valor, fmt: '#,##0.00', num: true },
+    { k: 'qtd', label: 'Total', v: c => String(m(c.id).total), ord: c => m(c.id).total, x: c => m(c.id).total, num: true },
+  ], { titulo: 'Consultores', arquivo: 'consultores', unidade: 'consultores', aoMudar: render, totais: l => ({ 'No mês': l.reduce((t, c) => t + m(c.id).mes, 0), 'Valor previsto (R$)': l.reduce((t, c) => t + m(c.id).valor, 0) }),
+    subtitulo: () => ['Mês: ' + mesLbl, S.uni ? 'Unidade: ' + uniNome(S.uni) : ''].filter(Boolean).join(' · '),
+    extrasExport: [{ label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }],
+    filtrosExtras: () => filtrosTopo(S.indCon && 'Indicador: ' + IND[S.indCon].k, S.inativos && 'Mostrando os inativos') });
   const listaC = TC.aplicar(lista);
-  const linkPes = id => '../pessoas/' + (id ? '#p=' + encodeURIComponent(id) : '');
   $('#main').innerHTML = `<section class="panel">
-    <div class="panel-h"><div><h2>Consultores</h2><p class="sub">Quem traz a solicitação do cliente. Esta lista é só para consulta: o cadastro e o acesso ao portal ficam no módulo <b>Pessoas</b> (função Consultor).</p></div></div>
-    <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label><span style="margin-left:auto">${TC.botao()}</span><a class="btn" href="${linkPes('')}">Cadastrar/editar em Pessoas</a></div>
+    <div class="panel-h"><div><h2>Consultores</h2><p class="sub">Quem traz a solicitação do cliente, só para consulta (o cadastro fica no módulo Pessoas). No mês, Realizadas e Valor previsto são do mês escolhido; Em andamento é a situação de hoje. Clique num indicador para filtrar a lista.</p></div>
+      <div class="month"><button id="cm-prev" aria-label="Mês anterior">‹</button><span class="lbl">${esc(mesLbl)}</span><button id="cm-next" aria-label="Próximo mês">›</button></div></div>
+    ${inds}
+    <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label>
+      ${S.indCon ? `<span class="pill">${esc(IND[S.indCon].k)} <button class="btn sm" id="ind-limpar" style="padding:0 6px;margin-left:4px" aria-label="Tirar o filtro do indicador">×</button></span>` : ''}
+      <span style="margin-left:auto">${TC.botao()}</span></div>
     ${TC.info(listaC.length, lista.length)}
-    ${lista.length ? `<div class="tbl-wrap"><table><thead>${TC.cab('<th></th>')}</thead><tbody>
-    ${listaC.map(c => `<tr class="${c.ativo ? '' : 'inativo'}"><td><b>${esc(c.nome)}</b></td><td>${esc(c.email || '—')}</td><td>${esc(c.telefone || '—')}</td><td class="num">${qtd(c.id)}</td>
-      <td><div class="acoes"><button class="btn sm" data-chist="${c.id}">Histórico</button><a class="btn sm" href="${linkPes(c.id)}">Abrir em Pessoas</a></div></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum consultor com os filtros das colunas.</td></tr>'}
-    </tbody></table></div>` : '<div class="empty">Nenhum consultor cadastrado. Cadastre no módulo Pessoas com a função Consultor.</div>'}</section>`;
-  const achar = id => S.d.consultores.find(c => c.id === id);
+    ${lista.length ? `<div class="tbl-wrap"><table><thead>${TC.cab()}</thead><tbody>
+    ${listaC.map(c => `<tr class="${c.ativo ? '' : 'inativo'}"><td><b>${esc(c.nome)}</b>${top && top.id === c.id ? ' <span class="pill ok">destaque</span>' : ''}</td><td>${esc(c.email || '—')}</td><td>${esc(c.telefone || '—')}</td>
+      <td class="num">${m(c.id).mes}</td><td class="num">${m(c.id).and}</td><td class="num">${m(c.id).real}</td><td class="num">${R(m(c.id).valor)}</td><td class="num">${m(c.id).total}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nenhum consultor com esses filtros.</td></tr>'}
+    </tbody></table></div>` : `<div class="empty">${S.indCon ? 'Nenhum consultor neste indicador.' : 'Nenhum consultor cadastrado. O cadastro é feito no módulo Pessoas, com a função Consultor.'}</div>`}</section>`;
   TC.ligar();
-  $$('[data-chist]').forEach(b => b.onclick = () => Portal.mostrarHistorico('Pessoas', b.dataset.chist, achar(b.dataset.chist).nome));
+  const mudaMes = d => { const [y, mm] = S.mesCon.split('-').map(Number); const t = new Date(y, mm - 1 + d, 1); S.mesCon = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0'); render(); };
+  $('#cm-prev').onclick = () => mudaMes(-1); $('#cm-next').onclick = () => mudaMes(1);
+  $$('[data-ind]').forEach(x => x.onclick = () => { const id = x.dataset.ind; S.indCon = !id || S.indCon === id ? '' : id; render(); });
+  const li = $('#ind-limpar'); if (li) li.onclick = () => { S.indCon = ''; render(); };
   const i = $('#inat'); if (i) i.onchange = () => { S.inativos = i.checked; render(); };
 }
 
