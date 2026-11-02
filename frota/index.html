@@ -279,6 +279,7 @@ td.wrap{white-space:normal;min-width:160px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
+<script src="../tabela.js?v=20261102"></script>
 </head>
 <body>
 <header class="top">
@@ -370,108 +371,27 @@ function render() {
   ({ veiculos: renderVeiculos, locacao: renderLocacao, caixas: renderCaixas, tipos: renderTipos })[S.tab]();
 }
 
-/* ---------- filtro por coluna, como no Excel ---------- */
-// S.filtros[aba][coluna] = Set dos valores que aparecem; S.ordem[aba] = { k, dir }.
-S.filtros = {}; S.ordem = {};
-const txtCol = (c, x) => { const v = c.v(x); return v === '' || v == null ? (c.vazio || '(Vazias)') : String(v); };
-const cmpCol = (c, a, b) => c.num ? (Number(c.v(a)) || 0) - (Number(c.v(b)) || 0) : txtCol(c, a).localeCompare(txtCol(c, b), 'pt-BR', { numeric: true });
-function passaFiltros(aba, cols, x, exceto) {
-  const f = S.filtros[aba] || {};
-  return cols.every(c => c.k === exceto || !f[c.k] || f[c.k].has(txtCol(c, x)));
+/* ---------- filtro por coluna e exportação (peça comum do portal: tabela.js) ---------- */
+const TITULOS = { veiculos: 'Veículos', caixas: 'Caixas estacionárias', tipos: 'Tipos de veículo', locacao: 'Locação do mês' };
+const UNID = { veiculos: 'veículos', caixas: 'caixas', tipos: 'tipos', locacao: 'itens' };
+const valorLoc = l => { const m = S.locDraft && S.locDraft.m[l.k]; return m && m.uso ? +m.valor || 0 : ''; };
+const EXTRAS = {
+  veiculos: { extrasExport: [{ label: 'Modelo', x: v => v.modelo || '' }, { label: 'Ano', x: v => v.ano || '' }, { label: 'Observações', x: v => v.obs || '' }] },
+  caixas: { extrasExport: [{ label: 'Locadora', x: c => cadNome(c.locadoraId) }, { label: 'Observações', x: c => c.obs || '' }] },
+  tipos: {},
+  locacao: { extrasExport: [{ label: 'Valor no mês (R$)', x: valorLoc, fmt: '"R$" #,##0.00' }],
+             totais: l => ({ 'Valor no mês (R$)': l.reduce((t, x) => t + (+valorLoc(x) || 0), 0) }) },
+};
+function tb(aba, extra) {
+  return Portal.tabela('frota-' + aba, COLS[aba], Object.assign({ titulo: TITULOS[aba], arquivo: 'frota-' + aba, unidade: UNID[aba], aoMudar: render,
+    subtitulo: () => [S.uni ? 'Unidade: ' + (S.uni === '-' ? 'sem unidade definida' : uniNome(S.uni)) : '', aba === 'locacao' ? 'Mês: ' + mesLbl(S.mes) : ''].filter(Boolean).join(' · '),
+    filtrosExtras: () => [S.busca && aba !== 'locacao' && 'Busca: "' + S.busca + '"', S.inativos && aba !== 'locacao' && 'Inclui inativos'].filter(Boolean) }, EXTRAS[aba], extra || {}));
 }
-function aplicarFiltros(aba, cols, linhas) {
-  let out = linhas.filter(x => passaFiltros(aba, cols, x));
-  const o = S.ordem[aba]; const c = o && cols.find(y => y.k === o.k);
-  if (c) out = out.slice().sort((a, b) => o.dir * cmpCol(c, a, b));
-  return out;
-}
-const nFiltros = aba => Object.keys(S.filtros[aba] || {}).length + (S.ordem[aba] ? 1 : 0);
-const ICO_FILTRO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12l-4.6 5.4V13l-2.8-1.4V8.4z" fill="currentColor"/></svg>';
-const ICO_SETA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-function cabFiltro(aba, cols, extra) {
-  const f = S.filtros[aba] || {}, o = S.ordem[aba];
-  return '<tr>' + cols.map(c => {
-    const on = !!f[c.k], ord = o && o.k === c.k ? (o.dir > 0 ? ' ↑' : ' ↓') : '';
-    return `<th class="${c.num ? 'num' : ''}"><button type="button" class="fh${on || ord ? ' on' : ''}" data-fcol="${c.k}" aria-haspopup="dialog" aria-label="Filtrar ou ordenar a coluna ${esc(c.label)}${on ? ' (filtro ativo)' : ''}">${esc(c.label)}${ord}<span class="fi">${on ? ICO_FILTRO : ICO_SETA}</span></button></th>`;
-  }).join('') + (extra || '') + '</tr>';
-}
-function infoFiltros(aba, nVis, nTotal) {
-  return nFiltros(aba) ? `<div class="filtro-info"><span>${nVis} de ${nTotal} ${nTotal === 1 ? 'linha' : 'linhas'} com os filtros das colunas</span><button type="button" class="btn sm" id="limpar-filtros">Limpar filtros</button></div>` : '';
-}
-function fecharFiltro() { const p = document.getElementById('fpop'); if (p) p.remove(); document.removeEventListener('mousedown', fecharFora, true); document.removeEventListener('keydown', escFiltro, true); }
-function fecharFora(ev) { const p = document.getElementById('fpop'); if (p && !p.contains(ev.target) && !ev.target.closest('[data-fcol]')) fecharFiltro(); }
-function escFiltro(ev) { if (ev.key === 'Escape') { const k = (document.getElementById('fpop') || {}).dataset; fecharFiltro(); const b = k && document.querySelector(`[data-fcol="${k.col}"]`); if (b) b.focus(); } }
-function ligarFiltros(aba, cols, base) {
-  document.querySelectorAll('[data-fcol]').forEach(b => b.onclick = ev => {
-    ev.stopPropagation();
-    const ja = document.getElementById('fpop'); if (ja && ja.dataset.col === b.dataset.fcol) { fecharFiltro(); return; }
-    abrirFiltro(aba, cols.find(c => c.k === b.dataset.fcol), cols, base, b);
-  });
-  const lf = $('#limpar-filtros'); if (lf) lf.onclick = () => { delete S.filtros[aba]; delete S.ordem[aba]; render(); };
-}
-function abrirFiltro(aba, col, cols, base, btn) {
-  fecharFiltro();
-  // valores possíveis: linhas que passam pelos filtros das OUTRAS colunas (igual ao Excel)
-  const cont = new Map();
-  base.filter(x => passaFiltros(aba, cols, x, col.k)).forEach(x => { const t = txtCol(col, x); cont.set(t, (cont.get(t) || 0) + 1); });
-  const vazio = col.vazio || '(Vazias)';
-  const valores = [...cont.keys()].sort((a, b) => a === vazio ? 1 : b === vazio ? -1 : col.num ? Number(a) - Number(b) : a.localeCompare(b, 'pt-BR', { numeric: true }));
-  const atual = (S.filtros[aba] || {})[col.k];
-  const sel = new Set(valores.filter(v => !atual || atual.has(v)));
-  const az = col.num ? ['Menor → maior', 'Maior → menor'] : ['A → Z', 'Z → A'];
-  const p = document.createElement('div');
-  p.id = 'fpop'; p.className = 'fpop'; p.dataset.col = col.k; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Filtro da coluna ' + col.label);
-  p.innerHTML = `<div class="fp-ord"><button type="button" class="fp-o" data-o="1">↑ Ordenar ${az[0]}</button><button type="button" class="fp-o" data-o="-1">↓ Ordenar ${az[1]}</button></div>
-    <input type="search" class="fp-busca" placeholder="Pesquisar" aria-label="Pesquisar valores de ${esc(col.label)}">
-    <div class="fp-lista">
-      <label class="fp-all"><input type="checkbox" data-all> <span>(Selecionar tudo)</span></label>
-      ${valores.map((v, i) => `<label data-txt="${esc(v.toLowerCase())}"><input type="checkbox" data-i="${i}" ${sel.has(v) ? 'checked' : ''}> <span>${esc(v)}</span><em>${cont.get(v)}</em></label>`).join('') || '<div class="sub" style="padding:6px">Nenhum valor.</div>'}
-    </div>
-    <div class="fp-bot"><button type="button" class="btn sm" data-limpar ${atual || (S.ordem[aba] && S.ordem[aba].k === col.k) ? '' : 'disabled'}>Limpar</button><span style="flex:1"></span><button type="button" class="btn sm" data-cancel>Cancelar</button><button type="button" class="btn sm pri" data-ok>OK</button></div>`;
-  document.body.appendChild(p);
-  // posição: logo abaixo do cabeçalho, sem sair da tela
-  const r = btn.getBoundingClientRect(), w = Math.min(290, window.innerWidth - 16);
-  p.style.width = w + 'px';
-  p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + window.scrollX + 'px';
-  p.style.top = r.bottom + 4 + window.scrollY + 'px';
-  const busca = p.querySelector('.fp-busca'), all = p.querySelector('[data-all]'), ok = p.querySelector('[data-ok]');
-  const caixas = [...p.querySelectorAll('[data-i]')];
-  const visiveis = () => caixas.filter(c => !c.closest('label').hidden);
-  const atualizar = () => {
-    const vis = visiveis(), n = vis.filter(c => c.checked).length;
-    all.checked = vis.length > 0 && n === vis.length; all.indeterminate = n > 0 && n < vis.length;
-    ok.disabled = n === 0;
-  };
-  caixas.forEach(c => c.onchange = () => { const v = valores[+c.dataset.i]; c.checked ? sel.add(v) : sel.delete(v); atualizar(); });
-  all.onchange = () => { visiveis().forEach(c => { c.checked = all.checked; const v = valores[+c.dataset.i]; all.checked ? sel.add(v) : sel.delete(v); }); atualizar(); };
-  busca.oninput = () => {
-    const q = busca.value.trim().toLowerCase();
-    caixas.forEach(c => { const l = c.closest('label'); l.hidden = !!q && !l.dataset.txt.includes(q); if (q) c.checked = !l.hidden; });
-    if (!q) caixas.forEach(c => c.checked = sel.has(valores[+c.dataset.i]));
-    atualizar();
-  };
-  const aplicar = () => {
-    const q = busca.value.trim();
-    const escolhidos = q ? visiveis().filter(c => c.checked).map(c => valores[+c.dataset.i]) : valores.filter(v => sel.has(v));
-    S.filtros[aba] = S.filtros[aba] || {};
-    if (escolhidos.length === valores.length && !q) delete S.filtros[aba][col.k];
-    else S.filtros[aba][col.k] = new Set(escolhidos);
-    if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba];
-    fecharFiltro(); render();
-  };
-  ok.onclick = aplicar;
-  busca.onkeydown = ev => { if (ev.key === 'Enter' && !ok.disabled) aplicar(); };
-  p.querySelector('[data-cancel]').onclick = () => { fecharFiltro(); btn.focus(); };
-  p.querySelector('[data-limpar]').onclick = () => {
-    if (S.filtros[aba]) { delete S.filtros[aba][col.k]; if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba]; }
-    if (S.ordem[aba] && S.ordem[aba].k === col.k) delete S.ordem[aba];
-    fecharFiltro(); render();
-  };
-  p.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { S.ordem[aba] = { k: col.k, dir: +b.dataset.o }; fecharFiltro(); render(); });
-  atualizar();
-  document.addEventListener('mousedown', fecharFora, true); document.addEventListener('keydown', escFiltro, true);
-  busca.focus();
-}
+const aplicarFiltros = (aba, cols, linhas) => tb(aba).aplicar(linhas);
+const cabFiltro = (aba, cols, extra) => tb(aba).cab(extra);
+const infoFiltros = (aba, nVis, nTotal) => tb(aba).info(nVis, nTotal);
+const ligarFiltros = (aba) => tb(aba).ligar();
+const fecharFiltro = () => { if (Portal.fecharFiltroTabela) Portal.fecharFiltroTabela(); };
 const COLS = {
   veiculos: [
     { k: 'placa', label: 'Placa', v: v => v.placa },
@@ -522,10 +442,10 @@ function ligarAcoes(tabela, lista, rotulo) {
   document.querySelectorAll('[data-reat]').forEach(b => b.onclick = () => { const x = lista.find(y => y.id === b.dataset.reat); ativo(tabela, x.id, true, rotulo(x)); });
 }
 const botoes = (x) => `<div class="acoes">${S.ro ? '' : `<button class="btn sm" data-ed="${x.id}">Editar</button>`}<button class="btn sm" data-hist="${x.id}">Histórico</button>${S.ro ? '' : (x.ativo ? `<button class="btn sm danger" data-del="${x.id}" aria-label="Excluir">Excluir</button>` : `<button class="btn sm" data-reat="${x.id}">Reativar</button>`)}</div>`;
-const toolbar = (rotuloNovo) => `<div class="toolbar">
+const toolbar = (rotuloNovo, aba) => `<div class="toolbar">
   <input type="search" id="busca" placeholder="Buscar…" value="${esc(S.busca)}" aria-label="Buscar">
   <label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label>
-  ${S.ro || !rotuloNovo ? '' : `<button class="btn pri" id="novo" style="margin-left:auto">${rotuloNovo}</button>`}</div>`;
+  <span style="margin-left:auto">${aba ? tb(aba).botao() : ''}</span>${S.ro || !rotuloNovo ? '' : `<button class="btn pri" id="novo">${rotuloNovo}</button>`}</div>`;
 function ligarToolbar(novo) {
   const b = $('#busca'); if (b) b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
   const i = $('#inat'); if (i) i.onchange = () => { S.inativos = i.checked; render(); };
@@ -567,7 +487,7 @@ function renderVeiculos() {
   const lista = aplicarFiltros('veiculos', COLS.veiculos, base);
   $('#main').innerHTML = formVeiculo() + `<section class="panel">
     <div class="panel-h"><div><h2>Veículos</h2><p class="sub">Próprios e locados, por unidade. Veículo devolvido ou parado não aparece para a Programação.</p></div></div>
-    ${toolbar('+ Veículo')}${infoFiltros('veiculos', lista.length, base.length)}
+    ${toolbar('+ Veículo', 'veiculos')}${infoFiltros('veiculos', lista.length, base.length)}
     ${base.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('veiculos', COLS.veiculos, '<th></th>')}</thead><tbody>
     ${lista.map(v => { const t = tipoDe(v.tipoVeiculoId); return `<tr class="${v.ativo ? '' : 'inativo'}">
       <td class="mono"><b>${esc(v.placa)}</b>${v.modelo ? `<div class="sub" style="margin:0">${esc(v.modelo)}${v.ano ? ' · ' + esc(v.ano) : ''}</div>` : ''}</td>
@@ -615,7 +535,7 @@ function renderCaixas() {
   const lista = aplicarFiltros('caixas', COLS.caixas, base);
   $('#main').innerHTML = formCaixa() + `<section class="panel">
     <div class="panel-h"><div><h2>Caixas estacionárias</h2><p class="sub">Onde cada caixa está. Na Programação, a entrega, a retirada e a troca de caixa vão atualizar isso sozinhas.</p></div></div>
-    ${toolbar('+ Caixa')}${infoFiltros('caixas', lista.length, base.length)}
+    ${toolbar('+ Caixa', 'caixas')}${infoFiltros('caixas', lista.length, base.length)}
     ${base.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('caixas', COLS.caixas, '<th></th>')}</thead><tbody>
     ${lista.map(c => `<tr class="${c.ativo ? '' : 'inativo'}">
       <td class="mono"><b>${esc(c.numero)}</b></td><td class="num">${esc(c.capacidade)}</td>
@@ -651,7 +571,7 @@ function renderTipos() {
       <div class="row" style="grid-column:1/-1;justify-content:flex-end"><button class="btn pri" id="f-save" type="submit">${e.id ? 'Salvar alterações' : 'Cadastrar tipo'}</button></div>
     </form>${rodapeForm(e)}</section>` : '') + `<section class="panel">
     <div class="panel-h"><div><h2>Tipos de veículo</h2><p class="sub">Lista usada no cadastro de veículos. Tipo que já tem veículo não pode ser excluído, só inativado.</p></div></div>
-    ${toolbar('+ Tipo')}${infoFiltros('tipos', lista.length, base.length)}
+    ${toolbar('+ Tipo', 'tipos')}${infoFiltros('tipos', lista.length, base.length)}
     <div class="tbl-wrap"><table><thead>${cabFiltro('tipos', COLS.tipos, '<th></th>')}</thead><tbody>
     ${lista.map(t => `<tr class="${t.ativo ? '' : 'inativo'}"><td><b>${esc(t.nome)}</b></td><td>${t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '<span class="sem-uni">não definida</span>'}</td>
       <td>${esc(t.capacidadesCaixa || '—')}</td><td class="num">${t.veiculos}</td><td>${botoes(t)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum tipo com os filtros das colunas.</td></tr>'}
@@ -694,7 +614,7 @@ function renderLocacao() {
       <div class="month" role="group" aria-label="Mês"><button id="m-prev" aria-label="Mês anterior">‹</button><div class="lbl">${esc(mesLbl(S.mes))}</div><button id="m-next" aria-label="Próximo mês">›</button></div></div>
     <div class="toolbar">
       ${S.ro ? '' : `<button class="btn" id="copiar" ${ant.length ? '' : 'disabled'}>Copiar de ${esc(mesLbl(addMes(S.mes, -1)))}</button>`}
-      <span class="sub" style="margin:0 0 0 auto">${nUso} em uso · total</span><span class="loc-total">${R(total)}</span>
+      <span class="sub" style="margin:0 0 0 auto">${nUso} em uso · total</span><span class="loc-total">${R(total)}</span>${tb('locacao').botao()}
       ${S.ro ? '' : `<button class="btn pri" id="salvar" ${d.sujo ? '' : 'disabled'}>Salvar ${esc(mesLbl(S.mes))}</button>`}
     </div>
     ${infoFiltros('locacao', vis.length, linhas.length)}
