@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pessoas · Portal GVC</title>
+<link rel="icon" type="image/png" href="../img/logo-retec.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Mesmo visual do Controle de Destinação: barra fixa no topo (unidade + abas), conteúdo em painéis */
+:root{
+  --bg:#f5f7f5; --surface:#ffffff; --sunken:#edf1ee; --line:#d8dfda; --line-soft:#e6ebe7;
+  --ink:#14211b; --ink-2:#4b5a52; --ink-3:#77857d;
+  --accent:#1d6b52; --accent-ink:#ffffff; --accent-soft:#dcefe6; --plate:transparent; --plate-pad:0px;
+  --s-dest:#2a78d6; --s-loc:#eb6834; --s-rec:#1baf7a;
+  --warn:#a86400; --warn-bg:#fff3dc; --crit:#b42f2f; --crit-bg:#fde8e6; --ok:#1d7a3e; --ok-bg:#e2f4e7;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1512; --surface:#161e1a; --sunken:#1c2621; --line:#2c3a33; --line-soft:#233029;
+  --ink:#e9efeb; --ink-2:#b2c0b8; --ink-3:#83938a;
+  --accent:#4fb08c; --accent-ink:#06130d; --accent-soft:#1d3a2f; --plate:#eef3f0; --plate-pad:6px 10px;
+  --s-dest:#3987e5; --s-loc:#d95926; --s-rec:#199e70;
+  --warn:#e8a43a; --warn-bg:#33270f; --crit:#f07b74; --crit-bg:#3a1a19; --ok:#5cc47f; --ok-bg:#15301f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --surface:#161e1a; --sunken:#1c2621; --line:#2c3a33; --line-soft:#233029;
+  --ink:#e9efeb; --ink-2:#b2c0b8; --ink-3:#83938a;
+  --accent:#4fb08c; --accent-ink:#06130d; --accent-soft:#1d3a2f; --plate:#eef3f0; --plate-pad:6px 10px;
+  --s-dest:#3987e5; --s-loc:#d95926; --s-rec:#199e70;
+  --warn:#e8a43a; --warn-bg:#33270f; --crit:#f07b74; --crit-bg:#3a1a19; --ok:#5cc47f; --ok-bg:#15301f;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:12px 0}
+.brand{display:flex;flex-direction:column;gap:0;margin-right:auto;min-width:0}
+.brand b{font-family:var(--f-display);font-weight:800;font-stretch:80%;font-size:22px;letter-spacing:.01em;line-height:1.1;text-wrap:balance}
+.brand span{font-size:12px;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+.brand-row{display:flex;align-items:center;gap:14px;margin-right:auto;min-width:0}
+.logos{display:flex;align-items:center;gap:10px;background:var(--plate);padding:var(--plate-pad);border-radius:6px;flex-shrink:0}
+.logos img{display:block;width:auto}
+.logos .l-retec{height:30px}.logos .l-gvc{height:34px}
+.logos i{width:1px;align-self:stretch;background:var(--line);margin:2px 0}
+.brand-row .brand{margin-right:0;padding-left:14px;border-left:1px solid var(--line)}
+.login-logos{display:flex;justify-content:center;align-items:center;gap:22px;margin:28px auto 0;width:max-content;max-width:100%}
+.login-logos .l-retec{height:48px}.login-logos .l-gvc{height:56px}
+.login-logos i{height:44px}
+@media (max-width:560px){.logos .l-retec{height:24px}.logos .l-gvc{height:27px}.brand-row{gap:10px}.brand-row .brand{padding-left:10px}.brand b{font-size:19px}.login-logos .l-retec{height:38px}.login-logos .l-gvc{height:44px}}
+.month{display:flex;align-items:center;gap:4px;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r);padding:3px}
+.month button{border:0;background:transparent;color:var(--ink-2);width:32px;height:32px;border-radius:4px;cursor:pointer;font-size:16px}
+.month button:hover{background:var(--surface);color:var(--ink)}
+.month .lbl{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:16px;min-width:150px;text-align:center}
+.sync{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--ink-3);display:inline-block}
+.sync.on i{background:var(--ok)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+nav.tabs button{border:0;background:transparent;color:var(--ink-2);font:600 14px var(--f-body);padding:10px 14px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button .ct{font:500 11px var(--f-mono);background:var(--sunken);border-radius:10px;padding:1px 6px;margin-left:6px;color:var(--ink-2)}
+nav.tabs button .ct.alert{background:var(--warn-bg);color:var(--warn)}
+main{padding-block:20px 60px;display:flex;flex-direction:column;gap:20px}
+h2{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:17px;margin:0;letter-spacing:.005em}
+.sub{color:var(--ink-3);font-size:12.5px;margin:2px 0 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.panel-h{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:20px}
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .k{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.kpi .k i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.kpi .v{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.kpi.net{background:var(--sunken)}
+.delta{font:500 11.5px var(--f-mono);padding:1px 5px;border-radius:3px}
+.delta.up{background:var(--crit-bg);color:var(--crit)} .delta.dn{background:var(--ok-bg);color:var(--ok)}
+.delta.rup{background:var(--ok-bg);color:var(--ok)} .delta.rdn{background:var(--crit-bg);color:var(--crit)}
+/* bars */
+.bars{display:flex;flex-direction:column;gap:7px}
+.bar{display:grid;grid-template-columns:minmax(90px,34%) 1fr auto;align-items:center;gap:10px;font-size:13px;cursor:default}
+.bar .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.bar .t{height:14px;background:var(--line-soft);border-radius:0 4px 4px 0;position:relative}
+.bar .t span{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;min-width:2px}
+.bar .val{font:500 12.5px var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;min-width:86px}
+.bar:hover .n{color:var(--ink)}
+.empty{color:var(--ink-3);font-size:13px;padding:14px 0}
+/* trend */
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink-2)}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:-1px}
+svg text{fill:var(--ink-3);font:11px var(--f-body)}
+.chart-box{overflow-x:auto}
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-weight:600;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:8px 10px;background:var(--sunken);border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:7px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.mono{font-family:var(--f-mono);font-size:12.5px}
+tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--accent-soft)}
+tfoot td{font-weight:600;background:var(--sunken);border-top:1px solid var(--line)}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.pill.custo{background:color-mix(in srgb,var(--s-dest) 15%,transparent);color:var(--s-dest)}
+.pill.receita{background:color-mix(in srgb,var(--s-rec) 18%,transparent);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.crit{background:var(--crit-bg);color:var(--crit)} .pill.ok{background:var(--ok-bg);color:var(--ok)}
+/* alerts */
+.alerts{display:flex;flex-direction:column;gap:8px}
+.al{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:10px 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface)}
+.al.crit{border-left:4px solid var(--crit)} .al.warn{border-left:4px solid var(--warn)}
+.al b{font-size:13.5px} .al .x{grid-column:2;color:var(--ink-2);font-size:12.5px}
+.al .x code{font-family:var(--f-mono);font-size:12px;background:var(--sunken);padding:0 4px;border-radius:3px;cursor:pointer}
+/* forms */
+.btn{font:600 13px var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:var(--r);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--ink-3)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--crit)}
+.btn.sm{padding:5px 10px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
+input,select,textarea{font:14px var(--f-body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;width:100%;min-width:0}
+input.mono{font-family:var(--f-mono)}
+input:focus,select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.hint{font-size:12px;color:var(--ink-3);min-height:16px}
+.hint.warn{color:var(--warn)} .hint.crit{color:var(--crit)}
+.calc{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.filters>*{flex:1 1 160px}
+td input,td select{padding:5px 8px;font-size:13px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r);font-size:13px;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.tip{position:fixed;pointer-events:none;z-index:30;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:4px;max-width:260px;line-height:1.4;white-space:pre-line}
+.dest-card{border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.dest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
+.dest-card h3{margin:0;font:700 15px var(--f-body)}
+.price-row{display:grid;grid-template-columns:1fr 100px 32px;gap:6px}
+.price-list{display:flex;flex-direction:column}
+.price-ro{display:flex;justify-content:space-between;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+.price-ro:last-child{border-bottom:0}
+.dest-card a.btn,.panel-h a.btn{text-decoration:none}
+.price-ro b{font-variant-numeric:tabular-nums;white-space:nowrap}.price-ro small{font-weight:400;color:var(--ink-2);margin-left:2px}
+.notice{padding:14px 16px;border-radius:var(--r);background:var(--sunken);border:1px dashed var(--line);color:var(--ink-2)}
+.confirm{display:inline-flex;gap:6px;align-items:center;font-size:12.5px}
+.kpis{}@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:1fr}.month .lbl{min-width:120px;font-size:15px}.kpi .v{font-size:23px}.bar{grid-template-columns:minmax(80px,38%) 1fr auto}}
+
+
+.inp-btn{display:flex;gap:6px}.inp-btn input{flex:1;min-width:0}
+.scan-btn{padding:0 10px!important;flex-shrink:0}
+.scan-ov{position:fixed;inset:0;z-index:40;background:rgba(8,14,11,.72);display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.scan-box{background:var(--surface);border-radius:12px;padding:16px;width:min(100%,480px);display:flex;flex-direction:column;gap:12px}
+#scan-cam{width:100%;min-height:220px;background:#000;border-radius:8px;overflow:hidden}
+#scan-cam video{width:100%!important;display:block;border-radius:8px}
+/* tipo de negócio */
+.seg{display:inline-flex;background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
+.seg button,.seg label{border:0;background:transparent;color:var(--ink-2);font:600 13px var(--f-body);padding:7px 14px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"],.seg input:checked+label{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input:focus-visible+label{outline:2px solid var(--accent);outline-offset:1px}
+.pill.neg-rss{background:color-mix(in srgb,var(--s-loc) 16%,transparent);color:var(--s-loc)}
+.pill.neg-ind{background:color-mix(in srgb,var(--s-dest) 15%,transparent);color:var(--s-dest)}
+.pill.neg-none{background:var(--warn-bg);color:var(--warn)}
+.bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r);margin-bottom:12px;font-size:13px;color:var(--ink-2)}
+/* ---------- celular ---------- */
+nav.tabs .ic,nav.tabs .t-short{display:none}
+.rt td.full,.rt td.strong-m{}
+@media (max-width:640px){
+  body{font-size:15px}
+  input,select,textarea{font-size:16px}
+  header.top{position:static}
+  .top-row{gap:8px;padding-block:10px 10px;flex-wrap:wrap}
+  .brand-row{flex-basis:100%;gap:10px}
+  .brand span{display:none}
+  .brand{min-width:0}
+  .brand b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .top-row>.row{flex-wrap:nowrap;gap:6px!important}
+  #u-box>.sync{display:none}
+  .month{flex:1 1 0;min-width:0}.month .lbl{min-width:0;flex:1;font-size:15px;white-space:nowrap}
+  .logos .l-retec{height:20px}.logos .l-gvc{height:23px}.logos{gap:7px}.brand-row .brand{padding-left:9px}
+  .month button{width:40px;height:36px}
+  .sync span{display:none}
+  #u-nivel{display:none}
+  #u-nome{max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:15;margin:0;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:2px;overflow:visible;
+    padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  nav.tabs button{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px 5px;border-bottom:0;border-radius:10px;font-size:11px;font-weight:600;position:relative}
+  nav.tabs button[aria-selected="true"]{color:var(--accent);background:var(--accent-soft)}
+  nav.tabs .ic{display:block;width:22px;height:22px}
+  nav.tabs .t-long{display:none}nav.tabs .t-short{display:inline}
+  nav.tabs .ct{position:absolute;top:1px;left:calc(50% + 7px);margin:0;font-size:10px;padding:0 5px;line-height:16px}
+  main{padding-block:14px calc(92px + env(safe-area-inset-bottom,0px));gap:14px}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 32px);text-align:center}
+  .panel{padding:14px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{padding:12px}.kpi .v{font-size:21px}.kpi .k{font-size:10.5px}.kpi .d{font-size:12px}
+  .form{grid-template-columns:1fr 1fr;gap:10px}
+  .form .full{grid-column:1/-1}
+  .btn{padding:10px 14px}.btn.sm{padding:7px 11px}
+  .filters>*{flex:1 1 100%}
+  .bar{grid-template-columns:minmax(78px,36%) 1fr auto;gap:8px}.bar .val{min-width:0}
+  /* tabelas viram cartões */
+  .rtw{border:0;border-radius:0;overflow:visible;max-height:none!important}
+  table.rt,.rt tbody,.rt tfoot{display:block}
+  .rt thead{display:none}
+  .rt tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-bottom:10px}
+  .rt td{display:block;padding:0;border:0;white-space:normal;text-align:left!important;min-width:0;overflow-wrap:anywhere}
+  .rt td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+  .rt td[data-label=""]::before{display:none}
+  .rt td.full{grid-column:1/-1}
+  .rt td.strong-m{font-weight:700;font-size:15px}
+  .rt .hide-m{display:none}
+  .rt td input,.rt td select{width:100%!important;text-align:left!important}
+  .rt tfoot tr{background:var(--sunken)}.rt tfoot td{background:transparent;border:0}
+  tbody tr.click:hover td{background:transparent}
+  tbody tr.click:active{background:var(--accent-soft)}
+  .dest-grid{grid-template-columns:1fr}
+  .login-logos{margin-top:12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+#u-nivel{display:none!important} /* o nível do usuário não aparece no topo (pedido do Milton) */
+</style>
+<style>
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.toolbar input[type=search]{max-width:280px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.chk input{width:auto}
+tr.inativo td{opacity:.55}
+tr.inativo td:last-child{opacity:1}
+.acoes{display:flex;gap:6px;justify-content:flex-end}
+.tag-uni{font-size:11.5px;color:var(--ink-3)}
+.sem-uni{font-size:11.5px;color:var(--warn);font-weight:600}
+.cnh{font:600 12px var(--f-mono);background:var(--sunken);border-radius:4px;padding:1px 6px}
+.form-panel{border-left:4px solid var(--accent)}
+.uni-sel{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-3)}
+.uni-sel select{width:auto;padding:5px 8px;font-size:13px}
+td.wrap{white-space:normal;min-width:160px}
+.loc-total{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:20px}
+
+.full{grid-column:1/-1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:var(--surface);cursor:pointer}
+.chip input{width:auto;margin:0}
+.chip:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+h3.sec{font:600 14px var(--f-body);margin:18px 0 8px;color:var(--ink)}
+.pill.st{white-space:nowrap}
+.pill.st.lib{background:#e3edfb;color:#1f5fa8}
+.pill.st.fat{background:#efe6fb;color:#6a3fb0}
+.pill.st.nf{background:var(--ok-bg);color:var(--ok)}
+.pill.st.ok{background:#dff3f0;color:#0e7466}
+.pill.st.crit{background:var(--crit-bg);color:var(--crit)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root:not([data-theme="light"]) .pill.st.fat{background:#2c2240;color:#c3a6f0}:root:not([data-theme="light"]) .pill.st.ok{background:#14302b;color:#6fd3c2}}
+:root[data-theme="dark"] .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root[data-theme="dark"] .pill.st.fat{background:#2c2240;color:#c3a6f0}:root[data-theme="dark"] .pill.st.ok{background:#14302b;color:#6fd3c2}
+.tag-imp{font:500 10.5px var(--f-mono);color:var(--ink-3);border:1px dashed var(--line);border-radius:4px;padding:0 4px;vertical-align:1px}
+.funil{display:flex;flex-wrap:wrap;gap:0;list-style:none;margin:0 0 10px;padding:0;counter-reset:f}
+.funil li{font-size:12px;color:var(--ink-3);padding:5px 12px 5px 18px;background:var(--sunken);clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%,8px 50%);margin-right:-4px}
+.funil li:first-child{clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%);padding-left:12px}
+.funil li.feito{background:var(--accent-soft);color:var(--accent)}
+.funil li.agora{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.fat-box{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunken);font-size:13.5px}
+table.docs td input,table.docs td select{min-width:110px}
+.dlg-ov{position:fixed;inset:0;background:rgba(10,16,13,.45);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}
+.dlg{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;width:100%;max-width:440px;max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.dlg h3{font:700 18px var(--f-display);font-stretch:85%;margin:0 0 12px}
+.dlg .fld{margin-bottom:10px}
+.cli-card{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:12px}
+.cli-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+td.neg{color:var(--crit)}
+table.itens td input,table.itens td select{min-width:70px}
+.al.ok{border-color:var(--ok)}
+.toolbar .seg{max-width:100%;overflow-x:auto;scrollbar-width:thin}
+.toolbar .seg button{white-space:nowrap}
+</style>
+<style>
+.dia{border-top:1px solid var(--line-soft);padding:10px 0}
+.dia h3{font:600 14px var(--f-body);margin:0 0 8px}
+.dia.hoje h3{color:var(--accent)}
+.dia .vazio{margin:0}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.vcard{display:block;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:10px 12px;cursor:pointer;font:inherit;color:inherit}
+.vcard:hover{border-color:var(--accent)}
+.vcard.cancel{opacity:.55;border-left-color:var(--crit)}
+.vc-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.vc-p{margin:6px 0 0;padding-left:18px;font-size:13px}
+.vc-p li.ok::marker{color:var(--ok)} .vc-p li.x{text-decoration:line-through;color:var(--crit)}
+.paradas{display:flex;flex-direction:column;gap:10px}
+.parada{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}
+.parada.ok{border-left:4px solid var(--ok)} .parada.x{border-left:4px solid var(--crit)}
+.pa-h{display:flex;gap:10px;align-items:flex-start;margin-bottom:6px}
+.pa-n{font:700 15px var(--f-mono);background:var(--sunken);border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.pa-acts{display:flex;gap:4px}
+.pa-f{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.av{width:34px;height:34px;border-radius:50%;object-fit:cover;display:inline-flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);font:600 12px var(--f-body)}
+.foto-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.foto-row .av{width:64px;height:64px;font-size:18px}
+.foto-row label.btn{cursor:pointer}
+td.atraso{color:var(--crit);font-weight:600}
+.dest{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+.dest-h{margin-bottom:6px;font-size:13.5px}
+.dest-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;padding:8px;background:var(--sunken);border-radius:var(--r);margin-bottom:6px}
+.dest-l .calc{font-size:13px}
+ul.avisos{margin:0 0 6px;padding-left:18px;font-size:14px}
+details.mais{margin-top:6px;font-size:13px;color:var(--ink-2)}
+details.mais .chips{margin-top:6px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.crit{background:var(--crit-bg);color:var(--crit)}
+#os{display:none}
+@media print{
+  body>*:not(#os){display:none!important}
+  body{background:#fff;color:#000}
+  #os{display:block;font:12px Arial,sans-serif;color:#000}
+  .os-h{display:flex;gap:14px;align-items:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px}
+  .os-h img{height:40px} .os-h h1{font-size:20px;margin:0}
+  #os h2{font-size:14px;margin:14px 0 6px}
+  .os-t{width:100%;border-collapse:collapse} .os-t th,.os-t td{border:1px solid #444;padding:5px 6px;text-align:left;vertical-align:top}
+  .os-t th{background:#eee;width:150px}
+  .os-ass{display:flex;gap:40px;margin-top:50px} .os-ass div{flex:1;border-top:1px solid #000;text-align:center;padding-top:4px}
+}
+</style>
+<style>
+.ficha-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.ficha-grid{grid-template-columns:1fr}}
+.box{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--surface)}
+.box h3{font:700 15px var(--f-display);font-stretch:85%;margin:0 0 8px}
+.box + .box{margin-top:12px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px;margin:0}
+.kv dt{color:var(--ink-3)} .kv dd{margin:0}
+.niv{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 12px;margin:8px 0}
+.niv .fld select{width:100%}
+.fun-ed{display:flex;flex-direction:column;gap:6px;max-width:420px}
+.fun-ed .row{flex-wrap:nowrap}
+.fun-ed input{flex:1}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.so-leitura .form input,.so-leitura .form select{pointer-events:none;background:var(--sunken)}
+.dup{font-size:13px}
+.fld.cnh-f[hidden]{display:none}
+.fld .chip{text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;color:var(--ink)}
+.toolbar select{width:auto;max-width:220px}
+</style>
+<script src="../config.js"></script>
+<script src="../portal.js?v=20261106"></script>
+<script src="../tabela.js?v=20261102"></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <div class="brand-row"><div class="logos" aria-label="Retec · Grupo GVC"><img class="l-retec" src="../img/logo-retec.png" alt="Retec"><i></i><img class="l-gvc" src="../img/logo-gvc.png" alt="Grupo GVC"></div><div class="brand"><span>Cadastro único</span><b>Pessoas</b></div></div>
+      <label class="uni-sel" id="uni-box" hidden>Unidade <select id="uni-sel" aria-label="Unidade"></select></label>
+      <div class="row" style="gap:10px"><div class="sync" id="sync"><i></i><span>Conectando…</span></div><button class="btn sm" id="btn-atualizar" hidden>Atualizar</button><span id="u-box" class="row" style="gap:8px" hidden><span class="sync" style="flex-direction:column;align-items:flex-end;gap:0;line-height:1.2"><b id="u-nome" style="color:var(--ink);font-weight:600"></b></span><a class="btn sm" href="../" title="Voltar ao portal">⌂ Portal</a><button class="btn sm" id="btn-sair">Sair</button></span></div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="pessoas" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5"/><path d="M16 4.5a3 3 0 0 1 0 6M18 15c1.6.6 2.6 2.2 3 5"/></svg><span class="t-long">Pessoas</span><span class="t-short">Pessoas</span> <span class="ct alert" id="ct-al" hidden>0</span></button>
+      <button role="tab" data-tab="funcoes" aria-selected="false" id="tab-funcoes" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="t-long">Funções</span><span class="t-short">Funções</span></button>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main"><div class="notice">Carregando o cadastro de pessoas…</div></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+(function () {
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const D = iso => iso ? iso.split('-').reverse().join('/') : '';
+const isoDe = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const hojeISO = () => isoDe(new Date());
+const diasEntre = (a, b) => a && b ? Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5) : 0;
+const NIV = { '': 'Sem acesso', leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
+const TABS = ['pessoas', 'funcoes'];
+const S = { tab: 'pessoas', d: null, uni: '', p: null, busca: '', fun: '', inativos: false, fotos: {}, gerar: false };
+
+function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 4200); }
+function setSync(ok, txt) { const s = $('#sync'); s.classList.toggle('on', ok); s.querySelector('span').textContent = txt; }
+function falha(e) { toast((e && e.mensagem) || 'Não foi possível salvar. Verifique a internet e tente de novo.'); }
+const opts = (lista, sel, vazio) => (vazio !== undefined ? `<option value="">${esc(vazio)}</option>` : '') + lista.map(v => { const [val, lbl] = Array.isArray(v) ? v : [v, v]; return `<option value="${esc(val)}" ${String(val) === String(sel ?? '') ? 'selected' : ''}>${esc(lbl)}</option>`; }).join('');
+
+/* ---------- dados auxiliares ---------- */
+const pesDe = id => (S.d.pessoas.find(p => p.id === id) || null);
+const uniNome = id => id ? ((S.d.todasUnidades.find(u => u.id === id) || {}).nome || '') : 'Todas as unidades';
+const passaUni = p => !S.uni || p.unidadeId === S.uni || !p.unidadeId;
+const temF = (p, f) => (p.funcoes || []).includes(f);
+function cnhStatus(p) {
+  if (!temF(p, 'Motorista')) return null;
+  if (!p.cnhValidade) return { cls: 'warn', txt: 'sem validade' };
+  const d = diasEntre(hojeISO(), p.cnhValidade);
+  if (d < 0) return { cls: 'crit', txt: 'vencida ' + D(p.cnhValidade) };
+  if (d <= S.d.parametros.diasAvisoCnh) return { cls: 'warn', txt: 'vence em ' + d + ' dia(s)' };
+  return { cls: 'ok', txt: 'até ' + D(p.cnhValidade) };
+}
+function acessoTxt(p) {
+  const a = p.acesso;
+  if (!a) return 'Sem acesso';
+  if (!a.ativo) return 'Suspenso';
+  return a.temSenha ? 'Com acesso' : 'Aguardando 1º acesso';
+}
+function acessoPill(p) {
+  const t = acessoTxt(p);
+  const cls = { 'Com acesso': 'ok', 'Aguardando 1º acesso': 'warn', 'Suspenso': 'crit' }[t] || '';
+  return `<span class="pill ${cls}">${esc(t)}</span>`;
+}
+function avatar(p) {
+  const ini = (p.apelido || p.nome || '?').split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase();
+  const f = S.fotos[p.id];
+  return f ? `<img class="av" src="${f}" alt="">` : `<span class="av" aria-hidden="true">${esc(ini)}</span>`;
+}
+async function carregarFotos(lista) {
+  if (!S.d.vePessoal) return;
+  for (const p of lista) {
+    if (!p.temFoto || S.fotos[p.id] !== undefined) continue;
+    S.fotos[p.id] = '';
+    try { const r = await Portal.api('pes.verFoto', { id: p.id }); S.fotos[p.id] = r.dataUrl || ''; $$(`[data-av="${p.id}"]`).forEach(el => { if (r.dataUrl) el.innerHTML = `<img class="av" src="${r.dataUrl}" alt="">`; }); } catch (e) {}
+  }
+}
+
+/* ---------- carregar ---------- */
+async function carregar(silencioso) {
+  if (!silencioso) setSync(false, 'Carregando…');
+  try {
+    S.d = await Portal.api('pes.dados', {});
+    setSync(true, (S.d.podeCriar ? '' : 'Somente leitura · ') + 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    $('#tab-funcoes').hidden = !S.d.podeEditarFuncoes;
+    montarUnidades();
+    if (S.p && S.p.id) { const atual = pesDe(S.p.id); S.p = atual ? { ...atual } : null; }
+    render();
+  } catch (e) {
+    setSync(false, 'Sem conexão');
+    if (!S.d) $('#main').innerHTML = `<section class="panel"><h2>Não consegui carregar o cadastro</h2><p class="sub">${esc((e && e.mensagem) || 'Verifique a internet.')}</p><div class="row" style="margin-top:10px"><button class="btn pri" id="tentar">Tentar de novo</button></div></section>`;
+    const t = $('#tentar'); if (t) t.onclick = () => carregar();
+  }
+}
+function montarUnidades() {
+  const us = S.d.unidades; const box = $('#uni-box'), sel = $('#uni-sel');
+  if (us.length <= 1) { box.hidden = true; S.uni = ''; return; }
+  box.hidden = false;
+  let salvo = ''; try { salvo = localStorage.getItem('pes-uni') || ''; } catch (e) {}
+  if (!S.uni && salvo && us.some(u => u.id === salvo)) S.uni = salvo;
+  sel.innerHTML = opts([['', 'Todas'], ...us.map(u => [u.id, u.nome])], S.uni);
+  sel.onchange = () => { S.uni = sel.value; try { localStorage.setItem('pes-uni', S.uni); } catch (e) {} render(); };
+}
+function setTab(t) {
+  if (!TABS.includes(t) || (t === 'funcoes' && !(S.d && S.d.podeEditarFuncoes))) t = 'pessoas';
+  S.tab = t; if (t !== 'pessoas') S.p = null;
+  $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  render(); scrollTo({ top: 0 });
+}
+$$('nav.tabs button').forEach(b => b.onclick = () => { if (b.dataset.tab === 'pessoas') history.replaceState(null, '', location.pathname); setTab(b.dataset.tab); });
+function render() {
+  if (!S.d) return;
+  const al = S.d.pessoas.filter(p => p.ativo && passaUni(p) && (cnhStatus(p) || {}).cls === 'crit').length;
+  const c = $('#ct-al'); c.textContent = al; c.hidden = !al;
+  if (S.tab === 'funcoes') return renderFuncoes();
+  renderPessoas();
+}
+
+/* ---------- lista ---------- */
+function renderPessoas() {
+  const e = S.p;
+  const base = S.d.pessoas.filter(p => passaUni(p) && (S.inativos || p.ativo));
+  const lista = base.filter(p => (!S.fun || (S.fun === '(sem função)' ? !p.funcoes.length : temF(p, S.fun)))
+      && (!S.busca || [p.nome, p.apelido, p.email, p.telefone].join(' ').toLowerCase().includes(S.busca.toLowerCase())))
+    .sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const alertas = S.d.pessoas.filter(p => p.ativo && passaUni(p)).map(p => [p, cnhStatus(p)]).filter(([, s]) => s && s.cls !== 'ok');
+  const dups = (S.d.duplicados || []).map(g => g.map(pesDe).filter(Boolean)).filter(g => g.length > 1);
+  const cnhTxt = p => { const st = cnhStatus(p); return [p.cnhCategoria, st && st.txt].filter(Boolean).join(' · '); };
+  const TP = Portal.tabela('pes-lista', [
+    { k: 'nome', label: 'Nome', v: p => p.nome },
+    { k: 'fun', label: 'Funções', v: p => p.funcoes.join(', '), vazio: '(Sem função)' },
+    { k: 'uni', label: 'Unidade', v: p => uniNome(p.unidadeId) },
+    { k: 'vin', label: 'Vínculo', v: p => p.vinculo, vazio: '(Sem vínculo)' },
+    { k: 'cnh', label: 'CNH', v: cnhTxt, ord: p => p.cnhValidade || 'z' },
+  ].concat(S.d.vePessoal ? [{ k: 'cpf', label: 'CPF', v: p => p.cpf }] : []).concat([
+    { k: 'acc', label: 'Acesso ao portal', v: acessoTxt },
+    { k: 'cont', label: 'Contato', v: p => [p.email, p.telefone].filter(Boolean).join(' · ') },
+  ]), { titulo: 'Pessoas', arquivo: 'pessoas', unidade: 'pessoas', aoMudar: render,
+    extrasExport: [{ label: 'Apelido', x: p => p.apelido || '' }, { label: 'E-mail', x: p => p.email || '' }, { label: 'Telefone', x: p => p.telefone || '' },
+      { label: 'Categoria da CNH', x: p => p.cnhCategoria || '' }, { label: 'Validade da CNH', x: p => D(p.cnhValidade) }, { label: 'Situação', x: p => p.ativo ? 'Ativa' : 'Inativa' }],
+    subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '',
+    filtrosExtras: () => [S.fun && 'Função: ' + S.fun, S.busca && 'Busca: "' + S.busca + '"', S.inativos && 'Inclui inativas'].filter(Boolean) });
+  const listaP = TP.aplicar(lista);
+  const nCols = 8 + (S.d.vePessoal ? 1 : 0);
+  $('#main').innerHTML = (e ? fichaHTML(e) : '') + `<section class="panel">
+    <div class="panel-h"><div><h2>Pessoas</h2><p class="sub">Cadastro único: motoristas e ajudantes (Programação e DP), consultores (Solicitações) e a equipe do escritório. O acesso ao portal é opcional e é gerado na ficha da pessoa.${S.d.restrito ? ' Você cadastra e altera pessoas da sua unidade.' : ''}</p></div></div>
+    ${alertas.length ? `<div class="alerts" style="margin-bottom:12px">${alertas.map(([p, s]) => `<div class="al ${s.cls === 'crit' ? 'crit' : 'warn'}"><span class="pill ${s.cls}">CNH</span><b>${esc(p.nome)}: ${esc(s.txt)}</b></div>`).join('')}</div>` : ''}
+    ${dups.length ? `<div class="al warn" style="margin-bottom:12px"><span class="pill warn">Confira</span><b>Possíveis cadastros repetidos (mesmo nome ou e-mail)</b><div class="x dup">${dups.map(g => g.map(p => `<a href="#p=${encodeURIComponent(p.id)}">${esc(p.nome)}</a> <span class="sub">(${esc(p.funcoes.join(', ') || 'sem função')}${p.acesso ? ', com acesso' : ''})</span>`).join(' · ')).join('<br>')}</div></div>` : ''}
+    <div class="toolbar"><input type="search" id="busca" placeholder="Buscar nome, e-mail ou telefone…" value="${esc(S.busca)}" aria-label="Buscar">
+      <select id="f-fun" aria-label="Função">${opts([['', 'Todas as funções'], ...S.d.listas.funcoes.map(f => [f, f]), ['(sem função)', '(sem função)']], S.fun)}</select>
+      <label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativas</label>
+      <span style="margin-left:auto">${TP.botao()}</span>${S.d.podeCriar ? '<button class="btn pri" id="novo">+ Pessoa</button>' : ''}</div>
+    ${TP.info(listaP.length, lista.length)}
+    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TP.cab('<th></th>', '<th></th>')}</thead><tbody>
+    ${listaP.map(p => { const s = cnhStatus(p); return `<tr class="${p.ativo ? '' : 'inativo'}" data-pes="${esc(p.id)}"><td data-label="" data-av="${esc(p.id)}">${avatar(p)}</td>
+      <td data-label="Nome" class="full"><b>${esc(p.nome)}</b>${p.apelido && p.apelido !== p.nome ? ` <span class="sub">“${esc(p.apelido)}”</span>` : ''}</td>
+      <td data-label="Funções">${p.funcoes.length ? p.funcoes.map(f => `<span class="pill acc">${esc(f)}</span>`).join(' ') : '<span class="pill warn">sem função</span>'}</td>
+      <td data-label="Unidade">${esc(uniNome(p.unidadeId))}</td>
+      <td data-label="Vínculo">${esc(p.vinculo || '—')}</td>
+      <td data-label="CNH">${p.cnhCategoria ? `<span class="cnh">${esc(p.cnhCategoria)}</span> ` : ''}${s ? `<span class="pill ${s.cls}">${esc(s.txt)}</span>` : (p.cnhCategoria ? '' : '—')}</td>
+      ${S.d.vePessoal ? `<td data-label="CPF" class="mono">${esc(p.cpf || '—')}${p.cpf && !p.cpfValido ? ' <span class="pill crit">confira</span>' : ''}</td>` : ''}
+      <td data-label="Acesso">${acessoPill(p)}</td>
+      <td data-label="Contato">${esc([p.email, p.telefone].filter(Boolean).join(' · ') || '—')}</td>
+      <td data-label=""><div class="acoes"><button class="btn sm" data-abrir="${esc(p.id)}">${p.podeEditar ? 'Abrir' : 'Ver'}</button></div></td></tr>`; }).join('') || `<tr><td colspan="${nCols + 1}" class="empty">Ninguém com os filtros das colunas.</td></tr>`}
+    </tbody></table></div>` : '<div class="empty">Ninguém cadastrado com esses filtros.</div>'}</section>`;
+  carregarFotos(listaP); TP.ligar();
+  const b = $('#busca'); b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
+  $('#f-fun').onchange = ev => { S.fun = ev.target.value; render(); };
+  $('#inat').onchange = ev => { S.inativos = ev.target.checked; render(); };
+  const n = $('#novo'); if (n) n.onclick = () => abrir(null);
+  $$('[data-abrir]').forEach(x => x.onclick = () => abrir(x.dataset.abrir));
+  if (e) ligarFicha();
+}
+function abrir(id) {
+  S.gerar = false;
+  if (!id) {
+    const uniPadrao = S.d.restrito ? (S.uni || (S.d.unidades[0] || {}).id || '') : (S.uni || '');
+    S.p = { funcoes: S.fun && S.fun !== '(sem função)' ? [S.fun] : [], unidadeId: uniPadrao, vinculo: '', ativo: true, podeEditar: true };
+  } else {
+    const p = pesDe(id); if (!p) { toast('Pessoa não encontrada (pode ser de outra unidade).'); return; }
+    S.p = { ...p };
+    if (location.hash !== '#p=' + encodeURIComponent(id)) history.replaceState(null, '', '#p=' + encodeURIComponent(id));
+  }
+  render(); scrollTo({ top: 0 });
+}
+
+/* ---------- ficha ---------- */
+function fichaHTML(e) {
+  const L = S.d.listas, ro = !e.podeEditar;
+  const unis = S.d.restrito ? S.d.unidades : S.d.todasUnidades;
+  const funcoesOpc = L.funcoes.concat((e.funcoes || []).filter(f => !L.funcoes.includes(f)));
+  const usos = (S.d.usos || {})[e.id] || {};
+  const usoTxt = [usos.viagens && usos.viagens + ' viagem(ns)', usos.solicitacoes && usos.solicitacoes + ' solicitação(ões) como consultor', usos.adiantamentos && usos.adiantamentos + ' adiantamento(s) de pernoite'].filter(Boolean).join(' · ');
+  return `<section class="panel form-panel ${ro ? 'so-leitura' : ''}" id="form-panel"><div class="panel-h"><div><h2>${e.id ? esc(e.nome) : 'Nova pessoa'}</h2>${e.id ? `<p class="sub mono">${esc(e.id)}${e.ativo ? '' : ' · <span class="pill crit">inativa</span>'}</p>` : ''}</div><button class="btn sm" id="p-fechar">Fechar</button></div>
+    <div class="ficha-grid"><div>
+    <form id="pf" class="form" autocomplete="off">
+      ${e.id && S.d.vePessoal ? `<div class="fld full foto-row"><span data-av="${esc(e.id)}">${avatar(e)}</span>${ro ? '' : `<label class="btn sm">📷 ${e.temFoto ? 'Trocar foto' : 'Incluir foto'}<input type="file" id="p-foto" accept="image/*" capture="user" hidden></label><span class="hint">A foto fica numa pasta restrita do Drive da empresa.</span>`}</div>` : ''}
+      <div class="fld"><label for="p-nome">Nome completo</label><input id="p-nome" required value="${esc(e.nome)}" ${ro ? 'readonly' : ''}></div>
+      <div class="fld"><label for="p-apel">Nome curto (como é chamado)</label><input id="p-apel" value="${esc(e.apelido)}" placeholder="Ex.: Silvanei, Márcio Jr" ${ro ? 'readonly' : ''}></div>
+      <div class="fld full"><label>Funções</label><div class="chips" id="p-funs">${funcoesOpc.map(f => `<label class="chip"><input type="checkbox" data-fun="${esc(f)}" ${(e.funcoes || []).includes(f) ? 'checked' : ''} ${ro ? 'disabled' : ''}> ${esc(f)}</label>`).join('')}</div><div class="hint">Pode marcar mais de uma. Motorista e Ajudante aparecem na Programação; Consultor aparece nas Solicitações.</div></div>
+      <div class="fld"><label for="p-uni">Unidade</label><select id="p-uni" ${ro ? 'disabled' : ''}>${S.d.restrito ? '' : `<option value="" ${e.unidadeId ? '' : 'selected'}>Todas as unidades</option>`}${opts(unis.map(u => [u.id, u.nome]), e.unidadeId)}</select><div class="hint">Motorista e ajudante precisam da unidade (equipe da programadora).</div></div>
+      <div class="fld"><label for="p-vin">Vínculo</label><select id="p-vin" ${ro ? 'disabled' : ''}>${opts(L.vinculo, e.vinculo, '—')}</select><div class="hint">Terceirizado não recebe pernoite.</div></div>
+      ${S.d.vePessoal ? `<div class="fld"><label for="p-cpf">CPF</label><input id="p-cpf" class="mono" inputmode="numeric" value="${esc(e.cpf)}" placeholder="000.000.000-00" ${ro ? 'readonly' : ''}></div>` : ''}
+      <div class="fld"><label for="p-email">E-mail</label><input id="p-email" type="email" value="${esc(e.email)}" ${ro ? 'readonly' : ''}>${e.acesso ? '<div class="hint">É o login desta pessoa no portal.</div>' : ''}</div>
+      <div class="fld"><label for="p-tel">Telefone</label><input id="p-tel" value="${esc(e.telefone)}" ${ro ? 'readonly' : ''}></div>
+      <div class="fld cnh-f"><label for="p-cat">Categoria da CNH</label><select id="p-cat" ${ro ? 'disabled' : ''}>${opts(L.categoriaCnh, e.cnhCategoria, '—')}</select></div>
+      <div class="fld cnh-f"><label for="p-val">Validade da CNH</label><input id="p-val" type="date" value="${esc(e.cnhValidade)}" ${ro ? 'readonly' : ''}></div>
+      <div class="fld full"><label for="p-obs">Observações</label><input id="p-obs" value="${esc(e.obs)}" ${ro ? 'readonly' : ''}></div>
+      ${ro ? '' : '<div class="row full" style="justify-content:flex-end"><button class="btn pri" id="p-salvar">Salvar</button></div>'}
+    </form>
+    ${e.id ? `<div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="p-hist">Histórico</button>${ro ? '' : e.ativo ? '<button class="btn sm danger" id="p-del">Excluir</button><button class="btn sm" id="p-inat">Inativar</button>' : '<button class="btn sm" id="p-reat">Reativar</button>'}</div>` : ''}
+    ${e.id && e.criadoEm ? `<div class="gvc-audit" style="margin-top:10px">${Portal.auditoriaHTML(e)}</div>` : ''}
+    </div><div>
+    ${e.id ? `<div class="box"><h3>Onde aparece</h3><p class="sub" style="margin:0">${esc(usoTxt || 'Ainda não aparece em viagens, solicitações nem adiantamentos.')}</p></div>` : ''}
+    ${e.id ? acessoHTML(e) : '<div class="box"><h3>Acesso ao portal</h3><p class="sub" style="margin:0">Salve a pessoa primeiro. Depois, se ela precisar entrar no portal, o administrador gera o acesso aqui.</p></div>'}
+    </div></div></section>`;
+}
+function acessoHTML(e) {
+  const a = e.acesso, adm = S.d.podeGerarAcesso;
+  if (!a) {
+    if (!adm) return `<div class="box"><h3>Acesso ao portal</h3><p class="sub" style="margin:0">Sem acesso. Nem toda pessoa precisa: só o administrador do portal gera o acesso.</p></div>`;
+    if (!S.gerar) return `<div class="box"><h3>Acesso ao portal</h3><p class="sub">Sem acesso. Nem toda pessoa precisa entrar no portal.</p>${e.ativo ? '<button class="btn pri" id="a-gerar">Gerar acesso</button>' : '<p class="sub">Reative a pessoa para gerar o acesso.</p>'}</div>`;
+    return gerarHTML(e);
+  }
+  const mods = adm && a.modulos ? Object.entries(S.d.modulos).filter(([k]) => a.modulos[k]).map(([k, n]) => esc(n) + ': ' + NIV[a.modulos[k]]).join('<br>') : '';
+  const unis = adm && a.unidades ? (a.unidades.length ? a.unidades.map(uniNome).join(', ') : 'Todas') : '';
+  return `<div class="box"><h3>Acesso ao portal</h3>
+    <dl class="kv"><dt>Situação</dt><dd>${acessoPill(e)}</dd><dt>Login</dt><dd class="mono">${esc(a.email)}</dd>
+    <dt>Último acesso</dt><dd>${esc(a.ultimoAcesso || '—')}</dd>
+    ${adm ? `<dt>Módulos</dt><dd>${mods || '—'}${a.adminPortal ? '<br><b>Admin do portal</b>' : ''}</dd><dt>Unidades</dt><dd>${esc(unis)}</dd>` : ''}</dl>
+    ${adm ? `<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
+      ${a.ativo ? `<button class="btn sm" data-acc="convite">Reenviar convite</button>${a.temSenha ? '<button class="btn sm" data-acc="apagarSenha">Apagar senha</button>' : ''}<button class="btn sm danger" data-acc="suspender">Suspender acesso</button>` : `<button class="btn sm pri" data-acc="reativar">Reativar acesso</button>`}
+      <a class="btn sm" href="../" id="a-niveis">Ajustar níveis em Usuários</a></div>` : ''}</div>`;
+}
+function sugestao(funcoes) {
+  const ordem = ['', 'leitor', 'editor', 'admin'], out = {};
+  (funcoes || []).forEach(f => Object.entries((S.d.sugestoes || {})[f] || {}).forEach(([m, n]) => { if (ordem.indexOf(n) > ordem.indexOf(out[m] || '')) out[m] = n; }));
+  return out;
+}
+function gerarHTML(e) {
+  const sug = sugestao(e.funcoes);
+  const unisSel = e.unidadeId ? [e.unidadeId] : [];
+  return `<div class="box" id="a-box"><h3>Gerar acesso ao portal</h3>
+    <div class="fld"><label for="a-email">E-mail (login)</label><input id="a-email" type="email" value="${esc(e.email)}" required></div>
+    <p class="sub" style="margin:8px 0 0">Níveis sugeridos pela função${(e.funcoes || []).length ? ' (' + esc(e.funcoes.join(', ')) + ')' : ''}. Ajuste antes de confirmar.</p>
+    <div class="niv">${Object.entries(S.d.modulos).map(([k, n]) => `<div class="fld"><label for="a-m-${k}">${esc(n)}</label><select id="a-m-${k}" data-mod="${k}">${opts([['', 'Sem acesso'], ['leitor', 'Leitor'], ['editor', 'Editor'], ['admin', 'Administrador']], sug[k] || '')}</select></div>`).join('')}</div>
+    <div class="fld"><label>Unidades que vê</label><div class="chips">${S.d.todasUnidades.map(u => `<label class="chip"><input type="checkbox" data-auni="${esc(u.id)}" ${unisSel.includes(u.id) ? 'checked' : ''}> ${esc(u.nome)}</label>`).join('')}</div><div class="hint">Nenhuma marcada = vê todas.</div></div>
+    <label class="chk"><input type="checkbox" id="a-admin"> Admin do portal</label><br>
+    <label class="chk"><input type="checkbox" id="a-conv" checked> Enviar e-mail com o convite (link do portal e como criar a senha)</label>
+    <div class="row" style="justify-content:flex-end;margin-top:10px;gap:8px"><button class="btn" id="a-cancel">Cancelar</button><button class="btn pri" id="a-ok">Gerar acesso</button></div></div>`;
+}
+function lerFicha() {
+  const reg = { id: S.p.id || '', nome: $('#p-nome').value, apelido: $('#p-apel').value, funcoes: $$('[data-fun]').filter(c => c.checked).map(c => c.dataset.fun),
+    unidadeId: $('#p-uni').value, vinculo: $('#p-vin').value, email: $('#p-email').value, telefone: $('#p-tel').value,
+    cnhCategoria: $('#p-cat').value, cnhValidade: $('#p-val').value, obs: $('#p-obs').value };
+  if ($('#p-cpf')) reg.cpf = $('#p-cpf').value;
+  return reg;
+}
+function ligarFicha() {
+  const e = S.p;
+  $('#p-fechar').onclick = () => { S.p = null; S.gerar = false; history.replaceState(null, '', location.pathname); render(); };
+  const motoristaMarcado = () => $$('[data-fun="Motorista"]').some(c => c.checked);
+  const mostrarCnh = () => $$('.cnh-f').forEach(f => f.hidden = !motoristaMarcado() && !e.cnhCategoria);
+  mostrarCnh(); $$('[data-fun]').forEach(c => c.onchange = mostrarCnh);
+  const f = $('#pf');
+  f.onsubmit = async ev => { ev.preventDefault();
+    if (!e.podeEditar) return;
+    const btn = $('#p-salvar'); btn.disabled = true;
+    try { const r = await Portal.api('pes.salvar', { registro: lerFicha() }); toast('Salvo'); S.p = { id: r.id }; await carregar(true); if (!S.p) abrir(r.id); }
+    catch (er) { btn.disabled = false; falha(er); } };
+  const ft = $('#p-foto'); if (ft) ft.onchange = async () => {
+    const arq = ft.files[0]; if (!arq) return;
+    try { const url = await reduzirFoto(arq); await Portal.api('pes.foto', { id: e.id, dataUrl: url }); S.fotos[e.id] = url; toast('Foto salva'); await carregar(true); }
+    catch (er) { falha(er); }
+  };
+  const h = $('#p-hist'); if (h) h.onclick = () => Portal.mostrarHistorico('Pessoas', e.id, e.nome);
+  const ativo = async (v) => {
+    try { const r = await Portal.api('pes.ativo', { id: e.id, ativo: v }); toast(v ? 'Pessoa reativada' + (e.acesso && !e.acesso.ativo ? ' (o acesso ao portal continua suspenso)' : '') : 'Pessoa inativada' + (r.acessoSuspenso ? ' e acesso ao portal suspenso' : '')); await carregar(true); }
+    catch (er) { falha(er); }
+  };
+  const ia = $('#p-inat'); if (ia) ia.onclick = () => { if (confirm('Inativar ' + e.nome + '? Ela deixa de aparecer para novas viagens e solicitações' + (e.acesso && e.acesso.ativo ? ', e o acesso ao portal é suspenso' : '') + '.')) ativo(false); };
+  const ra = $('#p-reat'); if (ra) ra.onclick = () => ativo(true);
+  const dl = $('#p-del'); if (dl) dl.onclick = async () => {
+    if (!confirm('Excluir ' + e.nome + '?')) return;
+    try { await Portal.api('pes.excluir', { id: e.id }); toast('Excluída'); S.p = null; history.replaceState(null, '', location.pathname); await carregar(true); }
+    catch (er) { if (er && er.erro === 'em_uso') { if (await Portal.confirmarInativar(er, e.nome)) ativo(false); } else falha(er); }
+  };
+  // acesso
+  const g = $('#a-gerar'); if (g) g.onclick = () => { S.gerar = true; render(); const b = $('#a-box'); if (b) b.scrollIntoView({ block: 'nearest' }); };
+  const ac = $('#a-cancel'); if (ac) ac.onclick = () => { S.gerar = false; render(); };
+  const ok = $('#a-ok'); if (ok) ok.onclick = async () => {
+    const modulos = {}; $$('#a-box [data-mod]').forEach(s => modulos[s.dataset.mod] = s.value);
+    const acesso = { id: e.id, email: $('#a-email').value.trim(), modulos, unidades: $$('[data-auni]').filter(c => c.checked).map(c => c.dataset.auni),
+      adminPortal: $('#a-admin').checked, convite: $('#a-conv').checked };
+    ok.disabled = true;
+    try { const r = await Portal.api('pes.gerarAcesso', { acesso }); S.gerar = false; toast(r.convite ? 'Acesso gerado. Convite enviado para ' + acesso.email + '.' : 'Acesso gerado.'); await carregar(true); }
+    catch (er) { ok.disabled = false; falha(er); }
+  };
+  $$('[data-acc]').forEach(b => b.onclick = async () => {
+    const tipo = b.dataset.acc;
+    const msg = { suspender: 'Suspender o acesso de ' + e.nome + '? Ela é desconectada na hora.', apagarSenha: 'Apagar a senha de ' + e.nome + '? Ela vai criar outra no próximo acesso.' }[tipo];
+    if (msg && !confirm(msg)) return;
+    b.disabled = true;
+    try { await Portal.api('pes.acesso', { id: e.id, tipo }); toast({ suspender: 'Acesso suspenso', reativar: 'Acesso reativado', apagarSenha: 'Senha apagada', convite: 'Convite reenviado' }[tipo]); await carregar(true); }
+    catch (er) { b.disabled = false; falha(er); }
+  });
+  const an = $('#a-niveis'); if (an) an.onclick = ev => { ev.preventDefault(); try { sessionStorage.setItem('portal-tela', 'usuarios'); } catch (x) {} location.href = '../'; };
+}
+function reduzirFoto(arq) {
+  return new Promise((ok, erro) => {
+    const img = new Image(); const url = URL.createObjectURL(arq);
+    img.onload = () => { const m = 480, k = Math.min(1, m / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.82)); };
+    img.onerror = () => erro({ mensagem: 'Não consegui abrir esta imagem.' }); img.src = url;
+  });
+}
+
+/* ---------- funções (lista editável) ---------- */
+function renderFuncoes() {
+  const fixas = S.d.funcoesFixas || [];
+  const uso = f => S.d.pessoas.filter(p => temF(p, f)).length;
+  $('#main').innerHTML = `<section class="panel"><div class="panel-h"><div><h2>Funções</h2><p class="sub">As opções que aparecem na ficha da pessoa. Motorista, Ajudante e Consultor alimentam os outros módulos e não podem sair. Tirar uma função da lista não muda quem já a tem.</p></div></div>
+    <div class="fun-ed" id="fl">${S.d.listas.funcoes.map(f => linhaFun(f, fixas.includes(f), uso(f))).join('')}</div>
+    <div class="row" style="margin-top:10px;gap:8px"><button class="btn" id="f-add">+ Função</button><button class="btn pri" id="f-salvar">Salvar lista</button></div></section>`;
+  const ligar = () => $$('[data-frm]').forEach(b => b.onclick = () => b.closest('.row').remove());
+  ligar();
+  $('#f-add').onclick = () => { $('#fl').insertAdjacentHTML('beforeend', linhaFun('', false, 0)); ligar(); const i = $$('#fl input'); i[i.length - 1].focus(); };
+  $('#f-salvar').onclick = async () => {
+    const valores = $$('#fl input').map(i => i.value.trim()).filter(Boolean);
+    try { await Portal.api('pes.salvarFuncoes', { valores }); toast('Lista de funções salva'); await carregar(true); } catch (er) { falha(er); }
+  };
+}
+const linhaFun = (f, fixa, n) => `<div class="row" style="gap:6px"><input value="${esc(f)}" ${fixa ? 'readonly' : ''} aria-label="Função"><span class="sub" style="min-width:80px">${n} pessoa(s)</span>${fixa ? '<span class="pill">fixa</span>' : '<button class="btn sm danger" data-frm>Tirar</button>'}</div>`;
+
+/* ---------- início ---------- */
+$('#btn-sair').onclick = () => Portal.sair();
+$('#btn-atualizar').onclick = () => carregar();
+function lerHash() {
+  const m = location.hash.match(/^#p=(.+)$/);
+  if (m && S.d) { S.tab = 'pessoas'; $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === 'pessoas')); abrir(decodeURIComponent(m[1])); return true; }
+  const t = location.hash.slice(1); if (TABS.includes(t) && S.d) { setTab(t); return true; }
+  return false;
+}
+window.addEventListener('hashchange', () => { const m = location.hash.match(/^#p=(.+)$/); if (m && S.p && S.p.id === decodeURIComponent(m[1])) return; lerHash(); });
+(async function start() {
+  let u;
+  try { u = await Portal.exigir('pessoas'); }
+  catch (e) { $('#main').innerHTML = `<section class="panel"><h2>Não consegui falar com o portal</h2><p class="sub">${esc((e && e.mensagem) || '')}</p></section>`; return; }
+  const mostrar = us => { $('#u-box').hidden = false; $('#btn-atualizar').hidden = false; $('#u-nome').textContent = us.nome; };
+  mostrar(u); Portal.aoAtualizarUsuario = us => mostrar(us);
+  await carregar();
+  lerHash();
+})();
+})();
+</script>
+</body>
+</html>
