@@ -288,6 +288,7 @@ table.itens td input,table.itens td select{min-width:70px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
+<script src="../tabela.js?v=20261102"></script>
 </head>
 <body>
 <header class="top">
@@ -528,6 +529,27 @@ function novaSol() { return { unidadeId: S.uni || (S.d.unidades.length === 1 ? S
 function abrir(id) { const s = S.d.solicitacoes.find(x => x.id === id); if (!s) return; S.edit = { ...s }; render(); const p = $('#form-panel'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
 /* ---------- listas ---------- */
+const FMT_R = '"R$" #,##0.00';
+const valorSol = s => s.faturamento ? +(s.faturamento.nfValor !== '' ? s.faturamento.nfValor : s.faturamento.bmValor) || 0 : (s.valorPrevisto === '' || s.valorPrevisto == null ? '' : +s.valorPrevisto);
+const bmnfTxt = s => s.faturamento ? (s.faturamento.nfNumero ? 'NF ' + s.faturamento.nfNumero : s.faturamento.bmNumero ? 'BM ' + s.faturamento.bmNumero : s.faturamento.status) + (s.faturamento.nfData ? ' · ' + D(s.faturamento.nfData) : '') : '';
+function colsSol(comFat) {
+  return [
+    { k: 'cli', label: 'Cliente', v: s => cliNome(s.clienteId) },
+    { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
+    { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) },
+    { k: 'sol', label: 'Solicitada', v: s => D(s.dataSolicitacao), ord: s => s.dataSolicitacao || '' },
+    comFat ? { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '' }
+           : { k: 'prev', label: 'Prevista', v: s => D(s.dataPrevista || s.dataColeta), ord: s => s.dataPrevista || s.dataColeta || '' },
+    { k: 'st', label: 'Status', v: s => s.status },
+  ].concat(comFat ? [
+    { k: 'val', label: 'Valor', v: s => R(valorSol(s)), ord: s => +valorSol(s) || 0, num: true, x: s => valorSol(s), fmt: FMT_R },
+    { k: 'bmnf', label: 'BM / NF', v: s => bmnfTxt(s) },
+  ] : []);
+}
+const EXTRAS_SOL = [{ label: 'Código UPLOG', x: s => cliDe(s.clienteId).codigoUplog || '' }, { label: 'Serviço', x: s => s.servico || '' },
+  { label: 'Descrição', x: s => s.descricao || '' }, { label: 'Origem', x: s => s.origem || '' }, { label: 'Motivo', x: s => s.motivo || '' }];
+const filtrosTopo = (...xs) => xs.filter(Boolean);
+
 function linhaSol(s, comFat) {
   const c = cliDe(s.clienteId); const pend = pendentes(s.id);
   return `<tr class="click" data-sol="${esc(s.id)}" tabindex="0">
@@ -546,38 +568,46 @@ function renderFila() {
   const cont = st => base.filter(s => s.status === st).length;
   const lista = base.filter(s => (!S.st || s.status === S.st) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog, conNome(s.consultorId), s.descricao].join(' ')))
     .sort((a, b) => ABERTAS.indexOf(a.status) - ABERTAS.indexOf(b.status) || String(a.dataPrevista || a.dataSolicitacao).localeCompare(String(b.dataPrevista || b.dataSolicitacao)));
+  const T = Portal.tabela('sol-fila', colsSol(false), { titulo: 'Fila de solicitações', arquivo: 'solicitacoes-fila', unidade: 'solicitações', aoMudar: render, extrasExport: EXTRAS_SOL,
+    subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => filtrosTopo(S.st && 'Status: ' + S.st, S.busca && 'Busca: "' + S.busca + '"') });
+  const listaTela = lista; const listaF = T.aplicar(listaTela);
   const atrasadas = base.filter(s => (s.status === 'Liberada para programar' || s.status === 'Programada') && (s.dataPrevista || s.dataColeta) && (s.dataPrevista || s.dataColeta) < hojeISO()).length;
   $('#main').innerHTML = formSol() + `<section class="panel">
     <div class="panel-h"><div><h2>Fila de solicitações</h2><p class="sub">Tudo que ainda não foi realizado. Clique numa linha para ver, mudar o status ou conferir os documentos.</p></div></div>
     ${atrasadas ? `<div class="al"><span class="pill warn">Atenção</span><b>${atrasadas} solicitação(ões) liberada(s)/programada(s) com data prevista já passada. Confira se foram realizadas.</b></div>` : ''}
     <div class="toolbar"><div class="seg" role="group" aria-label="Status">${[['', 'Todas', base.length], ...ABERTAS.map(st => [st, st, cont(st)])].map(([v, l, n]) => `<button type="button" data-fst="${esc(v)}" aria-pressed="${S.st === v}">${esc(l)} <span class="ct">${n}</span></button>`).join('')}</div>
       <input type="search" id="busca" placeholder="Buscar cliente, código, consultor…" value="${esc(S.busca)}" aria-label="Buscar">
-      ${S.ro ? '' : '<button class="btn pri" id="novo" style="margin-left:auto">+ Solicitação</button>'}</div>
-    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Cliente</th><th>Unidade</th><th>Consultor</th><th>Solicitada</th><th>Prevista</th><th>Status</th></tr></thead><tbody>${lista.map(s => linhaSol(s, false)).join('')}</tbody></table></div>` : '<div class="empty">Nenhuma solicitação aberta com estes filtros.</div>'}
+      <span style="margin-left:auto">${T.botao()}</span>${S.ro ? '' : '<button class="btn pri" id="novo">+ Solicitação</button>'}</div>
+    ${T.info(listaF.length, listaTela.length)}
+    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${listaF.map(s => linhaSol(s, false)).join('') || '<tr><td colspan="6" class="empty">Nenhuma solicitação com os filtros das colunas.</td></tr>'}</tbody></table></div>` : '<div class="empty">Nenhuma solicitação aberta com estes filtros.</div>'}
   </section>`;
-  ligarComum();
+  ligarComum(); T.ligar();
   $$('[data-fst]').forEach(b => b.onclick = () => { S.st = b.dataset.fst; render(); });
 }
 function renderTodas() {
   const meses = [...new Set(S.d.solicitacoes.map(s => (s.dataSolicitacao || '').slice(0, 7)).filter(Boolean))].sort().reverse();
-  const lista = S.d.solicitacoes.filter(s => passaUni(s) && (!S.mes || (s.dataSolicitacao || '').startsWith(S.mes)) && (!S.st || s.status === S.st) &&
+  const listaTela = S.d.solicitacoes.filter(s => passaUni(s) && (!S.mes || (s.dataSolicitacao || '').startsWith(S.mes)) &&
     passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog, conNome(s.consultorId), s.descricao, s.faturamento && s.faturamento.nfNumero, s.faturamento && s.faturamento.bmNumero].join(' ')))
     .sort((a, b) => String(b.dataSolicitacao).localeCompare(String(a.dataSolicitacao)));
+  const T = Portal.tabela('sol-todas', colsSol(true), { titulo: 'Todas as solicitações', arquivo: 'solicitacoes-todas', unidade: 'solicitações', aoMudar: render, extrasExport: EXTRAS_SOL,
+    subtitulo: () => [S.uni ? 'Unidade: ' + uniNome(S.uni) : '', S.mes ? 'Mês: ' + S.mes.split('-').reverse().join('/') : 'Todos os meses'].filter(Boolean).join(' · '),
+    filtrosExtras: () => filtrosTopo(S.busca && 'Busca: "' + S.busca + '"'),
+    totais: l => ({ 'Valor': l.reduce((t, s) => t + (s.faturamento ? +valorSol(s) || 0 : 0), 0) }) });
+  const lista = T.aplicar(listaTela);
   const total = lista.reduce((t, s) => t + (s.faturamento ? +(s.faturamento.nfValor !== '' ? s.faturamento.nfValor : s.faturamento.bmValor) || 0 : 0), 0);
   const MAX = 300;
   $('#main').innerHTML = formSol() + `<section class="panel">
     <div class="panel-h"><div><h2>Todas as solicitações</h2><p class="sub">Histórico completo, inclusive o importado da planilha de acompanhamento.</p></div></div>
     <div class="toolbar"><select id="f-mes" style="width:auto" aria-label="Mês da solicitação">${opts(meses.map(m => [m, m.split('-').reverse().join('/')]), S.mes, 'Todos os meses')}</select>
-      <select id="f-stt" style="width:auto" aria-label="Status">${opts(S.d.status, S.st, 'Todos os status')}</select>
       <input type="search" id="busca" placeholder="Buscar cliente, código, BM, NF…" value="${esc(S.busca)}" aria-label="Buscar">
       <span class="sub" style="margin:0 0 0 auto">${lista.length} solicitação(ões) · faturado ${R(total)}</span>
-      ${S.ro ? '' : '<button class="btn pri" id="novo">+ Solicitação</button>'}</div>
-    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Cliente</th><th>Unidade</th><th>Consultor</th><th>Solicitada</th><th>Coleta</th><th>Status</th><th class="num">Valor</th><th>BM / NF</th></tr></thead><tbody>${lista.slice(0, MAX).map(s => linhaSol(s, true)).join('')}</tbody></table></div>
-      ${lista.length > MAX ? `<p class="hint">Mostrando as ${MAX} mais recentes. Use o mês ou a busca para achar as outras.</p>` : ''}` : '<div class="empty">Nenhuma solicitação com estes filtros.</div>'}
+      ${T.botao()}${S.ro ? '' : '<button class="btn pri" id="novo">+ Solicitação</button>'}</div>
+    ${T.info(lista.length, listaTela.length)}
+    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${lista.slice(0, MAX).map(s => linhaSol(s, true)).join('') || '<tr><td colspan="8" class="empty">Nenhuma solicitação com os filtros das colunas.</td></tr>'}</tbody></table></div>
+      ${lista.length > MAX ? `<p class="hint">Mostrando as ${MAX} primeiras. Use o mês, a busca ou os filtros das colunas para achar as outras (a exportação leva todas as ${lista.length}).</p>` : ''}` : '<div class="empty">Nenhuma solicitação com estes filtros.</div>'}
   </section>`;
-  ligarComum();
+  ligarComum(); T.ligar();
   $('#f-mes').onchange = ev => { S.mes = ev.target.value; render(); };
-  $('#f-stt').onchange = ev => { S.st = ev.target.value; render(); };
 }
 function ligarComum() {
   ligarForm(); ligarLinhas();
@@ -592,6 +622,18 @@ function renderRecorrentes() {
   const hoje = hojeISO();
   const lista = (S.d.rotinas || []).filter(r => passaUni(r) && (S.inativos || r.ativo)).sort((a, b) => (b.ativo - a.ativo) || cliNome(a.clienteId).localeCompare(cliNome(b.clienteId), 'pt-BR'));
   const futuras = id => S.d.solicitacoes.filter(x => x.rotinaId === id && x.dataPrevista >= hoje).sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista));
+  const proxTxt = r => { const f = futuras(r.id); return r.ativo ? (f.length ? f.length + ' · próxima ' + D(f[0].dataPrevista) : '') : 'Pausada'; };
+  const TR = Portal.tabela('sol-rot', [
+    { k: 'cli', label: 'Cliente', v: r => cliNome(r.clienteId) },
+    { k: 'qd', label: 'Quando', v: r => r.frequencia + ' · ' + rotQuando(r) },
+    { k: 'uni', label: 'Unidade', v: r => uniNome(r.unidadeId) },
+    { k: 'con', label: 'Consultor', v: r => conNome(r.consultorId) },
+    { k: 'per', label: 'Período', v: r => D(r.dataInicio) + (r.dataFim ? ' a ' + D(r.dataFim) : ''), ord: r => r.dataInicio || '' },
+    { k: 'prox', label: 'Próximas', v: proxTxt, ord: r => { const f = futuras(r.id); return r.ativo && f.length ? f[0].dataPrevista : 'z'; } },
+  ], { titulo: 'Coletas recorrentes', arquivo: 'coletas-recorrentes', unidade: 'coletas', aoMudar: render,
+    extrasExport: [{ label: 'Situação', x: r => r.ativo ? 'Ativa' : 'Pausada' }, { label: 'Valor previsto', x: r => r.valorPrevisto === '' ? '' : +r.valorPrevisto }, { label: 'Descrição', x: r => r.descricao || '' }],
+    filtrosExtras: () => filtrosTopo(S.inativos && 'Mostrando as pausadas') });
+  const listaRot = TR.aplicar(lista);
   const form = !e ? '' : `<section class="panel form-panel" id="form-panel"><div class="panel-h"><div><h2>${e.id ? 'Editar coleta recorrente' : 'Nova coleta recorrente'}</h2><p class="sub">O portal cria as solicitações das próximas semanas já liberadas para programar. Mudar o dia ou a frequência refaz as que ainda não foram programadas.</p></div><button class="btn sm" id="f-cancel">Fechar</button></div>
     <form id="rf" class="form" autocomplete="off">
       <div class="fld full"><label for="r-cli">Cliente</label><input id="r-cli" list="dl-rcli" required value="${esc(e.clienteId ? cliRot(cliDe(e.clienteId)) : '')}" placeholder="Código UPLOG ou nome"><datalist id="dl-rcli">${S.d.clientes.filter(c => c.ativo).map(c => `<option value="${esc(cliRot(c))}">`).join('')}</datalist></div>
@@ -612,15 +654,17 @@ function renderRecorrentes() {
   $('#main').innerHTML = form + `<section class="panel">
     <div class="panel-h"><div><h2>Coletas recorrentes</h2><p class="sub">Clientes com coleta fixa (ex.: toda sexta). As solicitações das próximas ${S.d.semanasRecorrentes || 4} semanas aparecem sozinhas na fila da Programação.</p></div></div>
     <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar pausadas</label>
-      ${S.ro ? '' : '<button class="btn" id="r-gerar" style="margin-left:auto">Gerar agora</button><button class="btn pri" id="novo">+ Coleta recorrente</button>'}</div>
-    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Cliente</th><th>Quando</th><th>Unidade</th><th>Consultor</th><th>Período</th><th>Próximas</th><th></th></tr></thead><tbody>
-      ${lista.map(r => { const f = futuras(r.id); return `<tr class="${r.ativo ? '' : 'inativo'}"><td data-label="Cliente" class="full"><b>${esc(cliNome(r.clienteId))}</b>${r.descricao ? `<div class="sub">${esc(r.descricao)}</div>` : ''}</td>
+      <span style="margin-left:auto">${TR.botao()}</span>${S.ro ? '' : '<button class="btn" id="r-gerar">Gerar agora</button><button class="btn pri" id="novo">+ Coleta recorrente</button>'}</div>
+    ${TR.info(listaRot.length, lista.length)}
+    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TR.cab('<th></th>')}</thead><tbody>
+      ${listaRot.map(r => { const f = futuras(r.id); return `<tr class="${r.ativo ? '' : 'inativo'}"><td data-label="Cliente" class="full"><b>${esc(cliNome(r.clienteId))}</b>${r.descricao ? `<div class="sub">${esc(r.descricao)}</div>` : ''}</td>
         <td data-label="Quando">${esc(r.frequencia)} · ${esc(rotQuando(r))}</td><td data-label="Unidade">${esc(uniNome(r.unidadeId))}</td><td data-label="Consultor">${esc(conNome(r.consultorId) || '—')}</td>
         <td data-label="Período" class="mono">${esc(D(r.dataInicio))}${r.dataFim ? ' a ' + esc(D(r.dataFim)) : ''}</td>
         <td data-label="Próximas">${r.ativo ? (f.length ? f.length + ' · próxima ' + esc(D(f[0].dataPrevista)) : '—') : '<span class="pill">Pausada</span>'}</td>
-        <td data-label=""><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-red="${r.id}">Editar</button>`}<button class="btn sm" data-rhist="${r.id}">Histórico</button>${S.ro ? '' : r.ativo ? `<button class="btn sm danger" data-rpausa="${r.id}">Pausar</button>` : `<button class="btn sm" data-rreat="${r.id}">Retomar</button>`}</div></td></tr>`; }).join('')}
+        <td data-label=""><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-red="${r.id}">Editar</button>`}<button class="btn sm" data-rhist="${r.id}">Histórico</button>${S.ro ? '' : r.ativo ? `<button class="btn sm danger" data-rpausa="${r.id}">Pausar</button>` : `<button class="btn sm" data-rreat="${r.id}">Retomar</button>`}</div></td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Nenhuma coleta com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhuma coleta recorrente.</div>'}</section>`;
   const achar = id => S.d.rotinas.find(r => r.id === id);
+  TR.ligar();
   $('#inat').onchange = ev => { S.inativos = ev.target.checked; render(); };
   const n = $('#novo'); if (n) n.onclick = () => { S.edit = { unidadeId: S.uni || (S.d.unidades.length === 1 ? S.d.unidades[0].id : ''), frequencia: 'Semanal', residuoIds: [] }; render(); scrollTo({ top: 0 }); };
   const g = $('#r-gerar'); if (g) g.onclick = async () => { try { const r = await Portal.api('sol.rotGerar', {}); toast(r.geradas ? r.geradas + ' solicitação(ões) gerada(s)' : 'Tudo em dia: nada novo para gerar.'); await carregar(true); } catch (er) { falha(er); } };
@@ -653,6 +697,12 @@ function renderConsultores() {
   const e = S.edit;
   const lista = S.d.consultores.filter(c => S.inativos || c.ativo).sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const qtd = id => S.d.solicitacoes.filter(s => s.consultorId === id).length;
+  const TC = Portal.tabela('sol-con', [
+    { k: 'nome', label: 'Nome', v: c => c.nome }, { k: 'email', label: 'E-mail', v: c => c.email }, { k: 'tel', label: 'Telefone', v: c => c.telefone },
+    { k: 'qtd', label: 'Solicitações', v: c => String(qtd(c.id)), ord: c => qtd(c.id), num: true },
+  ], { titulo: 'Consultores', arquivo: 'consultores', unidade: 'consultores', aoMudar: render,
+    extrasExport: [{ label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }], filtrosExtras: () => filtrosTopo(S.inativos && 'Mostrando os inativos') });
+  const listaC = TC.aplicar(lista);
   $('#main').innerHTML = (e ? `<section class="panel form-panel" id="form-panel"><div class="panel-h"><h2>${e.id ? 'Editar consultor' : 'Novo consultor'}</h2><button class="btn sm" id="f-cancel">Fechar</button></div>
     <form id="f" class="form"><div class="fld"><label for="c-nome">Nome</label><input id="c-nome" required value="${esc(e.nome)}"></div>
     <div class="fld"><label for="c-email">E-mail</label><input id="c-email" type="email" value="${esc(e.email)}"><div class="hint">Usado depois para a tela "Minhas solicitações".</div></div>
@@ -660,12 +710,14 @@ function renderConsultores() {
     <div class="row full" style="justify-content:flex-end"><button class="btn pri" id="f-save">Salvar</button></div></form>
     ${e.id && e.criadoEm ? `<div class="gvc-audit" style="margin-top:10px">${Portal.auditoriaHTML(e)}</div>` : ''}</section>` : '') + `<section class="panel">
     <div class="panel-h"><div><h2>Consultores</h2><p class="sub">Quem traz a solicitação do cliente. Você cadastra aqui; o acesso ao portal é dado na tela Usuários.</p></div></div>
-    <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label>${S.ro ? '' : '<button class="btn pri" id="novo" style="margin-left:auto">+ Consultor</button>'}</div>
-    ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th class="num">Solicitações</th><th></th></tr></thead><tbody>
-    ${lista.map(c => `<tr class="${c.ativo ? '' : 'inativo'}"><td><b>${esc(c.nome)}</b></td><td>${esc(c.email || '—')}</td><td>${esc(c.telefone || '—')}</td><td class="num">${qtd(c.id)}</td>
-      <td><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-ced="${c.id}">Editar</button>`}<button class="btn sm" data-chist="${c.id}">Histórico</button>${S.ro ? '' : c.ativo ? `<button class="btn sm danger" data-cdel="${c.id}">Excluir</button>` : `<button class="btn sm" data-creat="${c.id}">Reativar</button>`}</div></td></tr>`).join('')}
+    <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label><span style="margin-left:auto">${TC.botao()}</span>${S.ro ? '' : '<button class="btn pri" id="novo">+ Consultor</button>'}</div>
+    ${TC.info(listaC.length, lista.length)}
+    ${lista.length ? `<div class="tbl-wrap"><table><thead>${TC.cab('<th></th>')}</thead><tbody>
+    ${listaC.map(c => `<tr class="${c.ativo ? '' : 'inativo'}"><td><b>${esc(c.nome)}</b></td><td>${esc(c.email || '—')}</td><td>${esc(c.telefone || '—')}</td><td class="num">${qtd(c.id)}</td>
+      <td><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-ced="${c.id}">Editar</button>`}<button class="btn sm" data-chist="${c.id}">Histórico</button>${S.ro ? '' : c.ativo ? `<button class="btn sm danger" data-cdel="${c.id}">Excluir</button>` : `<button class="btn sm" data-creat="${c.id}">Reativar</button>`}</div></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum consultor com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhum consultor cadastrado.</div>'}</section>`;
   const achar = id => S.d.consultores.find(c => c.id === id);
+  TC.ligar();
   $$('[data-ced]').forEach(b => b.onclick = () => { S.edit = { ...achar(b.dataset.ced) }; render(); });
   $$('[data-chist]').forEach(b => b.onclick = () => Portal.mostrarHistorico('Consultores', b.dataset.chist, achar(b.dataset.chist).nome));
   $$('[data-cdel]').forEach(b => b.onclick = () => excluirCad('Consultores', achar(b.dataset.cdel)));
@@ -680,6 +732,12 @@ function renderConsultores() {
 /* ---------- documentos: catálogo, padrão por cliente e serviços ---------- */
 function renderDocumentos() {
   const tipos = S.d.tiposDocumento.slice().sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const usoDoc = id => S.d.documentosPadrao.filter(d => d.tipoDocumentoId === id).length;
+  const TD = Portal.tabela('sol-tdoc', [
+    { k: 'nome', label: 'Documento', v: t => t.nome }, { k: 'sit', label: 'Situação', v: t => t.ativo ? 'Ativo' : 'Inativo' },
+    { k: 'cli', label: 'Clientes com este documento', v: t => String(usoDoc(t.id)), ord: t => usoDoc(t.id), num: true },
+  ], { titulo: 'Tipos de documento', arquivo: 'tipos-de-documento', unidade: 'tipos', aoMudar: render });
+  const tiposF = TD.aplicar(tipos);
   const cliSel = S.abrir && cliDe(S.abrir).id ? cliDe(S.abrir) : null;
   const padrao = cliSel ? S.d.documentosPadrao.filter(d => d.cadastroId === cliSel.id) : [];
   const comPadrao = [...new Set(S.d.documentosPadrao.map(d => d.cadastroId))].map(cliDe).filter(c => c.id);
@@ -692,12 +750,14 @@ function renderDocumentos() {
       : `<p class="sub">${comPadrao.length ? 'Clientes com documentos definidos: ' + comPadrao.map(c => `<a href="#" data-pcli="${c.id}">${esc(c.nome)}</a>`).join(', ') : 'Nenhum cliente com documentos definidos ainda.'}</p>`}
   </section>
   <section class="panel"><div class="panel-h"><div><h2>Tipos de documento</h2><p class="sub">Catálogo usado nos checklists.</p></div></div>
-    ${S.ro ? '' : '<div class="toolbar"><input id="td-novo" placeholder="Novo tipo de documento" style="max-width:320px"><button class="btn" id="td-add">Adicionar</button></div>'}
-    <div class="tbl-wrap"><table><tbody>${tipos.map(t => `<tr class="${t.ativo ? '' : 'inativo'}"><td>${esc(t.nome)}</td><td><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-tren="${t.id}">Renomear</button>`}<button class="btn sm" data-thist="${t.id}">Histórico</button>${S.ro ? '' : t.ativo ? `<button class="btn sm danger" data-tdel="${t.id}">Excluir</button>` : `<button class="btn sm" data-treat="${t.id}">Reativar</button>`}</div></td></tr>`).join('')}</tbody></table></div>
+    <div class="toolbar">${S.ro ? '' : '<input id="td-novo" placeholder="Novo tipo de documento" style="max-width:320px"><button class="btn" id="td-add">Adicionar</button>'}<span style="margin-left:auto">${TD.botao()}</span></div>
+    ${TD.info(tiposF.length, tipos.length)}
+    <div class="tbl-wrap"><table><thead>${TD.cab('<th></th>')}</thead><tbody>${tiposF.map(t => `<tr class="${t.ativo ? '' : 'inativo'}"><td>${esc(t.nome)}</td><td>${t.ativo ? 'Ativo' : '<span class="pill">Inativo</span>'}</td><td class="num">${usoDoc(t.id)}</td><td><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-tren="${t.id}">Renomear</button>`}<button class="btn sm" data-thist="${t.id}">Histórico</button>${S.ro ? '' : t.ativo ? `<button class="btn sm danger" data-tdel="${t.id}">Excluir</button>` : `<button class="btn sm" data-treat="${t.id}">Reativar</button>`}</div></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhum tipo com os filtros das colunas.</td></tr>'}</tbody></table></div>
   </section>
   <section class="panel"><div class="panel-h"><div><h2>Serviços</h2><p class="sub">Lista do campo "Serviço" da solicitação. Um por linha, na ordem em que devem aparecer.</p></div></div>
     <textarea id="serv" rows="5" ${S.ro ? 'disabled' : ''} style="max-width:420px">${esc(S.d.listas.servico.join('\n'))}</textarea>
     ${S.ro ? '' : '<div class="row" style="margin-top:8px"><button class="btn" id="serv-salvar">Salvar serviços</button></div>'}</section>`;
+  TD.ligar();
   const dc = $('#d-cli'); dc.onchange = () => { const v = dc.value.trim(); const c = S.d.clientes.find(c => cliRot(c) === v) || S.d.clientes.find(c => c.codigoUplog === v); S.abrir = c ? c.id : null; render(); };
   $$('[data-pcli]').forEach(a => a.onclick = ev => { ev.preventDefault(); S.abrir = a.dataset.pcli; render(); });
   const ps = $('#pad-salvar'); if (ps) ps.onclick = async () => { try { await Portal.api('sol.docsPadrao', { cadastroId: cliSel.id, itens: $$('[data-pad]:checked').map(x => ({ tipoDocumentoId: x.dataset.pad })) }); toast('Documentos do cliente salvos'); await carregar(true); } catch (e) { falha(e); } };
@@ -779,7 +839,6 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
   const q = new URLSearchParams(location.search).get('abrir'); if (q) abrir(q);
 })();
 })();
-
 </script>
 </body>
 </html>
