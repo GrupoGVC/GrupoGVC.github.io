@@ -287,7 +287,7 @@ table.itens td input,table.itens td select{min-width:70px}
 .toolbar .seg button{white-space:nowrap}
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261105"></script>
+<script src="../portal.js?v=20261106"></script>
 <script src="../tabela.js?v=20261102"></script>
 </head>
 <body>
@@ -694,7 +694,7 @@ async function excluirCad(tabela, x) {
   catch (e) { if (e && e.erro === 'em_uso') { if (await Portal.confirmarInativar(e, x.nome)) { await Portal.api('sol.ativoCadastro', { tabela, id: x.id, ativo: false }); toast('Inativado'); await carregar(true); } } else falha(e); }
 }
 function renderConsultores() {
-  const e = S.edit;
+  // só consulta: o cadastro (e o acesso ao portal) fica no módulo Pessoas
   const lista = S.d.consultores.filter(c => S.inativos || c.ativo).sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const qtd = id => S.d.solicitacoes.filter(s => s.consultorId === id).length;
   const TC = Portal.tabela('sol-con', [
@@ -703,30 +703,19 @@ function renderConsultores() {
   ], { titulo: 'Consultores', arquivo: 'consultores', unidade: 'consultores', aoMudar: render,
     extrasExport: [{ label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }], filtrosExtras: () => filtrosTopo(S.inativos && 'Mostrando os inativos') });
   const listaC = TC.aplicar(lista);
-  $('#main').innerHTML = (e ? `<section class="panel form-panel" id="form-panel"><div class="panel-h"><h2>${e.id ? 'Editar consultor' : 'Novo consultor'}</h2><button class="btn sm" id="f-cancel">Fechar</button></div>
-    <form id="f" class="form"><div class="fld"><label for="c-nome">Nome</label><input id="c-nome" required value="${esc(e.nome)}"></div>
-    <div class="fld"><label for="c-email">E-mail</label><input id="c-email" type="email" value="${esc(e.email)}"><div class="hint">Usado depois para a tela "Minhas solicitações".</div></div>
-    <div class="fld"><label for="c-tel">Telefone</label><input id="c-tel" value="${esc(e.telefone)}"></div>
-    <div class="row full" style="justify-content:flex-end"><button class="btn pri" id="f-save">Salvar</button></div></form>
-    ${e.id && e.criadoEm ? `<div class="gvc-audit" style="margin-top:10px">${Portal.auditoriaHTML(e)}</div>` : ''}</section>` : '') + `<section class="panel">
-    <div class="panel-h"><div><h2>Consultores</h2><p class="sub">Quem traz a solicitação do cliente. Você cadastra aqui; o acesso ao portal é dado na tela Usuários.</p></div></div>
-    <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label><span style="margin-left:auto">${TC.botao()}</span>${S.ro ? '' : '<button class="btn pri" id="novo">+ Consultor</button>'}</div>
+  const linkPes = id => '../pessoas/' + (id ? '#p=' + encodeURIComponent(id) : '');
+  $('#main').innerHTML = `<section class="panel">
+    <div class="panel-h"><div><h2>Consultores</h2><p class="sub">Quem traz a solicitação do cliente. Esta lista é só para consulta: o cadastro e o acesso ao portal ficam no módulo <b>Pessoas</b> (função Consultor).</p></div></div>
+    <div class="toolbar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label><span style="margin-left:auto">${TC.botao()}</span><a class="btn" href="${linkPes('')}">Cadastrar/editar em Pessoas</a></div>
     ${TC.info(listaC.length, lista.length)}
     ${lista.length ? `<div class="tbl-wrap"><table><thead>${TC.cab('<th></th>')}</thead><tbody>
     ${listaC.map(c => `<tr class="${c.ativo ? '' : 'inativo'}"><td><b>${esc(c.nome)}</b></td><td>${esc(c.email || '—')}</td><td>${esc(c.telefone || '—')}</td><td class="num">${qtd(c.id)}</td>
-      <td><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-ced="${c.id}">Editar</button>`}<button class="btn sm" data-chist="${c.id}">Histórico</button>${S.ro ? '' : c.ativo ? `<button class="btn sm danger" data-cdel="${c.id}">Excluir</button>` : `<button class="btn sm" data-creat="${c.id}">Reativar</button>`}</div></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum consultor com os filtros das colunas.</td></tr>'}
-    </tbody></table></div>` : '<div class="empty">Nenhum consultor cadastrado.</div>'}</section>`;
+      <td><div class="acoes"><button class="btn sm" data-chist="${c.id}">Histórico</button><a class="btn sm" href="${linkPes(c.id)}">Abrir em Pessoas</a></div></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum consultor com os filtros das colunas.</td></tr>'}
+    </tbody></table></div>` : '<div class="empty">Nenhum consultor cadastrado. Cadastre no módulo Pessoas com a função Consultor.</div>'}</section>`;
   const achar = id => S.d.consultores.find(c => c.id === id);
   TC.ligar();
-  $$('[data-ced]').forEach(b => b.onclick = () => { S.edit = { ...achar(b.dataset.ced) }; render(); });
-  $$('[data-chist]').forEach(b => b.onclick = () => Portal.mostrarHistorico('Consultores', b.dataset.chist, achar(b.dataset.chist).nome));
-  $$('[data-cdel]').forEach(b => b.onclick = () => excluirCad('Consultores', achar(b.dataset.cdel)));
-  $$('[data-creat]').forEach(b => b.onclick = async () => { await Portal.api('sol.ativoCadastro', { tabela: 'Consultores', id: b.dataset.creat, ativo: true }).catch(falha); await carregar(true); });
+  $$('[data-chist]').forEach(b => b.onclick = () => Portal.mostrarHistorico('Pessoas', b.dataset.chist, achar(b.dataset.chist).nome));
   const i = $('#inat'); if (i) i.onchange = () => { S.inativos = i.checked; render(); };
-  const n = $('#novo'); if (n) n.onclick = () => { S.edit = {}; render(); $('#c-nome').focus(); };
-  const c = $('#f-cancel'); if (c) c.onclick = () => { S.edit = null; render(); };
-  const f = $('#f'); if (f) f.onsubmit = async ev => { ev.preventDefault();
-    try { await Portal.api('sol.salvarCadastro', { tabela: 'Consultores', registro: { id: e.id || '', nome: $('#c-nome').value, email: $('#c-email').value, telefone: $('#c-tel').value } }); toast('Consultor salvo'); S.edit = null; await carregar(true); } catch (er) { falha(er); } };
 }
 
 /* ---------- documentos: catálogo, padrão por cliente e serviços ---------- */
