@@ -271,6 +271,7 @@ nav.tabs .ic,nav.tabs .t-short{display:none}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
+<script src="../tabela.js?v=20261102"></script>
 </head>
 <body>
 <header class="top">
@@ -427,112 +428,16 @@ function pendencias(lanc){
 
 const negPill=n=>n==='RSS'?'<span class="pill neg-rss">RSS</span>':n==='Industrial'?'<span class="pill neg-ind">Industrial</span>':'<span class="pill neg-none">sem tipo</span>';
 function bindNeg(){document.querySelectorAll('[data-neg]').forEach(b=>b.onclick=()=>{S.neg=b.dataset.neg;renderPainel();bindNeg()});
-  document.querySelectorAll('[data-negsel]').forEach(tr=>tr.onclick=()=>{const n=tr.dataset.negsel;if(n){S.neg=n;renderPainel();bindNeg()}else{S.f={dest:'',res:'',q:'',neg:''};S.filtros.lanc={neg:new Set(['Sem tipo'])};delete S.ordem.lanc;setTab('lanc')}})}
-/* ---------- filtro por coluna, como no Excel ---------- */
-// S.filtros[aba][coluna] = Set dos valores que aparecem; S.ordem[aba] = { k, dir }.
-S.filtros = S.filtros || {}; S.ordem = S.ordem || {};
-const txtCol = (c, x) => { const v = c.v(x); return v === '' || v == null ? (c.vazio || '(Vazias)') : String(v); };
-const cmpCol = (c, a, b) => { if (c.ord) { const x = c.ord(a), y = c.ord(b); return typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true }); } return c.num ? (Number(c.v(a)) || 0) - (Number(c.v(b)) || 0) : txtCol(c, a).localeCompare(txtCol(c, b), 'pt-BR', { numeric: true }); };
-function passaFiltros(aba, cols, x, exceto) {
-  const f = S.filtros[aba] || {};
-  return cols.every(c => c.k === exceto || !f[c.k] || f[c.k].has(txtCol(c, x)));
-}
-function aplicarFiltros(aba, cols, linhas) {
-  let out = linhas.filter(x => passaFiltros(aba, cols, x));
-  const o = S.ordem[aba]; const c = o && cols.find(y => y.k === o.k);
-  if (c) out = out.slice().sort((a, b) => o.dir * cmpCol(c, a, b));
-  return out;
-}
-const nFiltros = aba => Object.keys(S.filtros[aba] || {}).length + (S.ordem[aba] ? 1 : 0);
-const ICO_FILTRO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12l-4.6 5.4V13l-2.8-1.4V8.4z" fill="currentColor"/></svg>';
-const ICO_SETA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-function cabFiltro(aba, cols, extra) {
-  const f = S.filtros[aba] || {}, o = S.ordem[aba];
-  return '<tr>' + cols.map(c => {
-    const on = !!f[c.k], ord = o && o.k === c.k ? (o.dir > 0 ? ' ↑' : ' ↓') : '';
-    return `<th class="${c.num ? 'num' : ''}${c.cls ? ' ' + c.cls : ''}"><button type="button" class="fh${on || ord ? ' on' : ''}" data-fcol="${c.k}" aria-haspopup="dialog" aria-label="Filtrar ou ordenar a coluna ${esc(c.label)}${on ? ' (filtro ativo)' : ''}">${esc(c.label)}${ord}<span class="fi">${on ? ICO_FILTRO : ICO_SETA}</span></button></th>`;
-  }).join('') + (extra || '') + '</tr>';
-}
-function infoFiltros(aba, nVis, nTotal) {
-  return nFiltros(aba) ? `<div class="filtro-info"><span>${nVis} de ${nTotal} ${nTotal === 1 ? 'linha' : 'linhas'} com os filtros das colunas</span><button type="button" class="btn sm" id="limpar-filtros">Limpar filtros</button></div>` : '';
-}
-function fecharFiltro() { const p = document.getElementById('fpop'); if (p) p.remove(); document.removeEventListener('mousedown', fecharFora, true); document.removeEventListener('keydown', escFiltro, true); }
-function fecharFora(ev) { const p = document.getElementById('fpop'); if (p && !p.contains(ev.target) && !ev.target.closest('[data-fcol]')) fecharFiltro(); }
-function escFiltro(ev) { if (ev.key === 'Escape') { const k = (document.getElementById('fpop') || {}).dataset; fecharFiltro(); const b = k && document.querySelector(`[data-fcol="${k.col}"]`); if (b) b.focus(); } }
-function ligarFiltros(aba, cols, base) {
-  document.querySelectorAll('[data-fcol]').forEach(b => b.onclick = ev => {
-    ev.stopPropagation();
-    const ja = document.getElementById('fpop'); if (ja && ja.dataset.col === b.dataset.fcol) { fecharFiltro(); return; }
-    abrirFiltro(aba, cols.find(c => c.k === b.dataset.fcol), cols, base, b);
-  });
-  const lf = $('#limpar-filtros'); if (lf) lf.onclick = () => { delete S.filtros[aba]; delete S.ordem[aba]; renderLanc(); };
-}
-function abrirFiltro(aba, col, cols, base, btn) {
-  fecharFiltro();
-  // valores possíveis: linhas que passam pelos filtros das OUTRAS colunas (igual ao Excel)
-  const cont = new Map(), rep = new Map();
-  base.filter(x => passaFiltros(aba, cols, x, col.k)).forEach(x => { const t = txtCol(col, x); cont.set(t, (cont.get(t) || 0) + 1); if (!rep.has(t)) rep.set(t, col.ord ? col.ord(x) : t); });
-  const vazio = col.vazio || '(Vazias)';
-  const valores = [...cont.keys()].sort((a, b) => { if (a === vazio) return 1; if (b === vazio) return -1;
-    if (col.ord) { const x = rep.get(a), y = rep.get(b); return typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true }); }
-    return col.num ? Number(a) - Number(b) : a.localeCompare(b, 'pt-BR', { numeric: true }); });
-  const atual = (S.filtros[aba] || {})[col.k];
-  const sel = new Set(valores.filter(v => !atual || atual.has(v)));
-  const az = col.num ? ['Menor → maior', 'Maior → menor'] : ['A → Z', 'Z → A'];
-  const p = document.createElement('div');
-  p.id = 'fpop'; p.className = 'fpop'; p.dataset.col = col.k; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Filtro da coluna ' + col.label);
-  p.innerHTML = `<div class="fp-ord"><button type="button" class="fp-o" data-o="1">↑ Ordenar ${az[0]}</button><button type="button" class="fp-o" data-o="-1">↓ Ordenar ${az[1]}</button></div>
-    <input type="search" class="fp-busca" placeholder="Pesquisar" aria-label="Pesquisar valores de ${esc(col.label)}">
-    <div class="fp-lista">
-      <label class="fp-all"><input type="checkbox" data-all> <span>(Selecionar tudo)</span></label>
-      ${valores.map((v, i) => `<label data-txt="${esc(v.toLowerCase())}"><input type="checkbox" data-i="${i}" ${sel.has(v) ? 'checked' : ''}> <span>${esc(v)}</span><em>${cont.get(v)}</em></label>`).join('') || '<div class="sub" style="padding:6px">Nenhum valor.</div>'}
-    </div>
-    <div class="fp-bot"><button type="button" class="btn sm" data-limpar ${atual || (S.ordem[aba] && S.ordem[aba].k === col.k) ? '' : 'disabled'}>Limpar</button><span style="flex:1"></span><button type="button" class="btn sm" data-cancel>Cancelar</button><button type="button" class="btn sm pri" data-ok>OK</button></div>`;
-  document.body.appendChild(p);
-  // posição: logo abaixo do cabeçalho, sem sair da tela
-  const r = btn.getBoundingClientRect(), w = Math.min(290, window.innerWidth - 16);
-  p.style.width = w + 'px';
-  p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + window.scrollX + 'px';
-  p.style.top = r.bottom + 4 + window.scrollY + 'px';
-  const busca = p.querySelector('.fp-busca'), all = p.querySelector('[data-all]'), ok = p.querySelector('[data-ok]');
-  const caixas = [...p.querySelectorAll('[data-i]')];
-  const visiveis = () => caixas.filter(c => !c.closest('label').hidden);
-  const atualizar = () => {
-    const vis = visiveis(), n = vis.filter(c => c.checked).length;
-    all.checked = vis.length > 0 && n === vis.length; all.indeterminate = n > 0 && n < vis.length;
-    ok.disabled = n === 0;
-  };
-  caixas.forEach(c => c.onchange = () => { const v = valores[+c.dataset.i]; c.checked ? sel.add(v) : sel.delete(v); atualizar(); });
-  all.onchange = () => { visiveis().forEach(c => { c.checked = all.checked; const v = valores[+c.dataset.i]; all.checked ? sel.add(v) : sel.delete(v); }); atualizar(); };
-  busca.oninput = () => {
-    const q = busca.value.trim().toLowerCase();
-    caixas.forEach(c => { const l = c.closest('label'); l.hidden = !!q && !l.dataset.txt.includes(q); if (q) c.checked = !l.hidden; });
-    if (!q) caixas.forEach(c => c.checked = sel.has(valores[+c.dataset.i]));
-    atualizar();
-  };
-  const aplicar = () => {
-    const q = busca.value.trim();
-    const escolhidos = q ? visiveis().filter(c => c.checked).map(c => valores[+c.dataset.i]) : valores.filter(v => sel.has(v));
-    S.filtros[aba] = S.filtros[aba] || {};
-    if (escolhidos.length === valores.length && !q) delete S.filtros[aba][col.k];
-    else S.filtros[aba][col.k] = new Set(escolhidos);
-    if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba];
-    fecharFiltro(); renderLanc();
-  };
-  ok.onclick = aplicar;
-  busca.onkeydown = ev => { if (ev.key === 'Enter' && !ok.disabled) aplicar(); };
-  p.querySelector('[data-cancel]').onclick = () => { fecharFiltro(); btn.focus(); };
-  p.querySelector('[data-limpar]').onclick = () => {
-    if (S.filtros[aba]) { delete S.filtros[aba][col.k]; if (!Object.keys(S.filtros[aba]).length) delete S.filtros[aba]; }
-    if (S.ordem[aba] && S.ordem[aba].k === col.k) delete S.ordem[aba];
-    fecharFiltro(); renderLanc();
-  };
-  p.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { S.ordem[aba] = { k: col.k, dir: +b.dataset.o }; fecharFiltro(); renderLanc(); });
-  atualizar();
-  document.addEventListener('mousedown', fecharFora, true); document.addEventListener('keydown', escFiltro, true);
-  busca.focus();
-}
-
+  document.querySelectorAll('[data-negsel]').forEach(tr=>tr.onclick=()=>{const n=tr.dataset.negsel;if(n){S.neg=n;renderPainel();bindNeg()}else{S.f={dest:'',res:'',q:'',neg:''};const t=tbLanc();t.filtros={neg:new Set(['Sem tipo'])};t.ordem=null;setTab('lanc')}})}
+/* ---------- filtro por coluna e exportação (peça comum do portal: tabela.js) ---------- */
+function fecharFiltro(){if(window.Portal&&Portal.fecharFiltroTabela)Portal.fecharFiltroTabela()}
+const FMT_R='"R$" #,##0.00';
+function tbLanc(){return Portal.tabela('ctl-lanc',COLS_LANC,{titulo:'Lançamentos · '+mesLbl(S.mes),aba:'Lançamentos',arquivo:'destinacao-'+S.mes,unidade:'lançamentos',aoMudar:renderLanc,
+  subtitulo:()=>'Mês: '+mesLbl(S.mes),filtrosExtras:()=>S.f.q.trim()?['Busca: "'+S.f.q.trim()+'"']:[],
+  extrasExport:[{label:'Ticket',x:l=>l.ticket||'',pdf:false},{label:'Tipo',x:l=>tipoDe(l.destinador)==='receita'?'Receita':'Custo',pdf:false},{label:'Transportadora',x:l=>l.transportadora||'',pdf:false},
+    {label:'Valor fechado',x:l=>l.valorFixo?+l.valorFixo:'',fmt:FMT_R,pdf:false},{label:'Observação',x:l=>l.obs||'',pdf:false}],
+  totais:l=>{const c=l.filter(x=>tipoDe(x.destinador)!=='receita').reduce((s,x)=>s+(+x.valor||0),0),r=l.filter(x=>tipoDe(x.destinador)==='receita').reduce((s,x)=>s+(+x.valor||0),0);
+    return{'kg':l.reduce((s,x)=>s+(+x.kg||0),0),'Valor':c-r,'Observação':'saldo = custos '+R(c)+' − receitas '+R(r)}}})}
 /* ---------- render ---------- */
 function bars(rows,color,fmt,tipFn){
   if(!rows.length)return '<div class="empty">Nada lançado neste mês.</div>';
@@ -575,7 +480,11 @@ function renderPainel(){
   const gerTop=gerRows.slice(0,10);const outros=gerRows.slice(10);if(outros.length)gerTop.push({n:`Outros (${outros.length})`,v:outros.reduce((s,r)=>s+r.v,0),kg:outros.reduce((s,r)=>s+r.kg,0),c:outros.reduce((s,r)=>s+r.c,0)});
   const resRows=Object.entries(a.byRes).map(([n,d])=>({n,v:d.kg,val:d.v})).sort((x,y)=>y.v-x.v);
   const resR=Object.entries(a.byResR).map(([n,d])=>({n,v:d.kg,val:d.v})).sort((x,y)=>y.v-x.v);
-  const vs=(S.loc&&S.loc.veiculos)||[];
+  const vsTela=(S.loc&&S.loc.veiculos)||[];
+  const TU=Portal.tabela('ctl-uso',colsLocacao(a).map(c=>c.k==='val'?Object.assign({},c,{label:'Aluguel'}):c).filter(c=>c.k!=='tipo'||true),{titulo:'Uso da frota alugada · '+mesLbl(S.mes),aba:'Uso da frota',arquivo:'uso-frota-'+S.mes,unidade:'veículos',aoMudar:render,
+    subtitulo:()=>'Mês: '+mesLbl(S.mes),extrasExport:[{label:'Alerta',x:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p&&p.mtr.size?'':'Sem viagem lançada'}}],
+    totais:l=>({'Aluguel':l.reduce((t,v)=>t+(+v.valor||0),0)})});
+  const vs=TU.aplicar(vsTela);
   const proprio=gerRows.find(r=>r.n==='RETEC');
   $('#main').innerHTML=`
   ${pend.length?`<div class="al ${pend.some(p=>p.sev==='crit')?'crit':'warn'}" style="cursor:pointer" data-go="pend"><span class="pill ${pend.some(p=>p.sev==='crit')?'crit':'warn'}">${pend.length} ponto(s)</span><b>Há lançamentos para conferir antes de fechar ${esc(mesLbl(S.mes))}</b><div class="x">${esc(pend.slice(0,3).map(p=>p.tit).join(' · '))}${pend.length>3?' …':''}</div></div>`:''}
@@ -619,15 +528,17 @@ function renderPainel(){
   </div>
 
   <section class="panel">
-    <div class="panel-h"><div><h2>Uso da frota alugada</h2><p class="sub">Viagens de descarte lançadas por placa alugada. Custo por viagem = aluguel ÷ viagens.</p></div><button class="btn sm" data-go="frota">Editar frota do mês</button></div>
-    ${vs.length?`<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Placa</th><th>Tipo</th><th>Fornecedor</th><th class="num">Aluguel</th><th class="num">Viagens</th><th class="num">kg levados</th><th class="num">R$/viagem</th><th></th></tr></thead><tbody>
-    ${vs.map(v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];const n=p?p.mtr.size:0;return `<tr><td class="mono">${esc(v.placa)}</td><td>${esc(v.tipo)}</td><td>${esc(v.fornecedor)}</td><td class="num">${R(v.valor)}</td><td class="num">${n}</td><td class="num">${p?N(p.kg):'—'}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td><td class="${n?'hide-m':'full'}">${n?'':'<span class="pill warn">sem viagem lançada</span>'}</td></tr>`}).join('')}
-    </tbody><tfoot><tr><td colspan="3">${vs.length} itens</td><td class="num">${R(a.loc)}</td><td class="num"></td><td></td><td></td><td></td></tr></tfoot></table></div>`:`<div class="empty">Nenhum veículo cadastrado para ${esc(mesLbl(S.mes))}. <button class="btn sm" data-go="frota">Cadastrar frota</button></div>`}
+    <div class="panel-h"><div><h2>Uso da frota alugada</h2><p class="sub">Viagens de descarte lançadas por placa alugada. Custo por viagem = aluguel ÷ viagens.</p></div><div class="row" style="gap:6px">${vsTela.length?TU.botao():''}<button class="btn sm" data-go="frota">Editar frota do mês</button></div></div>
+    ${TU.info(vs.length,vsTela.length)}
+    ${vsTela.length?`<div class="tbl-wrap rtw"><table class="rt"><thead>${TU.cab('<th></th>')}</thead><tbody>
+    ${vs.map(v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];const n=p?p.mtr.size:0;return `<tr><td>${esc(v.tipo)}</td><td class="mono">${esc(v.placa)}</td><td>${esc(v.fornecedor)}</td><td class="num">${R(v.valor)}</td><td class="num">${n}</td><td class="num">${p?N(p.kg):'—'}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td><td class="${n?'hide-m':'full'}">${n?'':'<span class="pill warn">sem viagem lançada</span>'}</td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Nada com os filtros das colunas.</td></tr>'}
+    </tbody><tfoot><tr><td colspan="3">${vs.length} itens</td><td class="num">${R(vs.reduce((t,v)=>t+(+v.valor||0),0))}</td><td class="num"></td><td></td><td></td><td></td></tr></tfoot></table></div>`:`<div class="empty">Nenhum veículo cadastrado para ${esc(mesLbl(S.mes))}. <button class="btn sm" data-go="frota">Cadastrar frota</button></div>`}
   </section>`;
+  TU.ligar();
 }
 
 const COLS_LANC=[
-  {k:'data',label:'Data',v:l=>fmtData(l.data),ord:l=>l.data||''},
+  {k:'data',label:'Data',v:l=>fmtData(l.data),ord:l=>l.data||'',x:l=>fmtDataLonga(l.data)},
   {k:'mtr',label:'MTR',v:l=>l.mtr},
   {k:'dest',label:'Destinador',v:l=>nomeDe(l.destinador)},
   {k:'neg',label:'Negócio',v:l=>l.negocio||'Sem tipo'},
@@ -635,17 +546,17 @@ const COLS_LANC=[
   {k:'orig',label:'Origem',v:l=>l.origem,cls:'hide-m'},
   {k:'res',label:'Resíduo',v:l=>l.residuo},
   {k:'placa',label:'Placa',v:l=>l.placa},
-  {k:'kg',label:'kg',v:l=>l.kg!=null&&l.kg!==''?N(l.kg):'',ord:l=>+l.kg||0,num:true},
-  {k:'preco',label:'R$/kg',v:l=>l.valorFixo?'fechado':N(l.preco,3),ord:l=>l.valorFixo?-1:+l.preco||0,num:true,cls:'hide-m'},
-  {k:'valor',label:'Valor',v:l=>(tipoDe(l.destinador)==='receita'?'+ ':'')+R(l.valor),ord:l=>+l.valor||0,num:true}];
+  {k:'kg',label:'kg',v:l=>l.kg!=null&&l.kg!==''?N(l.kg):'',ord:l=>+l.kg||0,num:true,x:l=>l.kg===''||l.kg==null?'':+l.kg,fmt:'#,##0.##'},
+  {k:'preco',label:'R$/kg',v:l=>l.valorFixo?'fechado':N(l.preco,3),ord:l=>l.valorFixo?-1:+l.preco||0,num:true,cls:'hide-m',x:l=>l.valorFixo?'':+l.preco||0,fmt:'0.000'},
+  {k:'valor',label:'Valor',v:l=>(tipoDe(l.destinador)==='receita'?'+ ':'')+R(l.valor),ord:l=>+l.valor||0,num:true,x:l=>+l.valor||0,fmt:FMT_R}];
 /** Lançamentos do mês com a busca (sem os filtros das colunas). */
 function lancBase(){
   const q=S.f.q.trim().toUpperCase();
   return S.lanc.filter(l=>!q||[l.mtr,l.gerador,l.placa,l.origem,l.ticket].some(x=>String(x||'').toUpperCase().includes(q)))
     .sort((a,b)=>(a.data||'9999').localeCompare(b.data||'9999')||nomeDe(a.destinador).localeCompare(nomeDe(b.destinador)));
 }
-const temFiltroLanc=()=>!!S.f.q.trim()||Object.keys(S.filtros.lanc||{}).length>0;
-function lancFiltrados(){ return aplicarFiltros('lanc',COLS_LANC,lancBase()); }
+const temFiltroLanc=()=>!!S.f.q.trim()||Object.keys(tbLanc().filtros).length>0;
+function lancFiltrados(){ return tbLanc().aplicar(lancBase()); }
 function destOptions(sel,blank){const ds=Object.entries(S.dest).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
   return (blank?`<option value="">${blank}</option>`:'')+['custo','receita'].map(t=>`<optgroup label="${t==='custo'?'Destinação (custo)':'Recicláveis (receita)'}">${ds.filter(([id,d])=>d.tipo===t&&(d.ativo!==false||id===sel)).map(([id,d])=>`<option value="${esc(id)}" ${id===sel?'selected':''}>${esc(d.nome)}</option>`).join('')}</optgroup>`).join('')}
 
@@ -686,15 +597,13 @@ function renderLanc(){
   </section>
   <section class="panel">
     <div class="panel-h"><div><h2>Lançamentos de ${esc(mesLbl(S.mes))}</h2><p class="sub">${lst.length} de ${S.lanc.length} · saldo filtrado ${R(tot)} (custos − receitas) · clique numa linha para editar · filtre pelo cabeçalho de cada coluna</p></div>
-      <div class="exp-wrap"><button class="btn sm" id="exp-btn" type="button" aria-haspopup="menu" aria-expanded="false" ${lst.length?'':'disabled'}>↓ Exportar</button>
-        <div class="exp-menu" id="exp-menu" role="menu" hidden><div class="exp-info" id="exp-info"></div>
-          <button type="button" role="menuitem" data-exp="xlsx">📊 Planilha Excel (.xlsx)</button><button type="button" role="menuitem" data-exp="csv">📄 CSV</button><button type="button" role="menuitem" data-exp="pdf">🖨 PDF</button></div></div></div>
+      ${tbLanc().botao()}</div>
     <div class="filters" style="grid-template-columns:minmax(0,1fr)">
       <input id="flt-q" type="search" placeholder="Buscar MTR, gerador, placa, origem, ticket…" value="${esc(S.f.q)}" aria-label="Buscar">
     </div>
-    ${infoFiltros('lanc',lst.length,base.length)}
+    ${tbLanc().info(lst.length,base.length)}
     ${!S.readOnly&&lst.length&&temFiltroLanc()?`<div class="bulk" id="bulk"><span>Definir o tipo de negócio dos <b>${lst.length}</b> lançamento(s) filtrados:</span><button type="button" class="btn sm" data-lote="RSS">RSS</button><button type="button" class="btn sm" data-lote="Industrial">Industrial</button></div>`:''}
-    ${base.length?`<div class="tbl-wrap rtw" style="max-height:620px"><table class="rt"><thead>${cabFiltro('lanc',COLS_LANC)}</thead><tbody>
+    ${base.length?`<div class="tbl-wrap rtw" style="max-height:620px"><table class="rt"><thead>${tbLanc().cab()}</thead><tbody>
     ${lst.map(l=>{const t=tipoDe(l.destinador);return `<tr class="click" data-id="${esc(l._id)}"><td>${fmtData(l.data)}</td><td class="mono">${esc(l.mtr||'—')}</td><td class="full"><span class="pill ${t}">${esc(nomeDe(l.destinador))}</span></td><td>${negPill(l.negocio)}</td><td>${esc(l.gerador)}</td><td class="hide-m">${esc(l.origem)}</td><td>${esc(l.residuo)}</td><td class="mono">${esc(l.placa)}</td><td class="num">${l.kg!=null&&l.kg!==''?N(l.kg):'—'}</td><td class="num hide-m">${l.valorFixo?'fechado':N(l.preco,3)}</td><td class="num strong-m">${t==='receita'?'+ ':''}${R(l.valor)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">Nenhum lançamento com os filtros das colunas.</td></tr>'}
     </tbody></table></div>`:`<div class="empty">${S.lanc.length?'Nenhum lançamento com esses filtros.':'Nenhum lançamento em '+esc(mesLbl(S.mes))+'. Use o formulário acima para lançar a primeira viagem.'}</div>`}
   </section>`;
@@ -703,8 +612,7 @@ function renderLanc(){
 function defaultDate(){return hoje.slice(0,7)===S.mes?hoje:S.mes+'-01'}
 function bindLancForm(){
   const f=$('#f');
-  if(document.querySelector('[data-fcol]'))ligarFiltros('lanc',COLS_LANC,lancBase());
-  ligarExportacao();
+  tbLanc().ligar();
   document.querySelectorAll('[data-lote]').forEach(b=>b.onclick=()=>{const neg=b.dataset.lote;const ids=lancFiltrados().map(l=>l._id);const bk=$('#bulk');
     bk.innerHTML=`<span>Marcar <b>${ids.length}</b> lançamento(s) como <b>${esc(neg)}</b>?</span><button type="button" class="btn sm pri" id="lote-sim">Sim, marcar</button><button type="button" class="btn sm" id="lote-nao">Cancelar</button>`;
     $('#lote-nao').onclick=()=>renderLanc();
@@ -772,104 +680,35 @@ function bindLancForm(){
 }
 function falha(err){console.error(err);if(err&&err.erro==='sem_permissao'){S.readOnly=true;toast('Seu acesso é só de leitura');render()}else toast((err&&err.mensagem)||'Não foi possível salvar. Verifique a internet e tente de novo.')}
 
-/* ---------- exportar: o que está na tela (busca + filtros das colunas, na ordem da tela) ---------- */
-const LIB_XLSX='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-const LIB_PDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-const LIB_PDF_TAB='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.1/jspdf.plugin.autotable.min.js';
-function carregarScript(src){return new Promise((ok,er)=>{const ja=document.querySelector(`script[data-src="${src}"]`);if(ja){if(ja.dataset.ok)ok();else{ja.addEventListener('load',()=>ok());ja.addEventListener('error',()=>er(new Error('lib')))}return}
-  const sc=document.createElement('script');sc.src=src;sc.dataset.src=src;sc.onload=()=>{sc.dataset.ok='1';ok()};sc.onerror=()=>er(new Error('lib'));document.head.appendChild(sc)})}
-function filtrosLancTexto(){
-  const out=[];const q=S.f.q.trim();if(q)out.push('Busca: "'+q+'"');
-  Object.entries(S.filtros.lanc||{}).forEach(([k,set])=>{const c=COLS_LANC.find(x=>x.k===k);out.push((c?c.label:k)+': '+[...set].join(', '))});
-  const o=S.ordem.lanc;if(o){const c=COLS_LANC.find(x=>x.k===o.k);out.push('Ordenado por '+(c?c.label:o.k)+(o.dir>0?' (crescente)':' (decrescente)'))}
-  return out;
-}
-function dadosExportacao(){
-  const lst=lancFiltrados();
-  const linhas=lst.map(l=>{const t=tipoDe(l.destinador);return{
-    'Data':fmtDataLonga(l.data),'MTR':l.mtr||'','Ticket':l.ticket||'','Destinador':nomeDe(l.destinador),'Tipo':t==='receita'?'Receita':'Custo',
-    'Negócio':l.negocio||'Sem tipo','Gerador':l.gerador||'','Origem':l.origem||'','Resíduo':l.residuo||'','Transportadora':l.transportadora||'',
-    'Placa':l.placa||'','kg':l.kg===''||l.kg==null?'':+l.kg,'R$/kg':l.valorFixo?'':+l.preco||0,'Valor fechado':l.valorFixo?+l.valorFixo:'',
-    'Valor (R$)':+l.valor||0,'Observação':l.obs||''}});
-  const kg=lst.reduce((s,l)=>s+(+l.kg||0),0),custo=lst.filter(l=>tipoDe(l.destinador)!=='receita').reduce((s,l)=>s+(+l.valor||0),0),
-        rec=lst.filter(l=>tipoDe(l.destinador)==='receita').reduce((s,l)=>s+(+l.valor||0),0);
-  const filtros=filtrosLancTexto();
-  return{lst,linhas,tot:{kg,custo,rec,saldo:custo-rec},filtros,nome:`destinacao-${S.mes}${filtros.length?'-filtrado':''}`};
-}
 function fmtDataLonga(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):(d||'')}
-function baixarBlob(blob,nome){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
-function exportarCsv(){
-  const d=dadosExportacao();if(!d.linhas.length)return toast('Nenhum lançamento na tela para exportar.');
-  const cols=Object.keys(d.linhas[0]);
-  const cel=v=>{if(typeof v==='number')v=String(v).replace('.',',');v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const tot=['TOTAL','','','','','','','','','','',d.tot.kg,'','',d.tot.saldo,'custos '+R(d.tot.custo)+' − receitas '+R(d.tot.rec)];
-  const csv='﻿'+[cols.join(';'),...d.linhas.map(r=>cols.map(c=>cel(r[c])).join(';')),tot.map(cel).join(';')].join('\n');
-  baixarBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),d.nome+'.csv');
-}
-async function exportarXlsx(){
-  const d=dadosExportacao();if(!d.linhas.length)return toast('Nenhum lançamento na tela para exportar.');
-  try{await carregarScript(LIB_XLSX)}catch(e){return toast('Não consegui carregar o gerador de planilhas. Verifique a internet.')}
-  const ws=XLSX.utils.json_to_sheet(d.linhas);
-  XLSX.utils.sheet_add_json(ws,[{'Data':'TOTAL','kg':d.tot.kg,'Valor (R$)':d.tot.saldo,'Observação':'saldo = custos − receitas'}],{origin:-1,skipHeader:true,header:Object.keys(d.linhas[0])});
-  const cols=Object.keys(d.linhas[0]);ws['!cols']=cols.map(k=>({wch:Math.min(45,Math.max(8,k.length+2,...d.linhas.map(r=>String(r[k]??'').length+1)))}));
-  // formato de número nas colunas de valor
-  const rng=XLSX.utils.decode_range(ws['!ref']);cols.forEach((k,ci)=>{const fmt=k==='kg'?'#,##0.##':k==='R$/kg'?'0.000':/Valor/.test(k)?'"R$" #,##0.00':null;if(!fmt)return;
-    for(let r=1;r<=rng.e.r;r++){const c=ws[XLSX.utils.encode_cell({r,c:ci})];if(c&&c.t==='n')c.z=fmt}});
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Lançamentos');
-  const fr=[{'Item':'Mês','Valor':mesLbl(S.mes)},{'Item':'Exportado em','Valor':new Date().toLocaleString('pt-BR')},{'Item':'Lançamentos exportados','Valor':d.lst.length+' de '+S.lanc.length},
-    {'Item':'Peso total (kg)','Valor':d.tot.kg},{'Item':'Custos (R$)','Valor':d.tot.custo},{'Item':'Receitas (R$)','Valor':d.tot.rec},{'Item':'Saldo (custos − receitas)','Valor':d.tot.saldo}];
-  if(!d.filtros.length)fr.push({'Item':'Filtros','Valor':'Nenhum: todos os lançamentos do mês'});
-  d.filtros.forEach((f,i)=>fr.push({'Item':i?'':'Filtros','Valor':f}));
-  const ws2=XLSX.utils.json_to_sheet(fr);ws2['!cols']=[{wch:26},{wch:90}];XLSX.utils.book_append_sheet(wb,ws2,'Filtros');
-  XLSX.writeFile(wb,d.nome+'.xlsx');
-}
-async function exportarPdf(){
-  const d=dadosExportacao();if(!d.linhas.length)return toast('Nenhum lançamento na tela para exportar.');
-  try{await carregarScript(LIB_PDF);await carregarScript(LIB_PDF_TAB)}catch(e){return toast('Não consegui carregar o gerador de PDF. Verifique a internet.')}
-  const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(20,33,27);doc.text('Controle de Destinação · '+mesLbl(S.mes),14,15);
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(90,105,98);
-  doc.text(`Exportado em ${new Date().toLocaleString('pt-BR')} · ${d.lst.length} de ${S.lanc.length} lançamentos · ${N(d.tot.kg)} kg · custos ${R(d.tot.custo)} · receitas ${R(d.tot.rec)} · saldo ${R(d.tot.saldo)}`,14,21);
-  const ft=doc.splitTextToSize(d.filtros.length?'Filtros: '+d.filtros.join(' · '):'Sem filtro: todos os lançamentos do mês',268);doc.text(ft.slice(0,3),14,26);
-  const cols=['Data','MTR','Destinador','Negócio','Gerador','Origem','Resíduo','Placa','kg','R$/kg','Valor (R$)'];
-  const body=d.lst.map(l=>{const t=tipoDe(l.destinador);return[fmtDataLonga(l.data),l.mtr||'',nomeDe(l.destinador),l.negocio||'Sem tipo',l.gerador||'',l.origem||'',l.residuo||'',l.placa||'',
-    l.kg!=null&&l.kg!==''?N(l.kg):'',l.valorFixo?'fechado':N(l.preco,3),(t==='receita'?'+ ':'')+R(l.valor)]});
-  body.push(['TOTAL','','','','','','','',N(d.tot.kg),'','saldo '+R(d.tot.saldo)]);
-  doc.autoTable({startY:27+Math.min(3,ft.length)*3.6,head:[cols],body,
-    styles:{font:'helvetica',fontSize:7,cellPadding:1.8,textColor:[20,33,27],lineColor:[216,223,218],lineWidth:0.2},
-    headStyles:{fillColor:[29,107,82],textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[245,247,245]},
-    columnStyles:{8:{halign:'right'},9:{halign:'right'},10:{halign:'right'}},margin:{left:14,right:14},
-    didParseCell:h=>{if(h.section==='body'&&h.row.index===body.length-1){h.cell.styles.fontStyle='bold';h.cell.styles.fillColor=[220,239,230]}}});
-  doc.save(d.nome+'.pdf');
-}
-function ligarExportacao(){
-  const b=$('#exp-btn'),m=$('#exp-menu');if(!b||!m)return;
-  const fechar=()=>{m.hidden=true;b.setAttribute('aria-expanded','false');document.removeEventListener('mousedown',fora,true)};
-  const fora=e=>{if(!e.target.closest('.exp-wrap'))fechar()};
-  b.onclick=()=>{if(!m.hidden)return fechar();const d=dadosExportacao();
-    $('#exp-info').innerHTML=`Vão sair <b>${d.lst.length} de ${S.lanc.length}</b> lançamentos de ${esc(mesLbl(S.mes))}${d.filtros.length?' <span class="tag-f">com filtro</span>':''}`;
-    m.hidden=false;b.setAttribute('aria-expanded','true');document.addEventListener('mousedown',fora,true);m.querySelector('button').focus()};
-  m.onkeydown=e=>{if(e.key==='Escape'){fechar();b.focus()}};
-  m.querySelectorAll('[data-exp]').forEach(x=>x.onclick=()=>{fechar();({xlsx:exportarXlsx,csv:exportarCsv,pdf:exportarPdf})[x.dataset.exp]()});
-}
 
 /* ---------- frota ---------- */
 // Só para consulta: a locação é lançada no módulo Frota do portal.
+function colsLocacao(a){const vg=v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p?p.mtr.size:0};return[
+  {k:'tipo',label:'Tipo',v:v=>v.tipo},{k:'placa',label:'Placa / ativo',v:v=>v.placa},{k:'forn',label:'Fornecedor',v:v=>v.fornecedor},
+  {k:'val',label:'Valor no mês (R$)',v:v=>R(v.valor),ord:v=>+v.valor||0,num:true,x:v=>+v.valor||0,fmt:FMT_R},
+  {k:'vg',label:'Viagens',v:v=>String(vg(v)),ord:vg,num:true},
+  {k:'kg',label:'kg levados',v:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p?N(p.kg):''},ord:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p?p.kg:0},num:true},
+  {k:'rv',label:'R$/viagem',v:v=>vg(v)?R((+v.valor||0)/vg(v)):'',ord:v=>vg(v)?(+v.valor||0)/vg(v):0,num:true,fmt:FMT_R}]}
 function renderFrota(){
-  const d=(S.loc&&S.loc.veiculos)||[];
-  const a=agg(S.lanc,{veiculos:d});
+  const dTela=(S.loc&&S.loc.veiculos)||[];
+  const a=agg(S.lanc,{veiculos:dTela});
+  const TL=Portal.tabela('ctl-locacao',colsLocacao(a),{titulo:'Locação de veículos · '+mesLbl(S.mes),aba:'Locação',arquivo:'locacao-veiculos-'+S.mes,unidade:'itens',aoMudar:render,
+    subtitulo:()=>'Mês: '+mesLbl(S.mes),totais:l=>({'Valor no mês (R$)':l.reduce((t,v)=>t+(+v.valor||0),0)})});
+  const d=TL.aplicar(dTela);const totF=d.reduce((t,v)=>t+(+v.valor||0),0);
   const temFrota=!!(window.Portal&&Portal.nivel('frota'));
   $('#main').innerHTML=`<section class="panel">
     <div class="panel-h"><div><h2>Locação de veículos · ${esc(mesLbl(S.mes))}</h2><p class="sub">Vem do módulo Frota: veículos e caixas em uso no mês, com o valor da locação. As viagens e o custo por viagem são calculados com os lançamentos deste mês.</p></div>
       ${temFrota?`<a class="btn pri" href="../frota/#locacao" style="text-decoration:none">Abrir a Frota ↗</a>`:''}</div>
     <div class="notice" style="margin-bottom:12px">Esta tela é só para consulta. Para incluir, tirar ou mudar o valor de um veículo ou caixa no mês, use o módulo Frota${temFrota?'':' (peça acesso ao administrador do portal)'}.</div>
-    ${d.length?`<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>Tipo</th><th>Placa / ativo</th><th>Fornecedor</th><th class="num">Valor no mês (R$)</th><th class="num">Viagens</th><th class="num">R$/viagem</th></tr></thead><tbody>
+    ${dTela.length?`<div class="row" style="justify-content:flex-end;margin-bottom:8px">${TL.botao()}</div>${TL.info(d.length,dTela.length)}<div class="tbl-wrap rtw"><table class="rt"><thead>${TL.cab()}</thead><tbody>
     ${d.map(v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];const n=p?p.mtr.size:0;return `<tr>
       <td>${esc(v.tipo)}</td><td class="mono">${esc(v.placa)}</td><td>${esc(v.fornecedor)}</td>
-      <td class="num">${R(v.valor)}</td><td class="num">${n}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td></tr>`}).join('')}
-    </tbody><tfoot><tr><td colspan="3">${d.length} itens</td><td class="num">${R(a.loc)}</td><td></td><td></td></tr></tfoot></table></div>`:
+      <td class="num">${R(v.valor)}</td><td class="num">${n}</td><td class="num">${p?N(p.kg):'—'}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">Nada com os filtros das colunas.</td></tr>'}
+    </tbody><tfoot><tr><td colspan="3">${d.length} itens</td><td class="num">${R(totF)}</td><td></td><td></td><td></td></tr></tfoot></table></div>`:
     `<div class="empty">Nenhum veículo lançado na Frota para este mês.</div>`}
   </section>`;
+  TL.ligar();
 }
 
 /* ---------- destinadores ---------- */
@@ -882,8 +721,17 @@ function renderDest(){
   const podeMapa=!!(window.Portal&&Portal.podeEditar('mapa'));
   const linkMapa=d=>temMapa&&d.mapaId?`<a class="btn sm" href="../mapa/?abrir=${encodeURIComponent(d.mapaId)}" title="Abrir este cadastro no Mapa Operacional">${podeMapa?'Editar no Mapa':'Ver no Mapa'} ↗</a>`:'';
   const nat=(d,r)=>{const n=(d.naturezas||{})[r];return n&&n!==d.tipo?` <span class="pill ${n}" style="font-size:10.5px">${n==='receita'?'Receita':'Custo'}</span>`:''};
+  // tabela de preços (uma linha por destinador e resíduo) para exportar; a tela continua em cartões
+  const precos=[];ds.forEach(([id,d])=>{const pr=Object.entries(d.precos||{});(pr.length?pr:[['','']]).forEach(([r,p])=>precos.push({id,d,r,p}))});
+  const TP=Portal.tabela('ctl-precos',[
+    {k:'dest',label:'Destinador',v:x=>x.d.nome},{k:'tipo',label:'Tipo',v:x=>x.d.tipo==='receita'?'Receita':'Custo'},{k:'cid',label:'Cidade',v:x=>x.d.cidade},
+    {k:'res',label:'Resíduo',v:x=>x.r},{k:'preco',label:'Preço por kg (R$)',v:x=>x.p===''?'':RP(x.p),ord:x=>+x.p||0,num:true,x:x=>x.p===''?'':+x.p,fmt:'0.000'},
+    {k:'nat',label:'Natureza',v:x=>{const n=(x.d.naturezas||{})[x.r]||x.d.tipo;return x.r?(n==='receita'?'Receita':'Custo'):''}},
+    {k:'mes',label:'Lançado no mês (R$)',v:x=>{const m=a.byDest[x.id];return m?R(m.v):''},ord:x=>(a.byDest[x.id]||{}).v||0,num:true,x:x=>(a.byDest[x.id]||{}).v||'',fmt:FMT_R}],
+    {titulo:'Destinadores e tabela de preços',aba:'Preços',arquivo:'destinadores-precos',unidade:'linhas',subtitulo:()=>'Lançado no mês: '+mesLbl(S.mes)});
+  TP.aplicar(precos);
   $('#main').innerHTML=`<section class="panel"><div class="panel-h"><div><h2>Destinadores e tabela de preços</h2><p class="sub">Vem dos cadastros de destinador e reciclador do Mapa Operacional. O preço daqui preenche o lançamento automaticamente. Destinador de custo: a Retec paga. De receita: o comprador paga pelo reciclável.</p></div>
-    ${temMapa?`<a class="btn pri" href="../mapa/">Abrir o Mapa Operacional ↗</a>`:''}</div>
+    <div class="row" style="gap:6px">${TP.botao('↓ Exportar tabela de preços')}${temMapa?`<a class="btn pri" href="../mapa/">Abrir o Mapa Operacional ↗</a>`:''}</div></div>
     ${S.fonteDest==='controle'?'<div class="notice" style="margin-bottom:12px">Não consegui ler o Mapa Operacional agora; mostrando a última tabela guardada no Controle.</div>':''}
     <div class="notice" style="margin-bottom:12px">Esta tela é só para consulta. Para incluir um destinador ou reciclador, ou mudar resíduos e preços, edite o cadastro no Mapa Operacional${temMapa?'':' (peça acesso ao administrador do portal)'}. A mudança vale para os próximos lançamentos; os antigos mantêm o preço da época.</div>
     <div class="dest-grid">${ds.map(([id,d])=>{const m=a.byDest[id];const pr=Object.entries(d.precos||{}).sort((x,y)=>x[0].localeCompare(y[0]));return `<div class="dest-card" data-id="${esc(id)}">
@@ -893,6 +741,7 @@ function renderDest(){
       <div class="price-list">${pr.map(([r,p])=>`<div class="price-ro"><span>${esc(r)}${nat(d,r)}</span><b>${RP(p)}<small>/kg</small></b></div>`).join('')||'<div class="empty" style="padding:4px 0">Sem preços cadastrados</div>'}</div>
       ${linkMapa(d)?`<div class="row" style="justify-content:flex-end">${linkMapa(d)}</div>`:''}
     </div>`}).join('')}</div></section>`;
+  TP.ligar();
 }
 
 /* ---------- conferência ---------- */
