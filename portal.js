@@ -24,6 +24,8 @@
       desc: 'Para consultores: acompanhe os pedidos dos seus clientes, da chegada até a nota fiscal.' },
     faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
       desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
+    pessoas: { nome: 'Pessoas', caminho: 'pessoas/',
+      desc: 'Cadastro único de motoristas, ajudantes, consultores e equipe do escritório, com funções, CNH e acesso ao portal.' },
   };
   const NIVEIS = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 
