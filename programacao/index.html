@@ -330,6 +330,14 @@ details.mais .chips{margin-top:6px}
   .os-t th{background:#eee;width:150px}
   .os-ass{display:flex;gap:40px;margin-top:50px} .os-ass div{flex:1;border-top:1px solid #000;text-align:center;padding-top:4px}
 }
+.inds{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.ind{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;font:inherit;color:inherit;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ind:hover{border-color:var(--ink-3)}
+.ind .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.ind .v{font-family:var(--f-display);font-weight:700;font-stretch:85%;font-size:24px;line-height:1.15;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ind .d{font-size:12px;color:var(--ink-2)}
+.ind.crit .v{color:var(--crit)} .ind.warn .v{color:var(--warn)} .ind.zero .v{color:var(--ink-3)}
+.ind[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261106"></script>
@@ -371,7 +379,7 @@ const segunda = iso => { const d = new Date(iso + 'T12:00:00'); const w = (d.get
 const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const NIVEL_LBL = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 const TABS = ['fila', 'viagens', 'equipe', 'importar'];
-const S = { tab: 'viagens', d: null, ro: true, uni: '', semana: segunda(hojeISO()), v: null, col: null, busca: '', inativos: false, sel: {}, fotos: {} };
+const S = { tab: 'viagens', d: null, ro: true, uni: '', semana: segunda(hojeISO()), v: null, col: null, busca: '', inativos: false, sel: {}, fotos: {}, indEq: '' };
 
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 4200); }
 function setSync(ok, txt) { const s = $('#sync'); s.classList.toggle('on', ok); s.querySelector('span').textContent = txt; }
@@ -776,13 +784,53 @@ async function carregarFotos(lista) {
     try { const r = await Portal.api('prog.verFoto', { id: c.id }); S.fotos[c.id] = r.dataUrl || ''; const el = document.querySelector(`[data-av="${c.id}"]`); if (el && r.dataUrl) el.innerHTML = `<img class="av" src="${r.dataUrl}" alt="">`; } catch (e) {}
   }
 }
+// Viagens próprias (não canceladas) da pessoa num período; pernoites = realizados se concluída, senão previstos.
+function viagensDaPessoa(id, mes) {
+  return S.d.viagens.filter(v => v.status !== 'Cancelada' && v.execucao !== 'Terceirizada' && (!mes || (v.dataSaida || '').startsWith(mes))
+    && (v.motoristaId === id || equipeDe(v.id).includes(id)));
+}
+const pernoitesDe = v => +(v.status === 'Concluída' ? v.pernoitesRealizados : v.pernoitesPrevistos) || 0;
+function emViagemHoje(id) {
+  const h = hojeISO();
+  return S.d.viagens.some(v => v.status !== 'Cancelada' && v.execucao !== 'Terceirizada' && v.dataSaida && v.dataSaida <= h && h <= (v.dataRetorno || v.dataRetornoPrevisto || v.dataSaida)
+    && (v.motoristaId === id || equipeDe(v.id).includes(id)));
+}
 function renderEquipe() {
   // só consulta: o cadastro de motoristas e ajudantes fica no módulo Pessoas
-  const lista = S.d.colaboradores.filter(c => c.funcao && passaUni(c) && (S.inativos || c.ativo) && (!S.busca || (c.nome + ' ' + c.apelido).toLowerCase().includes(S.busca.toLowerCase())))
+  const mes = hojeISO().slice(0, 7), mesLbl = mes.split('-').reverse().join('/');
+  const ativos = S.d.colaboradores.filter(c => c.funcao && c.ativo && passaUni(c));
+  const nViag = {}, nPern = {}, hoje = {};
+  S.d.colaboradores.forEach(c => { const vs = viagensDaPessoa(c.id, mes); nViag[c.id] = vs.length; nPern[c.id] = vs.reduce((t, v) => t + pernoitesDe(v), 0); hoje[c.id] = emViagemHoje(c.id); });
+  const st = c => cnhStatus(c) || {};
+  const IND = {
+    terc: { k: 'Terceirizados', f: c => c.vinculo === 'Terceirizado' },
+    viagem: { k: 'Em viagem hoje', f: c => hoje[c.id] },
+    vencida: { k: 'CNH vencida', f: c => st(c).cls === 'crit' },
+    vencendo: { k: 'CNH vencendo', f: c => st(c).cls === 'warn' && st(c).txt !== 'sem validade' },
+    semval: { k: 'CNH sem validade', f: c => st(c).txt === 'sem validade' },
+    viajou: { k: 'Viajaram no mês', f: c => nViag[c.id] > 0 },
+  };
+  if (S.indEq && !IND[S.indEq]) S.indEq = '';
+  const fInd = S.indEq ? IND[S.indEq].f : () => true;
+  const lista = S.d.colaboradores.filter(c => c.funcao && passaUni(c) && (S.inativos || c.ativo) && fInd(c) && (!S.busca || (c.nome + ' ' + c.apelido).toLowerCase().includes(S.busca.toLowerCase())))
     .sort((a, b) => (b.ativo - a.ativo) || a.funcao.localeCompare(b.funcao) || a.nome.localeCompare(b.nome, 'pt-BR'));
-  const alertas = S.d.colaboradores.filter(c => c.ativo && passaUni(c)).map(c => [c, cnhStatus(c)]).filter(([, s]) => s && s.cls !== 'ok');
-  const cnhTxt = c => { const st = cnhStatus(c); return [c.cnhCategoria, st && st.txt].filter(Boolean).join(' · '); };
-  const linkPes = id => '../pessoas/' + (id ? '#p=' + encodeURIComponent(id) : '');
+  // indicadores (pessoas ativas da unidade escolhida)
+  const nMot = ativos.filter(c => /Motorista/.test(c.funcao)).length, nAj = ativos.filter(c => /Ajudante/.test(c.funcao)).length;
+  const nTerc = ativos.filter(IND.terc.f).length, nHoje = ativos.filter(IND.viagem.f).length;
+  const nVenc = ativos.filter(IND.vencida.f).length, nVcd = ativos.filter(IND.vencendo.f).length, nSem = ativos.filter(IND.semval.f).length;
+  const viagMes = S.d.viagens.filter(v => v.status !== 'Cancelada' && v.execucao !== 'Terceirizada' && (v.dataSaida || '').startsWith(mes) && passaUni(v));
+  const motMes = new Set(viagMes.map(v => v.motoristaId).filter(Boolean)).size;
+  const card = (id, k, v, d, cls) => `<button type="button" class="ind ${cls || ''} ${v === 0 ? 'zero' : ''}" ${id ? `data-ind="${id}" aria-pressed="${S.indEq === id}"` : 'data-ind="" aria-pressed="false"'}><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span><span class="d">${esc(d)}</span></button>`;
+  const inds = `<div class="inds" role="group" aria-label="Indicadores da equipe">
+    ${card('', 'Equipe ativa', ativos.length, nMot + ' motorista(s) · ' + nAj + ' ajudante(s)')}
+    ${card('terc', 'Próprios × terceirizados', (ativos.length - nTerc) + ' · ' + nTerc, nTerc ? nTerc + ' terceirizado(s): sem pernoite' : 'todos próprios')}
+    ${card('viagem', 'Em viagem hoje', nHoje, (ativos.length - nHoje) + ' livre(s)')}
+    ${card('vencida', 'CNH vencida', nVenc, nVenc ? 'não podem dirigir' : 'nenhuma', nVenc ? 'crit' : '')}
+    ${card('vencendo', 'CNH vencendo', nVcd, 'nos próximos ' + S.d.parametros.diasAvisoCnh + ' dias', nVcd ? 'warn' : '')}
+    ${card('semval', 'CNH sem validade', nSem, nSem ? 'complete em Pessoas' : 'tudo preenchido', nSem ? 'warn' : '')}
+    ${card('viajou', 'Viagens no mês', viagMes.length, mesLbl + (motMes ? ' · média ' + (viagMes.length / motMes).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' por motorista' : ''))}
+  </div>`;
+  const cnhTxt = c => { const s2 = cnhStatus(c); return [c.cnhCategoria, s2 && s2.txt].filter(Boolean).join(' · '); };
   // CPF: só aparece (e só sai na exportação) para quem já pode vê-lo na tela
   const TE = Portal.tabela('prog-equipe', [
     { k: 'nome', label: 'Nome', v: c => c.nome },
@@ -791,29 +839,35 @@ function renderEquipe() {
     { k: 'cnh', label: 'CNH', v: cnhTxt, ord: c => c.cnhValidade || 'z' },
   ].concat(S.d.vePessoal ? [{ k: 'cpf', label: 'CPF', v: c => c.cpf }] : []).concat([
     { k: 'uni', label: 'Unidade', v: c => uniNome(c.unidadeId) },
-  ]), { titulo: 'Equipe', arquivo: 'programacao-equipe', unidade: 'pessoas', aoMudar: render,
+    { k: 'vm', label: 'Viagens (mês)', v: c => String(nViag[c.id] || 0), ord: c => nViag[c.id] || 0, x: c => nViag[c.id] || 0, num: true },
+    { k: 'pm', label: 'Pernoites (mês)', v: c => String(nPern[c.id] || 0), ord: c => nPern[c.id] || 0, x: c => nPern[c.id] || 0, num: true },
+  ]), { titulo: 'Equipe', arquivo: 'programacao-equipe', unidade: 'pessoas', aoMudar: render, totais: l => ({ 'Pernoites (mês)': l.reduce((t, c) => t + (nPern[c.id] || 0), 0) }),
     extrasExport: [{ label: 'Apelido', x: c => c.apelido || '' }, { label: 'Categoria da CNH', x: c => c.cnhCategoria || '' }, { label: 'Validade da CNH', x: c => D(c.cnhValidade) }, { label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }],
-    subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"', S.inativos && 'Inclui inativos'].filter(Boolean) });
+    subtitulo: () => [S.uni ? 'Unidade: ' + uniNome(S.uni) : '', 'Viagens e pernoites de ' + mesLbl].filter(Boolean).join(' · '),
+    filtrosExtras: () => [S.indEq && 'Indicador: ' + IND[S.indEq].k, S.busca && 'Busca: "' + S.busca + '"', S.inativos && 'Inclui inativos'].filter(Boolean) });
   const listaE = TE.aplicar(lista);
+  const nCols = S.d.vePessoal ? 9 : 8;
   $('#main').innerHTML = `<section class="panel">
-    <div class="panel-h"><div><h2>Equipe</h2><p class="sub">Motoristas e ajudantes da unidade, só para consulta: o cadastro fica no módulo <b>Pessoas</b>. A CNH é conferida na hora de programar a viagem${S.d.vePessoal ? '' : '; CPF e foto só aparecem para quem edita a Programação'}.</p></div></div>
-    ${alertas.length ? `<div class="alerts">${alertas.map(([c, s]) => `<div class="al ${s.cls === 'crit' ? 'crit' : ''}"><span class="pill ${s.cls}">CNH</span><b>${esc(c.nome)}: ${esc(s.txt)}</b></div>`).join('')}</div>` : ''}
+    <div class="panel-h"><div><h2>Equipe</h2><p class="sub">Motoristas e ajudantes da unidade, só para consulta (o cadastro fica no módulo Pessoas). Clique num indicador para filtrar a lista.${S.d.vePessoal ? '' : ' CPF e foto só aparecem para quem edita a Programação.'}</p></div></div>
+    ${inds}
     <div class="toolbar"><input type="search" id="busca" placeholder="Buscar pessoa…" value="${esc(S.busca)}" aria-label="Buscar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label>
-      <span style="margin-left:auto">${TE.botao()}</span><a class="btn" href="${linkPes('')}">Cadastrar/editar em Pessoas</a></div>
+      ${S.indEq ? `<span class="pill">${esc(IND[S.indEq].k)} <button class="btn sm" id="ind-limpar" style="padding:0 6px;margin-left:4px" aria-label="Tirar o filtro do indicador">×</button></span>` : ''}
+      <span style="margin-left:auto">${TE.botao()}</span></div>
     ${TE.info(listaE.length, lista.length)}
-    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TE.cab('<th></th>', '<th></th>')}</thead><tbody>
-    ${listaE.map(c => { const s = cnhStatus(c); return `<tr class="${c.ativo ? '' : 'inativo'}"><td data-label="" data-av="${esc(c.id)}">${avatar(c)}</td>
-      <td data-label="Nome" class="full"><b>${esc(c.nome)}</b>${c.apelido && c.apelido !== c.nome ? ` <span class="sub">“${esc(c.apelido)}”</span>` : ''}</td>
+    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TE.cab('', '<th></th>')}</thead><tbody>
+    ${listaE.map(c => { const s2 = cnhStatus(c); return `<tr class="${c.ativo ? '' : 'inativo'}"><td data-label="" data-av="${esc(c.id)}">${avatar(c)}</td>
+      <td data-label="Nome" class="full"><b>${esc(c.nome)}</b>${c.apelido && c.apelido !== c.nome ? ` <span class="sub">“${esc(c.apelido)}”</span>` : ''}${hoje[c.id] ? ' <span class="pill st lib">em viagem</span>' : ''}</td>
       <td data-label="Função">${esc(c.funcao)}</td><td data-label="Vínculo">${esc(c.vinculo)}</td>
-      <td data-label="CNH">${c.cnhCategoria ? `<span class="cnh">${esc(c.cnhCategoria)}</span> ` : ''}${s ? `<span class="pill ${s.cls}">${esc(s.txt)}</span>` : '—'}</td>
+      <td data-label="CNH">${c.cnhCategoria ? `<span class="cnh">${esc(c.cnhCategoria)}</span> ` : ''}${s2 ? `<span class="pill ${s2.cls}">${esc(s2.txt)}</span>` : '—'}</td>
       ${S.d.vePessoal ? `<td data-label="CPF" class="mono">${esc(c.cpf || '—')}${c.cpf && !c.cpfValido ? ' <span class="pill crit">confira</span>' : ''}</td>` : ''}
       <td data-label="Unidade">${esc(uniNome(c.unidadeId))}</td>
-      <td data-label=""><div class="acoes"><button class="btn sm" data-chist="${c.id}">Histórico</button><a class="btn sm" href="${linkPes(c.id)}">Abrir em Pessoas</a></div></td></tr>`; }).join('') || `<tr><td colspan="${S.d.vePessoal ? 8 : 7}" class="empty">Ninguém com os filtros das colunas.</td></tr>`}
-    </tbody></table></div>` : '<div class="empty">Ninguém cadastrado. Cadastre motoristas e ajudantes no módulo Pessoas.</div>'}</section>`;
+      <td data-label="Viagens (mês)" class="num">${nViag[c.id] || 0}</td><td data-label="Pernoites (mês)" class="num">${nPern[c.id] || 0}</td></tr>`; }).join('') || `<tr><td colspan="${nCols}" class="empty">Ninguém com esses filtros.</td></tr>`}
+    </tbody></table></div>` : `<div class="empty">${S.indEq ? 'Ninguém neste indicador.' : 'Ninguém cadastrado. O cadastro de motoristas e ajudantes é feito no módulo Pessoas.'}</div>`}</section>`;
   carregarFotos(listaE); TE.ligar();
   const b = $('#busca'); b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
   $('#inat').onchange = ev => { S.inativos = ev.target.checked; render(); };
-  $$('[data-chist]').forEach(x => x.onclick = () => Portal.mostrarHistorico('Pessoas', x.dataset.chist, colDe(x.dataset.chist).nome));
+  $$('[data-ind]').forEach(x => x.onclick = () => { const id = x.dataset.ind; S.indEq = !id || S.indEq === id ? '' : id; render(); });
+  const li = $('#ind-limpar'); if (li) li.onclick = () => { S.indEq = ''; render(); };
 }
 
 /* ---------- Importar planilhas (admin do portal) ---------- */
