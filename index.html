@@ -115,6 +115,7 @@ tr.inativo td{opacity:.55}
 </style>
 <script src="config.js"></script>
 <script src="portal.js?v=20261105"></script>
+<script src="tabela.js?v=20261102"></script>
 </head>
 <body>
 <header class="top">
@@ -272,7 +273,20 @@ tr.inativo td{opacity:.55}
   function renderUsuarios() {
     if (!usuarios) { $('#main').innerHTML = '<p class="sub">Carregando usuários…</p>'; carregarUsuarios(); return; }
     const mods = Object.entries(Portal.MODULOS);
-    const us = [...usuarios].sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const usTela = [...usuarios].sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const nomeUni = id => (unidades.find(x => x.id === id) || {}).nome || id;
+    const NIV = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
+    const parseAcesso = t => { const m = String(t || '').match(/(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?/); return m ? m[3] + m[2] + m[1] + (m[4] || '00') + (m[5] || '00') : ''; };
+    const TU = Portal.tabela('portal-usuarios', [
+      { k: 'nome', label: 'Nome', v: u => u.nome }, { k: 'email', label: 'E-mail', v: u => u.email },
+    ].concat(mods.map(([k, m]) => ({ k: 'm-' + k, label: m.nome, v: u => NIV[(u.modulos || {})[k]] || 'Sem acesso' }))).concat([
+      { k: 'uni', label: 'Unidades', v: u => (u.unidades || []).length ? u.unidades.map(nomeUni).join(', ') : 'Todas' },
+      { k: 'adm', label: 'Admin do portal', v: u => u.adminPortal ? 'Sim' : 'Não' },
+      { k: 'at', label: 'Ativo', v: u => u.ativo ? 'Sim' : 'Não' },
+      { k: 'sen', label: 'Senha', v: u => u.temSenha ? 'criada' : 'aguardando 1º acesso' },
+      { k: 'ult', label: 'Último acesso', v: u => u.ultimoAcesso, ord: u => parseAcesso(u.ultimoAcesso) },
+    ]), { titulo: 'Usuários e acessos', arquivo: 'portal-usuarios', unidade: 'usuários', aoMudar: renderUsuarios });
+    const us = TU.aplicar(usTela);
     $('#main').innerHTML = `<section class="panel">
       <h2>Usuários e acessos</h2>
       <p class="sub">Para cada pessoa, escolha o nível em cada módulo: <b>Leitor</b> só vê, <b>Editor</b> lança e altera, <b>Administrador</b> também mexe nas configurações do módulo. <b>Admin do portal</b> cadastra usuários e vê o histórico geral. Em <b>Unidades</b>, marque a unidade da pessoa (programadora, frota e equipe são por unidade); sem nenhuma marcada, ela vê todas. Mudanças valem na hora, inclusive para quem já está conectado.</p>
@@ -283,8 +297,10 @@ tr.inativo td{opacity:.55}
         <div style="grid-column:1/-1"><label>Unidades</label><div id="nu-uni" class="row" style="gap:6px 14px;flex-wrap:wrap">${chkUnidades('nu-uni', [])}</div></div>
         <div><label class="chk"><input type="checkbox" id="nu-admin"> Admin do portal</label><button class="btn pri" id="nu-btn" style="margin-top:6px">Cadastrar</button></div>
       </form>
+      <div class="row" style="justify-content:flex-end;margin:14px 0 8px">${TU.botao()}</div>
+      ${TU.info(us.length, usTela.length)}
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Nome</th><th>E-mail</th>${mods.map(([, m]) => `<th>${esc(m.nome)}</th>`).join('')}<th>Unidades</th><th>Admin do portal</th><th>Ativo</th><th>Senha</th><th>Último acesso</th><th></th></tr></thead>
+        <thead>${TU.cab('<th></th>')}</thead>
         <tbody>${us.map(u => `<tr data-email="${esc(u.email)}" class="${u.ativo ? '' : 'inativo'}">
           <td><input data-k="nome" value="${esc(u.nome)}" style="width:170px" aria-label="Nome"></td>
           <td class="mono">${esc(u.email)}</td>
@@ -297,8 +313,10 @@ tr.inativo td{opacity:.55}
           <td><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="btn sm pri" data-salvar hidden>Salvar</button>${u.temSenha ? '<span data-rz><button class="btn sm" data-reset>Apagar senha</button></span>' : ''}</div></td>
         </tr>`).join('')}</tbody>
       </table></div>
+      ${us.length ? '' : '<p class="sub" style="padding:10px">Ninguém com os filtros das colunas.</p>'}
       <p class="sub" style="margin-top:12px">Depois de cadastrar, mande para a pessoa o link do portal: <b class="mono">${esc(Portal.RAIZ)}</b>. Ela clica em "Primeiro acesso", recebe um código no e-mail e cria a própria senha. "Apagar senha" desconecta a pessoa e faz ela criar uma senha nova.</p>
     </section>`;
+    TU.ligar();
     $('#nu').onsubmit = async e => {
       e.preventDefault(); const b = $('#nu-btn'); b.disabled = true;
       const modulos = {}; mods.forEach(([k]) => modulos[k] = $('#nu-' + k).value);
@@ -348,17 +366,29 @@ tr.inativo td{opacity:.55}
     const sel = $('#h-pessoa'); const atual = histFiltros.pessoa || '';
     sel.innerHTML = '<option value="">Todas</option>' + (j.pessoas || []).map(p => `<option ${p === atual ? 'selected' : ''}>${esc(p)}</option>`).join('');
     const cls = a => a === 'criou' ? 'ok' : (a === 'inativou' || a === 'excluiu') ? 'crit' : a === 'alterou' ? 'warn' : 'off';
-    $('#h-res').innerHTML = j.itens.length ? `<div class="tbl-wrap" style="margin-top:0;border:0"><table>
-      <thead><tr><th>Quando</th><th>Quem</th><th>Módulo</th><th>Registro</th><th>Ação</th><th>Campo</th><th>De</th><th>Para</th></tr></thead>
-      <tbody>${j.itens.map(x => `<tr>
+    const TH = Portal.tabela('portal-historico', [
+      { k: 'q', label: 'Quando', v: x => Portal.dataHora(x.quando).replace(' às ', ' '), ord: x => String(x.quando || '') },
+      { k: 'quem', label: 'Quem', v: x => x.nome || x.email },
+      { k: 'mod', label: 'Módulo', v: x => NOMES_MOD[x.modulo] || x.modulo },
+      { k: 'reg', label: 'Registro', v: x => [x.registroId, x.registroNome].filter(Boolean).join(' · ') },
+      { k: 'acao', label: 'Ação', v: x => ACOES[x.acao] || x.acao },
+      { k: 'campo', label: 'Campo', v: x => x.campo || (x.detalhe ? x.detalhe : '') },
+      { k: 'de', label: 'De', v: x => x.de }, { k: 'para', label: 'Para', v: x => x.para },
+    ], { titulo: 'Histórico geral', arquivo: 'historico-geral', unidade: 'alterações', aoMudar: desenharHistorico,
+      filtrosExtras: () => { const f = histFiltros || {}; return [f.de && 'De ' + f.de.split('-').reverse().join('/'), f.ate && 'Até ' + f.ate.split('-').reverse().join('/'), f.modulo && 'Módulo: ' + (NOMES_MOD[f.modulo] || f.modulo), f.pessoa && 'Pessoa: ' + f.pessoa, f.registro && 'Registro: ' + f.registro, f.acessos && 'Inclui entradas no portal'].filter(Boolean); } });
+    const itens = TH.aplicar(j.itens);
+    $('#h-res').innerHTML = j.itens.length ? `<div class="row" style="justify-content:flex-end;padding:10px 14px 0">${TH.botao()}</div><div style="padding:0 14px">${TH.info(itens.length, j.itens.length)}</div><div class="tbl-wrap" style="margin-top:0;border:0"><table>
+      <thead>${TH.cab()}</thead>
+      <tbody>${itens.map(x => `<tr>
         <td class="mono" style="white-space:nowrap">${esc(Portal.dataHora(x.quando).replace(' às ', ' '))}</td>
         <td>${esc(x.nome || x.email)}</td><td>${esc(NOMES_MOD[x.modulo] || x.modulo || '—')}</td>
         <td><span class="mono" style="white-space:nowrap">${esc(x.registroId)}</span>${x.registroNome ? `<div class="sub" style="margin:0">${esc(x.registroNome)}</div>` : ''}</td>
         <td><span class="pill ${cls(x.acao)}">${esc(ACOES[x.acao] || x.acao)}</span></td>
         <td>${esc(x.campo)}${!x.campo && x.detalhe ? `<div class="sub" style="margin:0;max-width:360px">${esc(x.detalhe)}</div>` : ''}</td>
-        <td>${esc(x.de)}</td><td>${esc(x.para)}</td></tr>`).join('')}</tbody></table></div>
+        <td>${esc(x.de)}</td><td>${esc(x.para)}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nada com os filtros das colunas.</td></tr>'}</tbody></table></div>
       <p class="sub" style="padding:10px 14px">Mostrando ${j.itens.length} de ${j.total} alterações encontradas${j.total > j.itens.length ? ' (refine os filtros para ver as mais antigas)' : ''}.</p>`
       : '<p class="sub" style="padding:14px">Nenhuma alteração com esses filtros.</p>';
+    TH.ligar();
   }
   function renderHistorico() {
     const f = histFiltros;
