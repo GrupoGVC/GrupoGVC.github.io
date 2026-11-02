@@ -332,7 +332,7 @@ details.mais .chips{margin-top:6px}
 }
 </style>
 <script src="../config.js"></script>
-<script src="../portal.js?v=20261105"></script>
+<script src="../portal.js?v=20261106"></script>
 <script src="../tabela.js?v=20261102"></script>
 </head>
 <body>
@@ -777,11 +777,12 @@ async function carregarFotos(lista) {
   }
 }
 function renderEquipe() {
-  const e = S.col; const L = S.d.listas;
-  const lista = S.d.colaboradores.filter(c => passaUni(c) && (S.inativos || c.ativo) && (!S.busca || (c.nome + ' ' + c.apelido).toLowerCase().includes(S.busca.toLowerCase())))
+  // só consulta: o cadastro de motoristas e ajudantes fica no módulo Pessoas
+  const lista = S.d.colaboradores.filter(c => c.funcao && passaUni(c) && (S.inativos || c.ativo) && (!S.busca || (c.nome + ' ' + c.apelido).toLowerCase().includes(S.busca.toLowerCase())))
     .sort((a, b) => (b.ativo - a.ativo) || a.funcao.localeCompare(b.funcao) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const alertas = S.d.colaboradores.filter(c => c.ativo && passaUni(c)).map(c => [c, cnhStatus(c)]).filter(([, s]) => s && s.cls !== 'ok');
   const cnhTxt = c => { const st = cnhStatus(c); return [c.cnhCategoria, st && st.txt].filter(Boolean).join(' · '); };
+  const linkPes = id => '../pessoas/' + (id ? '#p=' + encodeURIComponent(id) : '');
   // CPF: só aparece (e só sai na exportação) para quem já pode vê-lo na tela
   const TE = Portal.tabela('prog-equipe', [
     { k: 'nome', label: 'Nome', v: c => c.nome },
@@ -794,11 +795,11 @@ function renderEquipe() {
     extrasExport: [{ label: 'Apelido', x: c => c.apelido || '' }, { label: 'Categoria da CNH', x: c => c.cnhCategoria || '' }, { label: 'Validade da CNH', x: c => D(c.cnhValidade) }, { label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }],
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"', S.inativos && 'Inclui inativos'].filter(Boolean) });
   const listaE = TE.aplicar(lista);
-  $('#main').innerHTML = (e ? formColab(e) : '') + `<section class="panel">
-    <div class="panel-h"><div><h2>Equipe</h2><p class="sub">Motoristas e ajudantes da unidade. A CNH é conferida na hora de programar a viagem${S.d.vePessoal ? '' : '; CPF e foto só aparecem para quem edita a Programação'}.</p></div></div>
+  $('#main').innerHTML = `<section class="panel">
+    <div class="panel-h"><div><h2>Equipe</h2><p class="sub">Motoristas e ajudantes da unidade, só para consulta: o cadastro fica no módulo <b>Pessoas</b>. A CNH é conferida na hora de programar a viagem${S.d.vePessoal ? '' : '; CPF e foto só aparecem para quem edita a Programação'}.</p></div></div>
     ${alertas.length ? `<div class="alerts">${alertas.map(([c, s]) => `<div class="al ${s.cls === 'crit' ? 'crit' : ''}"><span class="pill ${s.cls}">CNH</span><b>${esc(c.nome)}: ${esc(s.txt)}</b></div>`).join('')}</div>` : ''}
     <div class="toolbar"><input type="search" id="busca" placeholder="Buscar pessoa…" value="${esc(S.busca)}" aria-label="Buscar"><label class="chk"><input type="checkbox" id="inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label>
-      <span style="margin-left:auto">${TE.botao()}</span>${S.ro ? '' : '<button class="btn pri" id="novo">+ Pessoa</button>'}</div>
+      <span style="margin-left:auto">${TE.botao()}</span><a class="btn" href="${linkPes('')}">Cadastrar/editar em Pessoas</a></div>
     ${TE.info(listaE.length, lista.length)}
     ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TE.cab('<th></th>', '<th></th>')}</thead><tbody>
     ${listaE.map(c => { const s = cnhStatus(c); return `<tr class="${c.ativo ? '' : 'inativo'}"><td data-label="" data-av="${esc(c.id)}">${avatar(c)}</td>
@@ -807,59 +808,12 @@ function renderEquipe() {
       <td data-label="CNH">${c.cnhCategoria ? `<span class="cnh">${esc(c.cnhCategoria)}</span> ` : ''}${s ? `<span class="pill ${s.cls}">${esc(s.txt)}</span>` : '—'}</td>
       ${S.d.vePessoal ? `<td data-label="CPF" class="mono">${esc(c.cpf || '—')}${c.cpf && !c.cpfValido ? ' <span class="pill crit">confira</span>' : ''}</td>` : ''}
       <td data-label="Unidade">${esc(uniNome(c.unidadeId))}</td>
-      <td data-label=""><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-ced="${c.id}">Editar</button>`}<button class="btn sm" data-chist="${c.id}">Histórico</button>${S.ro ? '' : c.ativo ? `<button class="btn sm danger" data-cdel="${c.id}">Excluir</button>` : `<button class="btn sm" data-creat="${c.id}">Reativar</button>`}</div></td></tr>`; }).join('') || `<tr><td colspan="${S.d.vePessoal ? 8 : 7}" class="empty">Ninguém com os filtros das colunas.</td></tr>`}
-    </tbody></table></div>` : '<div class="empty">Ninguém cadastrado.</div>'}</section>`;
+      <td data-label=""><div class="acoes"><button class="btn sm" data-chist="${c.id}">Histórico</button><a class="btn sm" href="${linkPes(c.id)}">Abrir em Pessoas</a></div></td></tr>`; }).join('') || `<tr><td colspan="${S.d.vePessoal ? 8 : 7}" class="empty">Ninguém com os filtros das colunas.</td></tr>`}
+    </tbody></table></div>` : '<div class="empty">Ninguém cadastrado. Cadastre motoristas e ajudantes no módulo Pessoas.</div>'}</section>`;
   carregarFotos(listaE); TE.ligar();
   const b = $('#busca'); b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
   $('#inat').onchange = ev => { S.inativos = ev.target.checked; render(); };
-  const n = $('#novo'); if (n) n.onclick = () => { S.col = { unidadeId: S.uni || (S.d.unidades.length === 1 ? S.d.unidades[0].id : ''), vinculo: 'Próprio', funcao: 'Ajudante' }; render(); scrollTo({ top: 0 }); };
-  $$('[data-ced]').forEach(x => x.onclick = () => { S.col = { ...colDe(x.dataset.ced) }; render(); scrollTo({ top: 0 }); });
-  $$('[data-chist]').forEach(x => x.onclick = () => Portal.mostrarHistorico('Colaboradores', x.dataset.chist, colDe(x.dataset.chist).nome));
-  $$('[data-cdel]').forEach(x => x.onclick = async () => { const c = colDe(x.dataset.cdel); if (!confirm('Excluir ' + c.nome + '?')) return;
-    try { await Portal.api('prog.excluirColaborador', { id: c.id }); toast('Excluído'); await carregar(true); }
-    catch (er) { if (er && er.erro === 'em_uso') { if (await Portal.confirmarInativar(er, c.nome)) { await Portal.api('prog.ativoColaborador', { id: c.id, ativo: false }).catch(falha); await carregar(true); } } else falha(er); } });
-  $$('[data-creat]').forEach(x => x.onclick = async () => { await Portal.api('prog.ativoColaborador', { id: x.dataset.creat, ativo: true }).catch(falha); await carregar(true); });
-  if (e) ligarColab();
-}
-function formColab(e) {
-  const L = S.d.listas;
-  return `<section class="panel form-panel" id="form-panel"><div class="panel-h"><h2>${e.id ? esc(e.nome) : 'Nova pessoa'}</h2><button class="btn sm" id="c-fechar">Fechar</button></div>
-    <form id="cf" class="form" autocomplete="off">
-      ${e.id && S.d.vePessoal ? `<div class="fld full foto-row"><span data-av="${esc(e.id)}">${avatar(e)}</span><label class="btn sm">📷 ${e.temFoto ? 'Trocar foto' : 'Incluir foto'}<input type="file" id="c-foto" accept="image/*" capture="user" hidden></label><span class="hint">A foto fica numa pasta restrita do Drive da empresa.</span></div>` : ''}
-      <div class="fld"><label for="c-nome">Nome completo</label><input id="c-nome" required value="${esc(e.nome)}"></div>
-      <div class="fld"><label for="c-apel">Nome na programação</label><input id="c-apel" value="${esc(e.apelido)}" placeholder="Ex.: Silvanei, Márcio Jr"></div>
-      ${S.d.unidades.length > 1 ? `<div class="fld"><label for="c-uni">Unidade</label><select id="c-uni">${opts(S.d.unidades.map(u => [u.id, u.nome]), e.unidadeId, 'Escolha…')}</select></div>` : ''}
-      <div class="fld"><label for="c-fun">Função</label><select id="c-fun">${opts(L.funcao, e.funcao)}</select></div>
-      <div class="fld"><label for="c-vin">Vínculo</label><select id="c-vin">${opts(L.vinculo, e.vinculo)}</select><div class="hint">Terceirizado não recebe pernoite.</div></div>
-      ${S.d.vePessoal ? `<div class="fld"><label for="c-cpf">CPF</label><input id="c-cpf" class="mono" inputmode="numeric" value="${esc(e.cpf)}" placeholder="000.000.000-00"></div>` : ''}
-      <div class="fld"><label for="c-cat">Categoria da CNH</label><select id="c-cat">${opts(L.categoriaCnh, e.cnhCategoria, '—')}</select></div>
-      <div class="fld"><label for="c-val">Validade da CNH</label><input id="c-val" type="date" value="${esc(e.cnhValidade)}"></div>
-      <div class="fld"><label for="c-tel">Telefone</label><input id="c-tel" value="${esc(e.telefone)}"></div>
-      <div class="fld full"><label for="c-obs">Observações</label><input id="c-obs" value="${esc(e.obs)}"></div>
-      <div class="row full" style="justify-content:flex-end"><button class="btn pri" id="c-salvar">Salvar</button></div>
-    </form>${e.id && e.criadoEm ? `<div class="gvc-audit" style="margin-top:10px">${Portal.auditoriaHTML(e)}</div>` : ''}</section>`;
-}
-function ligarColab() {
-  const e = S.col;
-  $('#c-fechar').onclick = () => { S.col = null; render(); };
-  $('#cf').onsubmit = async ev => { ev.preventDefault();
-    const reg = { id: e.id || '', nome: $('#c-nome').value, apelido: $('#c-apel').value, unidadeId: $('#c-uni') ? $('#c-uni').value : e.unidadeId, funcao: $('#c-fun').value, vinculo: $('#c-vin').value,
-      cnhCategoria: $('#c-cat').value, cnhValidade: $('#c-val').value, telefone: $('#c-tel').value, obs: $('#c-obs').value };
-    if ($('#c-cpf')) reg.cpf = $('#c-cpf').value;
-    try { const r = await Portal.api('prog.salvarColaborador', { registro: reg }); toast('Salvo'); await carregar(true); S.col = { ...colDe(r.id) }; render(); } catch (er) { falha(er); } };
-  const f = $('#c-foto'); if (f) f.onchange = async () => {
-    const arq = f.files[0]; if (!arq) return;
-    try { const url = await reduzirFoto(arq); await Portal.api('prog.foto', { id: e.id, dataUrl: url }); S.fotos[e.id] = url; toast('Foto salva'); await carregar(true); S.col = { ...colDe(e.id) }; render(); }
-    catch (er) { falha(er); }
-  };
-}
-function reduzirFoto(arq) {
-  return new Promise((ok, erro) => {
-    const img = new Image(); const url = URL.createObjectURL(arq);
-    img.onload = () => { const m = 480, k = Math.min(1, m / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.82)); };
-    img.onerror = () => erro({ mensagem: 'Não consegui abrir esta imagem.' }); img.src = url;
-  });
+  $$('[data-chist]').forEach(x => x.onclick = () => Portal.mostrarHistorico('Pessoas', x.dataset.chist, colDe(x.dataset.chist).nome));
 }
 
 /* ---------- Importar planilhas (admin do portal) ---------- */
