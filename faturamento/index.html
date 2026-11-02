@@ -288,6 +288,7 @@ table.itens td input,table.itens td select{min-width:70px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
+<script src="../tabela.js?v=20261102"></script>
 </head>
 <body>
 <header class="top">
@@ -389,23 +390,52 @@ function render() {
 }
 
 /* ---------- A faturar: realizadas sem BM, por cliente ---------- */
+const FMT_R = '"R$" #,##0.00';
+const valorFat = f => +(f.nfValor !== '' ? f.nfValor : f.bmValor) || 0;
+const nfTxt = f => f.nfNumero || f.nfData ? (f.nfNumero || 's/nº') + (f.nfData ? ' · ' + D(f.nfData) : '') : '';
+const COLS_FAT = [
+  { k: 'bm', label: 'BM', v: f => f.bmNumero || 's/nº' },
+  { k: 'cli', label: 'Cliente', v: f => cliNome(f.clienteId) },
+  { k: 'uni', label: 'Unidade', v: f => uniNome(f.unidadeId) },
+  { k: 'env', label: 'Envio', v: f => D(f.bmData), ord: f => f.bmData || '' },
+  { k: 'apr', label: 'Aprovação', v: f => D(f.aprovacaoData), ord: f => f.aprovacaoData || '' },
+  { k: 'nf', label: 'NF', v: nfTxt, ord: f => f.nfData || '' },
+  { k: 'val', label: 'Valor', v: f => R(valorFat(f)), ord: valorFat, num: true, x: valorFat, fmt: FMT_R },
+  { k: 'st', label: 'Status', v: f => f.status },
+];
+const EXTRAS_FAT = [{ label: 'Código UPLOG', x: f => cliDe(f.clienteId).codigoUplog || '' }, { label: 'Valor do BM', x: f => f.bmValor === '' ? '' : +f.bmValor },
+  { label: 'Valor da NF', x: f => f.nfValor === '' ? '' : +f.nfValor }, { label: 'Origem', x: f => f.origem || '' }];
 function renderAFaturar() {
-  const sols = S.d.solicitacoes.filter(s => s.status === 'Realizada' && passaUni(s) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog].join(' ')));
+  const solsTela = S.d.solicitacoes.filter(s => s.status === 'Realizada' && passaUni(s) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog].join(' ')));
+  const T = Portal.tabela('fat-afaturar', [
+    { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '' },
+    { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
+    { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) },
+    { k: 'desc', label: 'Descrição', v: s => s.descricao },
+    { k: 'val', label: 'Valor previsto', v: s => R(s.valorPrevisto), ord: s => +s.valorPrevisto || 0, num: true, x: s => s.valorPrevisto === '' ? '' : +s.valorPrevisto, fmt: FMT_R },
+  ], { titulo: 'Realizadas — falta BM', arquivo: 'faturamento-falta-bm', unidade: 'coletas', aoMudar: render,
+    extrasExport: [{ label: 'Cliente', x: s => cliNome(s.clienteId) }, { label: 'Código UPLOG', x: s => cliDe(s.clienteId).codigoUplog || '' }],
+    subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"'].filter(Boolean),
+    totais: l => ({ 'Valor previsto': l.reduce((t, s) => t + (+s.valorPrevisto || 0), 0) }) });
+  const sols = T.aplicar(solsTela);
   const grupos = {};
   sols.forEach(s => { (grupos[s.clienteId] = grupos[s.clienteId] || []).push(s); });
   const ids = Object.keys(grupos).sort((a, b) => cliNome(a).localeCompare(cliNome(b), 'pt-BR'));
   $('#main').innerHTML = `<section class="panel">
     <div class="panel-h"><div><h2>Realizadas — falta BM</h2><p class="sub">Coletas realizadas que ainda não entraram num BM. Marque as do mesmo cliente que vão no mesmo BM e clique em "Montar BM".</p></div></div>
-    <div class="toolbar"><input type="search" id="busca" placeholder="Buscar cliente ou código…" value="${esc(S.busca)}" aria-label="Buscar"><span class="sub" style="margin:0 0 0 auto">${sols.length} coleta(s) de ${ids.length} cliente(s)</span></div>
-    ${ids.length ? ids.map(cid => { const c = cliDe(cid); const l = grupos[cid].sort((a, b) => String(a.dataColeta).localeCompare(String(b.dataColeta)));
+    <div class="toolbar"><input type="search" id="busca" placeholder="Buscar cliente ou código…" value="${esc(S.busca)}" aria-label="Buscar"><span class="sub" style="margin:0 0 0 auto">${sols.length} coleta(s) de ${ids.length} cliente(s)</span>${T.botao()}</div>
+    ${T.info(sols.length, solsTela.length)}
+    ${ids.length ? ids.map(cid => { const c = cliDe(cid); let l = grupos[cid].sort((a, b) => String(a.dataColeta).localeCompare(String(b.dataColeta)));
+      if (T.ordem) l = T.aplicar(l); // mantém a ordem escolhida no cabeçalho dentro de cada cliente
+      T.base = solsTela;
       return `<div class="cli-card"><div class="cli-h"><div><b>${esc(c.nome)}</b> ${c.codigoUplog ? `<span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}</div>
         ${S.ro ? '' : `<button class="btn sm pri" data-montar="${esc(cid)}">Montar BM</button>`}</div>
-        <div class="tbl-wrap"><table><thead><tr>${S.ro ? '' : '<th></th>'}<th>Coleta</th><th>Unidade</th><th>Consultor</th><th>Descrição</th><th class="num">Valor previsto</th></tr></thead><tbody>
+        <div class="tbl-wrap"><table><thead>${T.cab('', S.ro ? '' : '<th></th>')}</thead><tbody>
         ${l.map(s => `<tr>${S.ro ? '' : `<td><input type="checkbox" data-sel="${esc(s.id)}" data-cli="${esc(cid)}" ${S.sel[s.id] ? 'checked' : ''} aria-label="Incluir no BM" style="width:auto"></td>`}
           <td class="mono">${esc(D(s.dataColeta))}</td><td>${esc(uniNome(s.unidadeId))}</td><td>${esc(conNome(s.consultorId) || '—')}</td><td class="wrap">${esc(s.descricao || '')}</td><td class="num">${R(s.valorPrevisto)}</td></tr>`).join('')}
-        </tbody></table></div></div>`; }).join('') : '<div class="empty">Nenhuma coleta realizada esperando BM.</div>'}
+        </tbody></table></div></div>`; }).join('') : `<div class="empty">${solsTela.length ? 'Nenhuma coleta com os filtros das colunas.' : 'Nenhuma coleta realizada esperando BM.'}</div>`}
   </section>`;
-  ligarBusca();
+  ligarBusca(); T.ligar();
   $$('[data-sel]').forEach(c => c.onchange = () => { S.sel[c.dataset.sel] = c.checked; });
   $$('[data-montar]').forEach(b => b.onclick = () => {
     const cid = b.dataset.montar;
@@ -550,15 +580,20 @@ function linhaFat(f, acoes) {
 function renderAbertos() {
   const lista = S.d.faturamentos.filter(f => (f.status === 'BM enviado' || f.status === 'Aprovado') && passaUni(f) && passaBusca([cliNome(f.clienteId), cliDe(f.clienteId).codigoUplog, f.bmNumero].join(' ')))
     .sort((a, b) => String(a.bmData).localeCompare(String(b.bmData)));
-  const total = lista.reduce((t, f) => t + (+f.bmValor || 0), 0);
+  const T = Portal.tabela('fat-abertos', COLS_FAT, { titulo: 'BMs enviados — aguardando aprovação e NF', aba: 'BMs enviados', arquivo: 'faturamento-bms-enviados', unidade: 'BMs', aoMudar: render, extrasExport: EXTRAS_FAT,
+    subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"'].filter(Boolean),
+    totais: l => ({ 'Valor': l.reduce((t, f) => t + valorFat(f), 0) }) });
+  const listaTela = lista; const listaF = T.aplicar(listaTela);
+  const total = listaF.reduce((t, f) => t + (+f.bmValor || 0), 0);
   $('#main').innerHTML = `<section class="panel">
     <div class="panel-h"><div><h2>BMs enviados — aguardando aprovação e NF</h2><p class="sub">Quando o cliente aprovar por e-mail, registre a aprovação. Ao emitir a NF, registre número e data: isso encerra o processo.</p></div></div>
-    <div class="toolbar"><input type="search" id="busca" placeholder="Buscar cliente, código ou nº do BM…" value="${esc(S.busca)}" aria-label="Buscar"><span class="sub" style="margin:0 0 0 auto">${lista.length} BM(s) · ${R(total)}</span></div>
-    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>BM</th><th>Cliente</th><th>Unidade</th><th>Envio</th><th>Aprovação</th><th>NF</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead><tbody>
-      ${lista.map(f => linhaFat(f, x => `<div class="acoes">${S.ro ? `<button class="btn sm" data-ver="${x.id}">Ver</button>` : `<button class="btn sm" data-ed="${x.id}">Editar</button>${x.status === 'BM enviado' ? `<button class="btn sm" data-apr="${x.id}">Aprovado</button>` : ''}<button class="btn sm pri" data-nf="${x.id}">Emitir NF</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>`}</div>`)).join('')}
+    <div class="toolbar"><input type="search" id="busca" placeholder="Buscar cliente, código ou nº do BM…" value="${esc(S.busca)}" aria-label="Buscar"><span class="sub" style="margin:0 0 0 auto">${listaF.length} BM(s) · ${R(total)}</span>${T.botao()}</div>
+    ${T.info(listaF.length, listaTela.length)}
+    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>')}</thead><tbody>
+      ${listaF.map(f => linhaFat(f, x => `<div class="acoes">${S.ro ? `<button class="btn sm" data-ver="${x.id}">Ver</button>` : `<button class="btn sm" data-ed="${x.id}">Editar</button>${x.status === 'BM enviado' ? `<button class="btn sm" data-apr="${x.id}">Aprovado</button>` : ''}<button class="btn sm pri" data-nf="${x.id}">Emitir NF</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>`}</div>`)).join('') || '<tr><td colspan="9" class="empty">Nenhum BM com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhum BM aguardando.</div>'}
   </section>`;
-  ligarBusca(); ligarAcoesFat();
+  ligarBusca(); ligarAcoesFat(); T.ligar();
 }
 function renderEmitidas() {
   const meses = [...new Set(S.d.faturamentos.filter(f => f.status === 'NF emitida').map(f => (f.nfData || '').slice(0, 7)).filter(Boolean))].sort().reverse();
@@ -566,19 +601,25 @@ function renderEmitidas() {
   const lista = S.d.faturamentos.filter(f => (f.status === 'NF emitida' || (S.cancelados && f.status === 'Cancelado')) && passaUni(f) &&
     (!S.mes || (f.nfData || f.bmData || '').startsWith(S.mes)) && passaBusca([cliNome(f.clienteId), cliDe(f.clienteId).codigoUplog, f.bmNumero, f.nfNumero].join(' ')))
     .sort((a, b) => String(b.nfData).localeCompare(String(a.nfData)));
-  const total = lista.filter(f => f.status === 'NF emitida').reduce((t, f) => t + (+(f.nfValor !== '' ? f.nfValor : f.bmValor) || 0), 0);
+  const T = Portal.tabela('fat-emitidas', COLS_FAT, { titulo: 'NFs emitidas', arquivo: 'faturamento-nfs-emitidas', unidade: 'NFs', aoMudar: render, extrasExport: EXTRAS_FAT,
+    subtitulo: () => [S.uni ? 'Unidade: ' + uniNome(S.uni) : '', S.mes ? 'Mês da NF: ' + S.mes.split('-').reverse().join('/') : 'Todos os meses'].filter(Boolean).join(' · '),
+    filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"', S.cancelados && 'Inclui cancelados'].filter(Boolean),
+    totais: l => ({ 'Valor': l.filter(f => f.status === 'NF emitida').reduce((t, f) => t + valorFat(f), 0) }) });
+  const listaTela = lista; const listaF = T.aplicar(listaTela);
+  const total = listaF.filter(f => f.status === 'NF emitida').reduce((t, f) => t + (+(f.nfValor !== '' ? f.nfValor : f.bmValor) || 0), 0);
   const admin = Portal.nivel('faturamento') === 'admin';
   $('#main').innerHTML = `<section class="panel">
     <div class="panel-h"><div><h2>NFs emitidas</h2><p class="sub">Processo encerrado. Escolha o mês da NF ou busque por cliente, BM ou NF.</p></div></div>
     <div class="toolbar"><select id="f-mes" style="width:auto" aria-label="Mês da NF">${opts(meses.map(m => [m, m.split('-').reverse().join('/')]), S.mes, 'Todos os meses')}</select>
       <input type="search" id="busca" placeholder="Buscar cliente, BM, NF…" value="${esc(S.busca)}" aria-label="Buscar">
       <label class="chk"><input type="checkbox" id="canc" ${S.cancelados ? 'checked' : ''}> Mostrar cancelados</label>
-      <span class="sub" style="margin:0 0 0 auto">${lista.length} NF(s) · ${R(total)}</span></div>
-    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead><tr><th>BM</th><th>Cliente</th><th>Unidade</th><th>Envio</th><th>Aprovação</th><th>NF</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead><tbody>
-      ${lista.map(f => linhaFat(f, x => `<div class="acoes"><button class="btn sm" data-ver="${x.id}">Ver</button>${admin && x.status === 'NF emitida' ? `<button class="btn sm" data-reab="${x.id}">Reabrir</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>` : ''}</div>`)).join('')}
+      <span class="sub" style="margin:0 0 0 auto">${listaF.length} NF(s) · ${R(total)}</span>${T.botao()}</div>
+    ${T.info(listaF.length, listaTela.length)}
+    ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>')}</thead><tbody>
+      ${listaF.map(f => linhaFat(f, x => `<div class="acoes"><button class="btn sm" data-ver="${x.id}">Ver</button>${admin && x.status === 'NF emitida' ? `<button class="btn sm" data-reab="${x.id}">Reabrir</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>` : ''}</div>`)).join('') || '<tr><td colspan="9" class="empty">Nenhuma NF com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhuma NF neste filtro.</div>'}
   </section>`;
-  ligarBusca(); ligarAcoesFat();
+  ligarBusca(); ligarAcoesFat(); T.ligar();
   $('#f-mes').onchange = e => { S.mes = e.target.value; render(); };
   $('#canc').onchange = e => { S.cancelados = e.target.checked; render(); };
 }
@@ -628,7 +669,6 @@ window.addEventListener('beforeunload', e => { if (S.bm && S.bm.sujo) { e.preven
   await carregar();
 })();
 })();
-
 </script>
 </body>
 </html>
