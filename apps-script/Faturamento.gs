@@ -34,7 +34,7 @@ function fatDados_(u) {
     faturamentos: ler_('Faturamentos').filter(function (f) { return veUnidade_(u, f.unidadeId); }).map(fatPublico_),
     solicitacoes: sols,
     clientes: clientesLista_(),
-    consultores: ler_('Consultores').map(function (r) { return { id: r.id, nome: String(r.nome) }; }),
+    consultores: consultoresLista_().map(function (r) { return { id: r.id, nome: r.nome }; }),
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome) }; }),
     precos: ler_('PrecosCliente').filter(function (p) { return p.ativo; }).map(precoPublico_),
     destinacao: destinacaoPorSolicitacao_(),

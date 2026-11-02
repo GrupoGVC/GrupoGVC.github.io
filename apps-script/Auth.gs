@@ -24,7 +24,7 @@ function acharUsuario_(email) {
   return { id: r.id, linha: r._linha, email: email, nome: String(r.nome || email.split('@')[0]), ativo: r.ativo,
            adminPortal: simNao_(r.adminPortal), unidades: separar_(r.unidades), senhaHash: String(r.senhaHash || ''),
            salt: String(r.salt || ''), modulos: modulos, nivel: modulos.destinacao,
-           ultimoAcesso: r.ultimoAcesso };
+           ultimoAcesso: r.ultimoAcesso, pessoaId: String(r.pessoaId || '') };
 }
 function usuarioPublico_(u) {
   return { email: u.email, nome: u.nome, adminPortal: u.adminPortal, modulos: u.modulos, unidades: u.unidades };
@@ -134,7 +134,9 @@ function unidadesLista_() {
 function listarUsuarios_() {
   return { ok: true, modulos: MODULOS, unidades: unidadesLista_(), usuarios: ler_('Usuarios').map(function (r) {
     const u = acharUsuario_(r.email);
-    return { email: u.email, nome: u.nome, modulos: u.modulos, adminPortal: u.adminPortal, ativo: u.ativo, temSenha: !!u.senhaHash,
+    const p = u.pessoaId ? porId_('Pessoas', u.pessoaId) : null;
+    return { email: u.email, nome: p ? String(p.nome) : u.nome, modulos: u.modulos, adminPortal: u.adminPortal, ativo: u.ativo, temSenha: !!u.senhaHash,
+             pessoaId: u.pessoaId, funcoes: p ? separar_(p.funcoes) : [], pessoaAtiva: p ? p.ativo : true,
              unidades: u.unidades, ultimoAcesso: r.ultimoAcesso instanceof Date ? Utilities.formatDate(r.ultimoAcesso, tz_(), 'dd/MM/yyyy HH:mm') : '',
              auditoria: auditoria_(r) };
   }) };
@@ -152,9 +154,20 @@ function salvarUsuario_(x, quem) {
   if (!Object.keys(niveis).some(function (m) { return niveis[m]; }) && !adminPortal) return { ok: false, erro: 'dados_invalidos', mensagem: 'Dê acesso a pelo menos um módulo.' };
   const validas = unidadesLista_().map(function (x) { return x.id; });
   const unidades = (Array.isArray(x.unidades) ? x.unidades : separar_(x.unidades)).filter(function (id) { return validas.indexOf(id) >= 0; });
-  const nome = String(x.nome || email.split('@')[0]).trim();
+  let nome = String(x.nome || email.split('@')[0]).trim();
   let u = acharUsuario_(email);
-  const campos = { email: email, nome: nome, adminPortal: adminPortal ? 'SIM' : 'NÃO', unidades: unidades.join('; '), ativo: ativo };
+  // todo acesso pertence a uma pessoa do cadastro de Pessoas: nome (e e-mail) vêm de lá
+  let pessoaId = String((u && u.pessoaId) || x.pessoaId || '');
+  if (u && u.pessoaId && x.pessoaId && String(x.pessoaId) !== u.pessoaId) return { ok: false, erro: 'dados_invalidos', mensagem: 'Este e-mail já é o acesso de outra pessoa do cadastro.' };
+  if (pessoaId && !porId_('Pessoas', pessoaId)) return { ok: false, erro: 'dados_invalidos', mensagem: 'Pessoa não encontrada no cadastro.' };
+  if (!pessoaId) {
+    const mesma = ler_('Pessoas').filter(function (p) { return p.email && normEmail_(p.email) === email; })[0];
+    pessoaId = mesma ? mesma.id : inserir_('Pessoas', { nome: nome, apelido: nome.split(' ')[0], email: email, funcoes: '', ativo: true,
+      obs: 'Criada junto com o acesso ao portal. Complete as funções.' }, quem, 'pessoas', nome).id;
+  }
+  if (ativo && !porId_('Pessoas', pessoaId).ativo) return { ok: false, erro: 'dados_invalidos', mensagem: 'A pessoa está inativa no cadastro de Pessoas. Reative a pessoa antes de liberar o acesso.' };
+  nome = String(porId_('Pessoas', pessoaId).nome);
+  const campos = { email: email, nome: nome, adminPortal: adminPortal ? 'SIM' : 'NÃO', unidades: unidades.join('; '), ativo: ativo, pessoaId: pessoaId };
   let id;
   if (u) { id = u.id; atualizar_('Usuarios', id, campos, quem, 'portal', { registroNome: nome }); }
   else { id = inserir_('Usuarios', campos, quem, 'portal', nome).id; }
@@ -171,7 +184,7 @@ function salvarUsuario_(x, quem) {
       if (u) hist_(quem, 'portal', 'Usuarios', id, nome, 'alterou', MODULOS[m] + ' · Nível', 'sem acesso', niveis[m], '');
     }
   });
-  return { ok: true };
+  return { ok: true, id: id, pessoaId: pessoaId, novo: !u };
 }
 function resetarSenha_(email, quem) {
   email = normEmail_(email); const u = acharUsuario_(email);

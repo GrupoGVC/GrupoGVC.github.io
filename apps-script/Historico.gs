@@ -4,7 +4,7 @@
 
 // Tabela → módulo que precisa poder ler para ver o histórico.
 const MODULO_DA_TABELA = { Cadastros: 'mapa', Unidades: 'mapa', Residuos: 'mapa', Equipamentos: 'mapa', Lancamentos: 'destinacao', LocacaoMensal: 'frota', Veiculos: 'frota', Caixas: 'frota', TiposVeiculo: 'frota',
-  Solicitacoes: 'solicitacoes', Consultores: 'solicitacoes', TiposDocumento: 'solicitacoes', Faturamentos: 'faturamento',
+  Solicitacoes: 'solicitacoes', Consultores: 'solicitacoes', Pessoas: 'pessoas', TiposDocumento: 'solicitacoes', Faturamentos: 'faturamento',
   Viagens: 'programacao', Colaboradores: 'programacao', Adiantamentos: 'dp', Rotinas: 'solicitacoes' };
 
 function linhaHistorico_(r) {
@@ -17,13 +17,15 @@ function linhaHistorico_(r) {
 function historicoRegistro_(tabela, id, u) {
   const mod = MODULO_DA_TABELA[tabela];
   if (!mod && !u.adminPortal) return semPermissao_('Histórico não disponível.');
-  if (mod && !podeLer_(u, mod) && !u.adminPortal) return semPermissao_('Você não tem acesso a este módulo.');
+  // pessoas: quem vê a equipe (Programação) ou os consultores (Solicitações) também vê o histórico do cadastro
+  const mods = tabela === 'Pessoas' ? ['pessoas', 'programacao', 'solicitacoes'] : [mod];
+  if (mod && !u.adminPortal && !mods.some(function (m) { return podeLer_(u, m); })) return semPermissao_('Você não tem acesso a este módulo.');
   const sh = abaHist_();
   const n = sh.getLastRow();
   if (n < 2) return { ok: true, itens: [] };
   const achados = sh.getRange(2, 6, n - 1, 1).createTextFinder(String(id)).matchEntireCell(true).findAll();
   const itens = achados.map(function (c) { return linhaHistorico_(sh.getRange(c.getRow(), 1, 1, HISTORICO_COLUNAS.length).getValues()[0]); })
-    .filter(function (x) { return !x.tabela || x.tabela === tabela || !tabela; });
+    .filter(function (x) { return !x.tabela || x.tabela === tabela || !tabela || (tabela === 'Pessoas' && (x.tabela === 'Colaboradores' || x.tabela === 'Consultores')); });
   itens.reverse();
   return { ok: true, itens: itens.slice(0, 500) };
 }

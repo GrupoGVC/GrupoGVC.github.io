@@ -53,7 +53,7 @@ function cpfValido_(c) {
 }
 function cpfFormatado_(c) { c = cpfDigitos_(c); return c.length === 11 ? c.slice(0, 3) + '.' + c.slice(3, 6) + '.' + c.slice(6, 9) + '-' + c.slice(9) : c; }
 function cpfMascarado_(c) { c = cpfDigitos_(c); return c.length === 11 ? '***.***.' + c.slice(6, 9).replace(/^./, '*') + '-' + c.slice(9) : (c ? '***' : ''); }
-function vePessoal_(u) { return u.adminPortal || podeEditar_(u, 'programacao') || podeLer_(u, 'dp'); }
+function vePessoal_(u) { return u.adminPortal || podeEditar_(u, 'programacao') || podeLer_(u, 'dp') || podeEditar_(u, 'pessoas'); }
 // A categoria da pessoa cobre a exigida? (B < C < D < E; A é separada)
 function cnhCobre_(daPessoa, exigida) {
   daPessoa = String(daPessoa || '').toUpperCase(); exigida = String(exigida || '').toUpperCase();
@@ -70,7 +70,8 @@ function diasEntre_(a, b) { if (!a || !b) return 0; return Math.round((paraData_
 
 /* ---------------- leitura ---------------- */
 function colabPublico_(r, u) {
-  const o = publico_('Colaboradores', r);
+  const o = publico_('Pessoas', r);
+  o.funcao = funcaoEquipe_(r); // a Programação só enxerga motorista/ajudante
   o.cnhValidade = dataTexto_(r.cnhValidade);
   o.temFoto = !!String(r.fotoId || '');
   delete o.fotoId;
@@ -102,7 +103,7 @@ function progDados_(u) {
   return { ok: true,
     unidades: unidadesDoUsuario_(u), todasUnidades: unidadesLista_(),
     vePessoal: vePessoal_(u),
-    colaboradores: ler_('Colaboradores').filter(function (c) { return veUnidade_(u, c.unidadeId); }).map(function (c) { return colabPublico_(c, u); }),
+    colaboradores: equipeVisivel_(u, viagens).map(function (c) { return colabPublico_(c, u); }),
     viagens: viagens.map(viagemPublica_),
     equipe: ler_('ViagemEquipe').filter(function (e) { return vis[e.viagemId]; }).map(function (e) { return publico_('ViagemEquipe', e); }),
     paradas: paradas.map(paradaPublica_),
@@ -125,76 +126,17 @@ function progDados_(u) {
 
 /* ---------------- equipe ---------------- */
 function rotuloColab_(c) { return String(c.apelido || c.nome); }
-function progSalvarColaborador_(reg, u) {
-  reg = reg || {};
-  const atual = reg.id ? porId_('Colaboradores', reg.id) : null;
-  if (reg.id && !atual) return erroDados_('Pessoa não encontrada. Atualize a página.');
-  if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
-  const r = { unidadeId: String(reg.unidadeId || ''), nome: String(reg.nome || '').trim().replace(/\s+/g, ' '), apelido: String(reg.apelido || '').trim(),
-              funcao: String(reg.funcao || ''), vinculo: String(reg.vinculo || ''), cnhCategoria: String(reg.cnhCategoria || '').toUpperCase(),
-              cnhValidade: dataTexto_(reg.cnhValidade), telefone: String(reg.telefone || '').trim(), obs: String(reg.obs || '').trim() };
-  if (!r.nome) return erroDados_('Informe o nome.');
-  if (!porId_('Unidades', r.unidadeId)) return erroDados_('Escolha a unidade.');
-  if (!veUnidade_(u, r.unidadeId)) return erroDados_('Você não tem acesso a esta unidade.');
-  if (listaValores_('funcaoColaborador').indexOf(r.funcao) < 0) return erroDados_('Escolha a função.');
-  if (listaValores_('vinculoColaborador').indexOf(r.vinculo) < 0) return erroDados_('Escolha o vínculo (próprio ou terceirizado).');
-  if (r.cnhCategoria && listaValores_('categoriaCnhPessoa').indexOf(r.cnhCategoria) < 0) return erroDados_('Categoria de CNH inválida.');
-  if (/Motorista/.test(r.funcao) && r.vinculo === 'Próprio' && (!r.cnhCategoria || !r.cnhValidade)) return erroDados_('Para motorista, informe a categoria e a validade da CNH.');
-  if ('cpf' in reg && vePessoal_(u)) {
-    const c = cpfDigitos_(reg.cpf);
-    if (c && !cpfValido_(c)) return erroDados_('CPF inválido. Confira os números.');
-    if (c && ler_('Colaboradores').some(function (x) { return cpfDigitos_(x.cpf) === c && x.id !== reg.id; })) return erroDados_('Já existe uma pessoa com este CPF.');
-    r.cpf = c;
-  }
-  if (r.nome === r.nome.toLowerCase() || r.nome === r.nome.toUpperCase()) r.nome = nomeProprio_(r.nome);
-  if (!r.apelido) r.apelido = apelidoDe_(r.nome);
-  if (atual) { atualizar_('Colaboradores', atual.id, r, u, 'programacao', { registroNome: r.nome }); return { ok: true, id: atual.id }; }
-  r.ativo = true;
-  return { ok: true, id: inserir_('Colaboradores', r, u, 'programacao', r.nome).id };
-}
-function progAtivoColaborador_(id, ativo, u) {
-  const c = porId_('Colaboradores', id); if (!c) return erroDados_('Pessoa não encontrada.');
-  if (!veUnidade_(u, c.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
-  atualizar_('Colaboradores', id, { ativo: !!ativo }, u, 'programacao', { registroNome: String(c.nome) });
-  return { ok: true };
-}
-function progExcluirColaborador_(id, u) {
-  const c = porId_('Colaboradores', id); if (!c) return { ok: true };
-  if (!veUnidade_(u, c.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
-  const r = excluir_('Colaboradores', id, u, 'programacao');
-  if (r.ok && c.fotoId) { try { DriveApp.getFileById(String(c.fotoId)).setTrashed(true); } catch (e) {} }
-  return r;
-}
-function pastaFotos_() {
-  const p = PropertiesService.getScriptProperties();
-  const id = p.getProperty('FOTOS_ID');
-  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
-  const pai = DriveApp.getFolderById(p.getProperty('PASTA_ID'));
-  const f = pai.createFolder('Fotos da equipe (restrito)');
-  p.setProperty('FOTOS_ID', f.getId());
-  return f;
-}
-/** Foto da pessoa: dataUrl JPEG já reduzido no navegador. */
-function progFoto_(id, dataUrl, u) {
-  if (!vePessoal_(u)) return semPermissao_('Só quem edita a Programação cuida das fotos.');
-  const c = porId_('Colaboradores', id); if (!c) return erroDados_('Pessoa não encontrada.');
-  if (!veUnidade_(u, c.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
-  const m = String(dataUrl || '').match(/^data:(image\/(jpeg|png|webp));base64,(.+)$/);
-  if (!m) return erroDados_('Imagem inválida.');
-  if (m[3].length > 700000) return erroDados_('Foto grande demais. Use uma imagem menor.');
-  const blob = Utilities.newBlob(Utilities.base64Decode(m[3]), m[1], c.id + '.' + (m[2] === 'jpeg' ? 'jpg' : m[2]));
-  const arq = pastaFotos_().createFile(blob);
-  if (c.fotoId) { try { DriveApp.getFileById(String(c.fotoId)).setTrashed(true); } catch (e) {} }
-  atualizar_('Colaboradores', id, { fotoId: arq.getId() }, u, null);
-  hist_(u, 'programacao', 'Colaboradores', id, String(c.nome), c.fotoId ? 'alterou' : 'alterou', 'Foto', c.fotoId ? 'foto anterior' : '', 'foto nova', '');
-  return { ok: true };
-}
-function progVerFoto_(id, u) {
-  if (!vePessoal_(u)) return semPermissao_('Sem acesso às fotos.');
-  const c = porId_('Colaboradores', id); if (!c || !c.fotoId) return { ok: true, dataUrl: '' };
-  if (!veUnidade_(u, c.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
-  try { const b = DriveApp.getFileById(String(c.fotoId)).getBlob(); return { ok: true, dataUrl: 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes()) }; }
-  catch (e) { return { ok: true, dataUrl: '' }; }
+/** Equipe que a Programação enxerga: motoristas e ajudantes (cadastro de Pessoas) das unidades da pessoa,
+ *  mais quem aparece nas viagens visíveis (mesmo que tenha deixado a função). Só consulta: o cadastro é no módulo Pessoas. */
+function equipeVisivel_(u, viagens) {
+  const usadas = {};
+  (viagens || []).forEach(function (v) { if (v.motoristaId) usadas[String(v.motoristaId)] = 1; });
+  const vis = {}; (viagens || []).forEach(function (v) { vis[v.id] = 1; });
+  ler_('ViagemEquipe').forEach(function (e) { if (vis[e.viagemId]) usadas[String(e.colaboradorId)] = 1; });
+  return ler_('Pessoas').filter(function (p) {
+    if (usadas[p.id]) return true;
+    return ehEquipe_(p) && p.unidadeId && veUnidade_(u, p.unidadeId);
+  });
 }
 
 /* ---------------- viagens ---------------- */
@@ -236,11 +178,11 @@ function conferirViagem_(v, equipeIds, id) {
   if (v.execucao === 'Própria') {
     const ve = porId_('Veiculos', v.veiculoId);
     if (!ve) erros.push('Escolha o veículo.');
-    const mot = porId_('Colaboradores', v.motoristaId);
+    const mot = porId_('Pessoas', v.motoristaId);
     if (!mot) erros.push('Escolha o motorista.');
     if (ve && ['Em manutenção', 'Parado', 'Devolvido'].indexOf(String(ve.situacao)) >= 0) avisos.push('O veículo ' + ve.placa + ' está "' + ve.situacao + '" na Frota.');
     if (mot) {
-      if (!/Motorista/.test(String(mot.funcao))) erros.push(mot.nome + ' não está cadastrado como motorista.');
+      if (!temFuncao_(mot, 'Motorista')) erros.push(mot.nome + ' não está cadastrado como motorista.');
       if (!mot.ativo) avisos.push(mot.nome + ' está inativo na equipe.');
       const val = dataTexto_(mot.cnhValidade);
       if (!val) avisos.push('CNH de ' + rotuloColab_(mot) + ' sem validade cadastrada.');
@@ -263,9 +205,9 @@ function conferirViagem_(v, equipeIds, id) {
       const quando = ' (' + rotuloViagem_(o) + ')';
       if (v.veiculoId && String(o.veiculoId) === String(v.veiculoId)) avisos.push('O veículo já está em outra viagem nessas datas' + quando + '.');
       const delas = [String(o.motoristaId)].concat(eqPor[o.id] || []);
-      pessoas.forEach(function (pid) { if (delas.indexOf(String(pid)) >= 0) { const c = porId_('Colaboradores', pid); avisos.push((c ? rotuloColab_(c) : pid) + ' já está em outra viagem nessas datas' + quando + '.'); } });
+      pessoas.forEach(function (pid) { if (delas.indexOf(String(pid)) >= 0) { const c = porId_('Pessoas', pid); avisos.push((c ? rotuloColab_(c) : pid) + ' já está em outra viagem nessas datas' + quando + '.'); } });
     });
-    equipeIds.forEach(function (pid) { const c = porId_('Colaboradores', pid); if (!c) erros.push('Pessoa da equipe não encontrada.'); });
+    equipeIds.forEach(function (pid) { const c = porId_('Pessoas', pid); if (!c) erros.push('Pessoa da equipe não encontrada.'); });
   } else {
     if (!porId_('Cadastros', v.transportadorId)) erros.push('Escolha a transportadora terceirizada (cadastro do Mapa).');
   }
@@ -336,7 +278,7 @@ function progSalvarViagem_(reg, confirmar, u) {
     id = inserir_('Viagens', v, u, 'programacao', nomeV).id;
   }
   // equipe (ajudantes)
-  const nomeP = function (pid) { const c = porId_('Colaboradores', pid); return c ? rotuloColab_(c) : pid; };
+  const nomeP = function (pid) { const c = porId_('Pessoas', pid); return c ? rotuloColab_(c) : pid; };
   const eqAtual = onde_('ViagemEquipe', 'viagemId', id);
   const antesEq = eqAtual.map(function (e) { return nomeP(e.colaboradorId); }).sort().join(', ');
   eqAtual.slice().sort(function (a, b) { return b._linha - a._linha; }).forEach(function (e) { if (equipeIds.indexOf(String(e.colaboradorId)) < 0) aba_('ViagemEquipe').deleteRow(e._linha); });
@@ -443,7 +385,7 @@ function nomeProprio_(nome) {
 function progImportarEquipe_(unidadeId, linhas, simular, u) {
   if (!porId_('Unidades', unidadeId)) return erroDados_('Escolha a unidade da equipe.');
   const res = { lidas: (linhas || []).length, novas: 0, jaExistiam: 0, cpfAConferir: [], nomes: [] };
-  const existentes = ler_('Colaboradores');
+  const existentes = ler_('Pessoas');
   const novos = [];
   (linhas || []).forEach(function (l) {
     const nome = String(l.nome || '').trim(); if (!nome) return;
@@ -453,14 +395,14 @@ function progImportarEquipe_(unidadeId, linhas, simular, u) {
     if (ja) { res.jaExistiam++; return; }
     const ok = !cpf11 || cpfValido_(cpf11);
     if (!ok || !cpf11) res.cpfAConferir.push(nomeProprio_(nome) + (cpf11 ? ' (CPF inválido)' : ' (sem CPF)'));
-    novos.push({ unidadeId: unidadeId, nome: nomeProprio_(nome), apelido: apelidoDe_(nome), funcao: l.funcao === 'Motorista' ? 'Motorista' : 'Ajudante', vinculo: 'Próprio',
+    novos.push({ unidadeId: unidadeId, nome: nomeProprio_(nome), apelido: apelidoDe_(nome), funcoes: l.funcao === 'Motorista' ? 'Motorista' : 'Ajudante', vinculo: 'Próprio',
       cpf: ok ? cpf11 : '', cnhCategoria: '', cnhValidade: '', telefone: '', fotoId: '',
       obs: 'Importado da planilha de equipe.' + (!ok && cpf ? ' CPF da planilha não confere (' + String(l.cpf) + '): corrija.' : '') + (l.funcao === 'Motorista' ? ' Complete a CNH.' : ''), ativo: true });
   });
-  res.novas = novos.length; res.nomes = novos.map(function (n) { return n.nome + ' (' + n.funcao + ')'; });
+  res.novas = novos.length; res.nomes = novos.map(function (n) { return n.nome + ' (' + n.funcoes + ')'; });
   if (simular) return Object.assign({ ok: true, simulacao: true }, res);
-  inserirLote_('Colaboradores', novos, u);
-  hist_(u, 'programacao', 'Colaboradores', '', '', 'importou', '', '', '', 'Planilha de equipe: ' + novos.length + ' pessoa(s).');
+  inserirLote_('Pessoas', novos, u);
+  hist_(u, 'pessoas', 'Pessoas', '', '', 'importou', '', '', '', 'Planilha de equipe: ' + novos.length + ' pessoa(s).');
   return Object.assign({ ok: true }, res);
 }
 
@@ -472,7 +414,7 @@ function progImportarProgramacao_(unidadeId, linhas, simular, u) {
   const g = function (l, k) { const v = l[k]; return v == null ? '' : String(v).trim(); };
   const pega = function (l, nomes) { for (let i = 0; i < nomes.length; i++) { const k = Object.keys(l).filter(function (x) { return semAcento_(x) === semAcento_(nomes[i]); })[0]; if (k && l[k] !== '' && l[k] != null) return l[k]; } return ''; };
   // pessoas da unidade
-  const pessoas = ler_('Colaboradores').filter(function (c) { return String(c.unidadeId) === unidadeId; }).map(function (c) { return { id: c.id, nome: String(c.nome), apelido: String(c.apelido || ''), funcao: String(c.funcao) }; });
+  const pessoas = ler_('Pessoas').filter(function (c) { return String(c.unidadeId) === unidadeId; }).map(function (c) { return { id: c.id, nome: String(c.nome), apelido: String(c.apelido || ''), funcao: funcaoEquipe_(c) }; });
   const novasPessoas = {};
   const acharPessoa = function (txt, funcao) {
     const t = semAcento_(String(txt || '').replace(/\(.*?\)/g, '')).replace(/\./g, '').trim(); if (!t || /AGUARD|TERCEIRIZ|^-+$|^X$|^\d+$/.test(t)) return '';
@@ -568,8 +510,8 @@ function progImportarProgramacao_(unidadeId, linhas, simular, u) {
   if (simular) return Object.assign({ ok: true, simulacao: true }, res);
   // grava: pessoas, clientes, viagens, equipe e paradas
   const idPessoa = {};
-  const pCriadas = inserirLote_('Colaboradores', Object.keys(novasPessoas).map(function (k) { const n = novasPessoas[k];
-    return { unidadeId: unidadeId, nome: n.nome, apelido: n.nome.split(' ')[0], funcao: n.funcao, vinculo: 'Próprio', cpf: '', cnhCategoria: '', cnhValidade: '', telefone: '', fotoId: '',
+  const pCriadas = inserirLote_('Pessoas', Object.keys(novasPessoas).map(function (k) { const n = novasPessoas[k];
+    return { unidadeId: unidadeId, nome: n.nome, apelido: n.nome.split(' ')[0], funcoes: n.funcao, vinculo: 'Próprio', cpf: '', cnhCategoria: '', cnhValidade: '', telefone: '', fotoId: '',
              obs: 'Criada pela importação da programação (só o nome usado na planilha). Complete o cadastro ou inative.', ativo: true }; }), u);
   Object.keys(novasPessoas).forEach(function (k, i) { idPessoa[k] = pCriadas[i].id; });
   const idCli = {};

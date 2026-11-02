@@ -26,7 +26,7 @@ function migrarFase4_() {
 }
 
 function rotuloAdi_(a, v) {
-  const c = porId_('Colaboradores', a.colaboradorId);
+  const c = porId_('Pessoas', a.colaboradorId);
   return (c ? rotuloColab_(c) : 'Pessoa') + ' · ' + (v ? rotuloViagem_(v) : 'viagem');
 }
 /** Mantém os adiantamentos da viagem coerentes com a equipe, as noites e o status dela. */
@@ -36,7 +36,7 @@ function sincronizarAdiantamentos_(viagemId, u, semEmail) {
   const existentes = onde_('Adiantamentos', 'viagemId', viagemId).filter(function (a) { return a.status !== 'Cancelado'; });
   const pessoas = v.execucao === 'Terceirizada' || v.status === 'Cancelada' ? [] :
     [String(v.motoristaId)].concat(onde_('ViagemEquipe', 'viagemId', viagemId).map(function (e) { return String(e.colaboradorId); }))
-      .filter(function (id, i, l) { const c = porId_('Colaboradores', id); return id && l.indexOf(id) === i && c && c.vinculo !== 'Terceirizado'; });
+      .filter(function (id, i, l) { const c = porId_('Pessoas', id); return id && l.indexOf(id) === i && c && c.vinculo !== 'Terceirizado'; });
   const concluida = v.status === 'Concluída';
   const noites = Math.max(0, Math.round(num_(concluida ? v.pernoitesRealizados : v.pernoitesPrevistos)));
   const novos = [];
@@ -83,7 +83,7 @@ function avisarDp_(v, novos) {
   if (!dest.length) return;
   const uni = porId_('Unidades', v.unidadeId);
   const linhas = novos.map(function (a) {
-    const c = porId_('Colaboradores', a.colaboradorId);
+    const c = porId_('Pessoas', a.colaboradorId);
     return '• ' + (c ? c.nome : '') + ': ' + a.noites + ' noite(s) × R$ ' + Number(a.valorNoite).toFixed(2).replace('.', ',') + ' = R$ ' + Number(a.valor).toFixed(2).replace('.', ',');
   });
   const total = novos.reduce(function (t, a) { return t + num_(a.valor); }, 0);
@@ -113,8 +113,8 @@ function dpDados_(u) {
     viagens: ler_('Viagens').filter(function (v) { return vIds[v.id]; }).map(function (v) {
       return { id: v.id, unidadeId: String(v.unidadeId || ''), dataSaida: dataTexto_(v.dataSaida), dataRetornoPrevisto: dataTexto_(v.dataRetornoPrevisto), dataRetorno: dataTexto_(v.dataRetorno),
                placa: String(v.placa || ''), status: String(v.status), pernoitesPrevistos: num_(v.pernoitesPrevistos), pernoitesRealizados: v.pernoitesRealizados === '' ? '' : num_(v.pernoitesRealizados) }; }),
-    colaboradores: ler_('Colaboradores').filter(function (c) { return cIds[c.id]; }).map(function (c) {
-      return { id: c.id, nome: String(c.nome), apelido: String(c.apelido || ''), funcao: String(c.funcao), cpf: cpfFormatado_(c.cpf), telefone: String(c.telefone || '') }; }) };
+    colaboradores: ler_('Pessoas').filter(function (c) { return cIds[c.id]; }).map(function (c) {
+      return { id: c.id, nome: String(c.nome), apelido: String(c.apelido || ''), funcao: funcaoEquipe_(c), cpf: cpfFormatado_(c.cpf), telefone: String(c.telefone || '') }; }) };
 }
 
 /* ---------------- ações da analista ---------------- */

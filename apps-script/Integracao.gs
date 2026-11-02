@@ -216,7 +216,7 @@ function rotSalvar_(reg, u) {
               valorPrevisto: reg.valorPrevisto === '' || reg.valorPrevisto == null ? '' : num_(reg.valorPrevisto), obs: String(reg.obs || '').trim() };
   if (!porId_('Unidades', r.unidadeId) || !veUnidade_(u, r.unidadeId)) return erroDados_('Escolha a unidade.');
   if (!porId_('Cadastros', r.clienteId)) return erroDados_('Escolha o cliente.');
-  if (r.consultorId && !porId_('Consultores', r.consultorId)) return erroDados_('Consultor não encontrado.');
+  if (r.consultorId && !porId_('Pessoas', r.consultorId)) return erroDados_('Consultor não encontrado.');
   if (ROT_FREQUENCIAS.indexOf(r.frequencia) < 0) return erroDados_('Escolha a frequência.');
   if (r.frequencia === 'Mensal') { if (!(r.diaMes >= 1 && r.diaMes <= 31)) return erroDados_('Informe o dia do mês (1 a 31).'); r.diaSemana = ''; }
   else { if (!(r.diaSemana >= 0 && r.diaSemana <= 6)) return erroDados_('Escolha o dia da semana.'); r.diaMes = ''; }
@@ -243,7 +243,9 @@ function rotAtivo_(id, ativo, u) {
 
 /* ---------------- 4. Minhas solicitações (consultor) ---------------- */
 function consultoresDoUsuario_(u) {
-  return ler_('Consultores').filter(function (c) { return normEmail_(c.email) === u.email; }).map(function (c) { return c.id; });
+  // a pessoa ligada ao acesso (cadastro de Pessoas); por segurança, também quem tem o mesmo e-mail
+  const consultores = {}; consultoresLista_().forEach(function (c) { consultores[c.id] = 1; });
+  return ler_('Pessoas').filter(function (c) { return consultores[c.id] && ((u.pessoaId && c.id === u.pessoaId) || (c.email && normEmail_(c.email) === u.email)); }).map(function (c) { return c.id; });
 }
 function minhasDados_(u) {
   const meus = consultoresDoUsuario_(u);

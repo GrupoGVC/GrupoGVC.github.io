@@ -13,7 +13,8 @@
  *   Faturamento.gs   BM/NF e preço de venda por cliente
  *   Integracao.gs    Fase 5: lançamentos das paradas, destinação para o BM, coletas recorrentes e "Minhas solicitações"
  *   DP.gs            adiantamentos de pernoite, acertos e aviso por e-mail ao DP (Fase 4)
- *   Programacao.gs   equipe, viagens, paradas, pernoites, caixas e importação das planilhas de programação/equipe (Fase 3)
+ *   Pessoas.gs       cadastro único de pessoas (equipe, consultores, escritório) e acesso ao portal a partir da ficha
+ *   Programacao.gs   equipe (consulta), viagens, paradas, pernoites, caixas e importação das planilhas de programação/equipe (Fase 3)
  *   Historico.gs  consulta do histórico
  *   Instalacao.gs criação da planilha central, migração e backup semanal
  *
@@ -29,7 +30,7 @@ const DIAS_SESSAO = 30;
 
 // Planilha antiga do Mapa (origem da migração; não é mais usada depois dela).
 const MAPA_PLANILHA_ID = '176bQkfOlMFCuKuACKfaogA1liMAxaTIIg-W_wPbV_9E';
-const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação', dp: 'DP', minhas: 'Minhas solicitações' };
+const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação', dp: 'DP', minhas: 'Minhas solicitações', pessoas: 'Pessoas' };
 const NIVEIS = ['leitor', 'editor', 'admin'];
 const MESES_JANELA = 6;
 
@@ -43,14 +44,16 @@ const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.exc
                            'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar'];
 const ACOES_MINHAS = ['minhas.dados', 'minhas.linhaTempo'];
 const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
-const ACOES_PROG_ESCRITA = ['prog.salvarColaborador', 'prog.ativoColaborador', 'prog.excluirColaborador', 'prog.foto', 'prog.salvarViagem', 'prog.viagemAcao'];
+const ACOES_PROG_ESCRITA = ['prog.salvarViagem', 'prog.viagemAcao'];
+const ACOES_PES_LEITURA = ['pes.dados', 'pes.verFoto'];
+const ACOES_PES_ESCRITA = ['pes.salvar', 'pes.ativo', 'pes.excluir', 'pes.foto', 'pes.salvarFuncoes'];
 const ACOES_DP_LEITURA = ['dp.dados'];
 const ACOES_DP_ESCRITA = ['dp.acao'];
 const ACOES_FAT_LEITURA = ['fat.dados'];
 const ACOES_FAT_ESCRITA = ['fat.salvar', 'fat.acao'];
 const ACOES_FROTA_LEITURA = ['frota.dados'];
 const ACOES_FROTA_ESCRITA = ['frota.salvar', 'frota.excluir', 'frota.ativo', 'frota.salvarLocacao'];
-const ACOES_ADMIN = ['listarUsuarios', 'salvarUsuario', 'resetarSenha', 'historico.geral', 'sol.importar', 'prog.importarEquipe', 'prog.importarProgramacao'];
+const ACOES_ADMIN = ['listarUsuarios', 'salvarUsuario', 'resetarSenha', 'pes.gerarAcesso', 'pes.acesso', 'historico.geral', 'sol.importar', 'prog.importarEquipe', 'prog.importarProgramacao'];
 
 function podeLer_(u, modulo) { return NIVEIS.indexOf(u.modulos[modulo]) >= 0; }
 function podeEditar_(u, modulo) { return u.modulos[modulo] === 'editor' || u.modulos[modulo] === 'admin'; }
@@ -77,6 +80,8 @@ function doPost(e) {
 }
 
 function rotear_(body) {
+  // cada chamada lê a planilha de novo (no Apps Script cada execução já começa vazia; aqui fica explícito)
+  Object.keys(CACHE_TAB_).forEach(function (k) { delete CACHE_TAB_[k]; }); NOMES_USUARIOS_ = null;
   const acao = body.acao;
   if (acao === 'sair') { if (body.token) PropertiesService.getScriptProperties().deleteProperty('S_' + body.token); return { ok: true }; }
   if (!baseInstalada_()) return MANUTENCAO;
@@ -107,7 +112,11 @@ function rotear_(body) {
   }
   if (ACOES_PROG_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'programacao')) return semPermissao_('Você não tem acesso à Programação.');
-    return acao === 'prog.verFoto' ? progVerFoto_(String(body.id), u) : progDados_(u);
+    return acao === 'prog.verFoto' ? pesVerFoto_(String(body.id), u) : progDados_(u);
+  }
+  if (ACOES_PES_LEITURA.indexOf(acao) >= 0) {
+    if (!podeLer_(u, 'pessoas') && !u.adminPortal) return semPermissao_('Você não tem acesso ao cadastro de Pessoas.');
+    return acao === 'pes.verFoto' ? pesVerFoto_(String(body.id), u) : pesDados_(u);
   }
   if (ACOES_MINHAS.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'minhas')) return semPermissao_('Você não tem acesso a "Minhas solicitações".');
@@ -138,6 +147,8 @@ function rotear_(body) {
     if (!podeEditar_(u, 'frota')) return semPermissao_(podeLer_(u, 'frota') ? 'Seu acesso à Frota é só de leitura.' : 'Você não tem acesso à Frota.');
   } else if (ACOES_SOL_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'solicitacoes')) return semPermissao_(podeLer_(u, 'solicitacoes') ? 'Seu acesso às Solicitações é só de leitura.' : 'Você não tem acesso às Solicitações.');
+  } else if (ACOES_PES_ESCRITA.indexOf(acao) >= 0) {
+    if (!podeEditar_(u, 'pessoas') && !u.adminPortal) return semPermissao_(podeLer_(u, 'pessoas') ? 'Seu acesso ao cadastro de Pessoas é só de leitura.' : 'Você não tem acesso ao cadastro de Pessoas.');
   } else if (ACOES_PROG_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'programacao')) return semPermissao_(podeLer_(u, 'programacao') ? 'Seu acesso à Programação é só de leitura.' : 'Você não tem acesso à Programação.');
   } else if (ACOES_DP_ESCRITA.indexOf(acao) >= 0) {
@@ -188,10 +199,13 @@ function rotear_(body) {
       case 'sol.rotAtivo': return rotAtivo_(String(body.id), body.ativo, u);
       case 'sol.rotGerar': return gerarRecorrentes_(u, true, true);
       case 'sol.importar': return solImportar_(body.linhas, body.simular === true, u);
-      case 'prog.salvarColaborador': return progSalvarColaborador_(body.registro, u);
-      case 'prog.ativoColaborador': return progAtivoColaborador_(String(body.id), body.ativo, u);
-      case 'prog.excluirColaborador': return progExcluirColaborador_(String(body.id), u);
-      case 'prog.foto': return progFoto_(String(body.id), body.dataUrl, u);
+      case 'pes.salvar': return pesSalvar_(body.registro, u);
+      case 'pes.ativo': return pesAtivo_(String(body.id), body.ativo, u);
+      case 'pes.excluir': return pesExcluir_(String(body.id), u);
+      case 'pes.foto': return pesFoto_(String(body.id), body.dataUrl, u);
+      case 'pes.salvarFuncoes': return pesSalvarFuncoes_(body.valores, u);
+      case 'pes.gerarAcesso': return pesGerarAcesso_(body.acesso, u);
+      case 'pes.acesso': return pesAcesso_(String(body.id), String(body.tipo), u);
       case 'prog.salvarViagem': return progSalvarViagem_(body.registro, body.confirmar === true, u);
       case 'prog.viagemAcao': return progViagemAcao_(String(body.id), String(body.tipo), body.dados, u);
       case 'prog.importarEquipe': return progImportarEquipe_(String(body.unidadeId), body.linhas, body.simular === true, u);

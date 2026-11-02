@@ -21,7 +21,7 @@ const SOL_LISTAS = {
 };
 // Sugestões iniciais; a lista é editável na aba Configurações das Solicitações.
 const TIPOS_DOCUMENTO_INICIAIS = ['Pedido / ordem de compra', 'Integração de segurança', 'Documentação da equipe (ASO, NRs)', 'Autorização de acesso', 'Ficha / FISPQ do resíduo'];
-const SOL_TABELAS = { Consultores: 1, TiposDocumento: 1 };
+const SOL_TABELAS = { TiposDocumento: 1 }; // consultores: cadastro de Pessoas (função Consultor)
 
 /* ---------------- migração da Fase 2 (roda uma vez, pelo garantirEsquema_) ---------------- */
 function migrarFase2_() {
@@ -90,7 +90,7 @@ function solDados_(u) {
     solicitacoes: sols,
     documentos: ler_('SolicitacaoDocumentos').filter(function (d) { return visiveis[d.solicitacaoId]; }).map(function (d) { return publico_('SolicitacaoDocumentos', d); }),
     clientes: clientesLista_(),
-    consultores: ler_('Consultores').map(function (r) { return publico_('Consultores', r); }),
+    consultores: consultoresLista_(),
     tiposDocumento: ler_('TiposDocumento').map(function (r) { return publico_('TiposDocumento', r); }),
     documentosPadrao: ler_('DocumentosPadrao').map(function (r) { return publico_('DocumentosPadrao', r); }),
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome), ativo: r.ativo }; }),
@@ -119,7 +119,7 @@ function validarSol_(r, atual, u) {
   if (!porId_('Unidades', r.unidadeId)) return 'Escolha a unidade.';
   if (!veUnidade_(u, r.unidadeId)) return 'Você não tem acesso a esta unidade.';
   if (!porId_('Cadastros', r.clienteId)) return 'Escolha o cliente (cadastro do Mapa Operacional).';
-  if (r.consultorId && !porId_('Consultores', r.consultorId)) return 'Consultor não encontrado.';
+  if (r.consultorId && !porId_('Pessoas', r.consultorId)) return 'Consultor não encontrado.';
   ['demanda', 'perfil', 'execucao', 'servico'].forEach(function (l) { if (r[l] && listaValores_(l).indexOf(r[l]) < 0 && !(atual && atual[l] === r[l])) r[l] = ''; });
   if (!r.dataSolicitacao) return 'Informe a data da solicitação.';
   r.residuoIds = (Array.isArray(r.residuoIds) ? r.residuoIds : separar_(r.residuoIds)).filter(function (id) { return porId_('Residuos', id); }).join('; ');
@@ -233,8 +233,6 @@ function solSalvarCadastro_(tabela, reg, u) {
   reg = reg || {};
   const r = { nome: String(reg.nome || '').trim() };
   if (!r.nome) return erroDados_('Informe o nome.');
-  if (tabela === 'Consultores') { r.email = normEmail_(reg.email); r.telefone = String(reg.telefone || '').trim();
-    if (r.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email)) return erroDados_('E-mail inválido.'); }
   const dup = idPorNome_(tabela, r.nome); if (dup && dup !== reg.id) return erroDados_('Já existe "' + r.nome + '".');
   if (reg.id) {
     if (!porId_(tabela, reg.id)) return erroDados_('Registro não encontrado.');
@@ -320,7 +318,8 @@ function solImportar_(linhas, simular, u) {
   const porCod = {}, porNome = {};
   ler_('Cadastros').forEach(function (c) { if (String(c.codigoUplog).trim()) porCod[String(c.codigoUplog).trim()] = c.id; porNome[semAcento_(c.nome)] = c.id; });
   const novosClientes = {}; // cod/nome → dados
-  const consultores = {}; ler_('Consultores').forEach(function (c) { consultores[semAcento_(c.nome)] = c.id; });
+  const consultores = {}; ler_('Pessoas').slice().sort(function (a, b) { return temFuncao_(a, 'Consultor') - temFuncao_(b, 'Consultor'); }) // quem é consultor ganha no nome repetido
+    .forEach(function (c) { consultores[semAcento_(c.nome)] = c.id; });
   const novosConsultores = {};
   const execMap = { PROPRIA: 'Própria', TERCEIRIZADA: 'Terceirizada', MISTA: 'Mista' };
   const sols = [], fats = [];
@@ -381,7 +380,7 @@ function solImportar_(linhas, simular, u) {
   }), u);
   Object.keys(novosClientes).forEach(function (k, i) { idCli['@' + k] = cliCriados[i].id; });
   const idCons = {};
-  const consCriados = inserirLote_('Consultores', Object.keys(novosConsultores).map(function (k) { return { nome: novosConsultores[k], ativo: true }; }), u);
+  const consCriados = inserirLote_('Pessoas', Object.keys(novosConsultores).map(function (k) { return { nome: novosConsultores[k], apelido: apelidoDe_(novosConsultores[k]), funcoes: 'Consultor', obs: 'Criado pela importação da planilha de acompanhamento.', ativo: true }; }), u);
   Object.keys(novosConsultores).forEach(function (k, i) { idCons['#' + k] = consCriados[i].id; });
   sols.forEach(function (s) { if (idCli[s.clienteId]) s.clienteId = idCli[s.clienteId]; if (idCons[s.consultorId]) s.consultorId = idCons[s.consultorId]; });
   // cadastros que já existiam no Mapa: passam a ser também "cliente" e ganham o código UPLOG que faltava
