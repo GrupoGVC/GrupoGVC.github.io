@@ -211,6 +211,21 @@ td input,td select{padding:5px 8px;font-size:13px}
 .pill.neg-rss{background:color-mix(in srgb,var(--s-loc) 16%,transparent);color:var(--s-loc)}
 .pill.neg-ind{background:color-mix(in srgb,var(--s-dest) 15%,transparent);color:var(--s-dest)}
 .pill.neg-none{background:var(--warn-bg);color:var(--warn)}
+.ad-list{display:flex;flex-direction:column;gap:12px}
+.ad{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--surface)}
+.ad.aberto{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ad-h{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;justify-content:space-between}
+.ad-h b{font-size:15px}
+.ad .sub{margin:2px 0 0}
+.ad-prev{font-size:13px;color:var(--ink-2);margin-top:6px}
+.ad-mtr{border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-top:10px;background:var(--sunken)}
+.ad-mtr-h{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) 150px 120px auto;gap:8px;align-items:end}
+.ad-l{display:grid;grid-template-columns:minmax(0,1.6fr) 130px minmax(0,1.4fr) 34px;gap:8px;align-items:center;margin-top:8px}
+.ad-l .x{font-size:12.5px;color:var(--ink-2)}
+.ad-km{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:end;margin-top:10px}
+.diverg{color:var(--warn);font-weight:600}
+.pill.fonte-int{background:var(--sunken);color:var(--ink-2)}
+@media (max-width:760px){.ad-mtr-h{grid-template-columns:1fr 1fr}.ad-mtr-h>:first-child{grid-column:1/-1}.ad-l{grid-template-columns:1fr 1fr}.ad-l>:first-child,.ad-l .x{grid-column:1/-1}.ad-km{grid-template-columns:1fr}}
 .bulk{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r);margin-bottom:12px;font-size:13px;color:var(--ink-2)}
 /* ---------- celular ---------- */
 nav.tabs .ic,nav.tabs .t-short{display:none}
@@ -288,6 +303,7 @@ nav.tabs .ic,nav.tabs .t-short{display:none}
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="painel" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V11M10 20V4M16 20v-7M21 20H3"/></svg><span>Painel</span></button>
       <button role="tab" data-tab="lanc" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h11M4 12h11M4 18h7M18 14v6M15 17h6"/></svg><span class="t-long">Lançamentos</span><span class="t-short">Lançar</span> <span class="ct" id="ct-lanc">0</span></button>
+      <button role="tab" data-tab="adest" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 11h4l3 3v2h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M6 11h5"/></svg><span class="t-long">A destinar</span><span class="t-short">A destinar</span> <span class="ct" id="ct-adest">0</span></button>
       <button role="tab" data-tab="frota" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h11v10H2zM13 10h4l3 3v3h-7"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg><span class="t-long">Locação de veículos</span><span class="t-short">Frota</span></button>
       <button role="tab" data-tab="dest" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg><span class="t-long">Destinadores e preços</span><span class="t-short">Preços</span></button>
       <button role="tab" data-tab="pend" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><span class="t-long">Conferência</span><span class="t-short">Conferir</span> <span class="ct" id="ct-pend">0</span></button>
@@ -434,7 +450,7 @@ function fecharFiltro(){if(window.Portal&&Portal.fecharFiltroTabela)Portal.fecha
 const FMT_R='"R$" #,##0.00';
 function tbLanc(){return Portal.tabela('ctl-lanc',COLS_LANC,{titulo:'Lançamentos · '+mesLbl(S.mes),aba:'Lançamentos',arquivo:'destinacao-'+S.mes,unidade:'lançamentos',aoMudar:renderLanc,
   subtitulo:()=>'Mês: '+mesLbl(S.mes),filtrosExtras:()=>S.f.q.trim()?['Busca: "'+S.f.q.trim()+'"']:[],
-  extrasExport:[{label:'Ticket',x:l=>l.ticket||'',pdf:false},{label:'Tipo',x:l=>tipoDe(l.destinador)==='receita'?'Receita':'Custo',pdf:false},{label:'Transportadora',x:l=>l.transportadora||'',pdf:false},
+  extrasExport:[{label:'Ticket',x:l=>l.ticket||'',pdf:false},{label:'Peso do MTR (kg)',x:l=>l.pesoMtr===''||l.pesoMtr==null?'':+l.pesoMtr,pdf:false},{label:'Divergência',x:l=>l.motivoDivergencia||'',pdf:false},{label:'Tipo',x:l=>tipoDe(l.destinador)==='receita'?'Receita':'Custo',pdf:false},{label:'Transportadora',x:l=>l.transportadora||'',pdf:false},
     {label:'Valor fechado',x:l=>l.valorFixo?+l.valorFixo:'',fmt:FMT_R,pdf:false},{label:'Observação',x:l=>l.obs||'',pdf:false}],
   totais:l=>{const c=l.filter(x=>tipoDe(x.destinador)!=='receita').reduce((s,x)=>s+(+x.valor||0),0),r=l.filter(x=>tipoDe(x.destinador)==='receita').reduce((s,x)=>s+(+x.valor||0),0);
     return{'kg':l.reduce((s,x)=>s+(+x.kg||0),0),'Valor':c-r,'Observação':'saldo = custos '+R(c)+' − receitas '+R(r)}}})}
@@ -486,7 +502,9 @@ function renderPainel(){
     totais:l=>({'Aluguel':l.reduce((t,v)=>t+(+v.valor||0),0)})});
   const vs=TU.aplicar(vsTela);
   const proprio=gerRows.find(r=>r.n==='RETEC');
+  const nAd=(S.aDest||[]).length;
   $('#main').innerHTML=`
+  ${nAd?`<div class="al warn" style="cursor:pointer" data-go="adest"><span class="pill warn">${nAd} coleta(s)</span><b>Aguardando a confirmação da destinação</b><div class="x">${N((S.aDest||[]).reduce((t,a)=>t+a.pendentes.reduce((u,l)=>u+(+l.pesoMtr||+l.kg||0),0),0))} kg declarados nos MTRs. Ficam fora dos totais do mês até o ticket da balança ser confirmado.</div></div>`:''}
   ${pend.length?`<div class="al ${pend.some(p=>p.sev==='crit')?'crit':'warn'}" style="cursor:pointer" data-go="pend"><span class="pill ${pend.some(p=>p.sev==='crit')?'crit':'warn'}">${pend.length} ponto(s)</span><b>Há lançamentos para conferir antes de fechar ${esc(mesLbl(S.mes))}</b><div class="x">${esc(pend.slice(0,3).map(p=>p.tit).join(' · '))}${pend.length>3?' …':''}</div></div>`:''}
   <div class="row" style="justify-content:space-between;gap:10px">
     <div class="seg" role="group" aria-label="Filtrar por tipo de negócio">${[['','Todos'],['RSS','RSS'],['Industrial','Industrial']].map(([v,t])=>`<button type="button" data-neg="${v}" aria-pressed="${S.neg===v}">${t}</button>`).join('')}</div>
@@ -543,6 +561,7 @@ const COLS_LANC=[
   {k:'dest',label:'Destinador',v:l=>nomeDe(l.destinador)},
   {k:'neg',label:'Negócio',v:l=>l.negocio||'Sem tipo'},
   {k:'ger',label:'Gerador',v:l=>l.gerador},
+  {k:'fonte',label:'Descarte',v:l=>l.fonte==='Coleta de cliente'?'Coleta':'Interno',cls:'hide-m',x:l=>l.fonte||''},
   {k:'orig',label:'Origem',v:l=>l.origem,cls:'hide-m'},
   {k:'res',label:'Resíduo',v:l=>l.residuo},
   {k:'placa',label:'Placa',v:l=>l.placa},
@@ -565,7 +584,7 @@ function renderLanc(){
   fecharFiltro();
   const base=lancBase();const lst=lancFiltrados();const tot=lst.reduce((s,l)=>s+(+l.valor||0)*(tipoDe(l.destinador)==='receita'?-1:1),0);
   const resSet=[...new Set(S.lanc.map(l=>l.residuo).filter(Boolean))].sort();
-  const geradores=S.geradores||[];
+  const geradores=(S.geradores||[]).filter(g=>isEdit||g.unidade);
   const placas=S.veiculos||[];
   const origens=[...new Set(S.lanc.map(l=>l.origem).filter(Boolean))].sort();
   $('#main').innerHTML=`
@@ -581,7 +600,7 @@ function renderLanc(){
       <div class="fld full"><label for="f-res">Resíduo / material</label><input id="f-res" list="dl-res" value="${esc(e.residuo||'')}" required><datalist id="dl-res"></datalist></div>
       <div class="fld"><label for="f-mtr">Nº MTR</label><div class="inp-btn"><input id="f-mtr" class="mono" inputmode="numeric" value="${esc(e.mtr||'')}"><button type="button" class="btn scan-btn" id="f-scan" aria-label="Escanear código de barras do MTR" title="Escanear código do MTR"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg></button></div><div class="hint" id="h-mtr"></div></div>
       <div class="fld"><label for="f-ticket">Ticket (opcional)</label><input id="f-ticket" class="mono" value="${esc(e.ticket||'')}"></div>
-      <div class="fld full"><label for="f-ger">Gerador</label><input id="f-ger" list="dl-ger" value="${esc(e.gerador||'')}" placeholder="Digite para buscar…"><datalist id="dl-ger">${geradores.map(g=>`<option value="${esc(g.nome)}">${esc([g.unidade?'Unidade GVC':'Cliente',[g.cidade,g.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '))}</option>`).join('')}</datalist><div class="hint" id="h-ger">Clientes e unidades GVC ativos no Mapa Operacional.</div></div>
+      <div class="fld full"><label for="f-ger">Gerador</label><input id="f-ger" list="dl-ger" value="${esc(e.gerador||'')}" placeholder="Digite para buscar…"><datalist id="dl-ger">${geradores.map(g=>`<option value="${esc(g.nome)}">${esc([g.unidade?'Unidade GVC':'Cliente',[g.cidade,g.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '))}</option>`).join('')}</datalist><div class="hint" id="h-ger">${isEdit?'Clientes e unidades GVC ativos no Mapa Operacional.':'Lançamento direto é da operação interna: o gerador é uma unidade GVC. O descarte das coletas de clientes chega pela Programação, na aba A destinar.'}</div></div>
       <div class="fld full"><label for="f-orig">Local de origem</label><input id="f-orig" list="dl-orig" value="${esc(e.origem||'')}"><datalist id="dl-orig">${origens.map(g=>`<option value="${esc(g)}">`).join('')}</datalist></div>
       <div class="fld"><label for="f-placa">Placa</label><input id="f-placa" class="mono" list="dl-placa" value="${esc(e.placa||'')}" placeholder="Escolha…"><datalist id="dl-placa">${placas.map(v=>`<option value="${esc(v.placa)}">${esc([v.tipo,v.propriedade==='Locada'?'locado':'',v.situacao!=='Em operação'?v.situacao:''].filter(Boolean).join(' · '))}</option>`).join('')}</datalist><div class="hint" id="h-placa">Veículos ativos da Frota.</div></div>
       <div class="fld"><label for="f-transp">Transportadora</label><input id="f-transp" value="${esc(e.transportadora||'RETEC')}"></div>
@@ -604,7 +623,7 @@ function renderLanc(){
     ${tbLanc().info(lst.length,base.length)}
     ${!S.readOnly&&lst.length&&temFiltroLanc()?`<div class="bulk" id="bulk"><span>Definir o tipo de negócio dos <b>${lst.length}</b> lançamento(s) filtrados:</span><button type="button" class="btn sm" data-lote="RSS">RSS</button><button type="button" class="btn sm" data-lote="Industrial">Industrial</button></div>`:''}
     ${base.length?`<div class="tbl-wrap rtw" style="max-height:620px"><table class="rt"><thead>${tbLanc().cab()}</thead><tbody>
-    ${lst.map(l=>{const t=tipoDe(l.destinador);return `<tr class="click" data-id="${esc(l._id)}"><td>${fmtData(l.data)}</td><td class="mono">${esc(l.mtr||'—')}</td><td class="full"><span class="pill ${t}">${esc(nomeDe(l.destinador))}</span></td><td>${negPill(l.negocio)}</td><td>${esc(l.gerador)}</td><td class="hide-m">${esc(l.origem)}</td><td>${esc(l.residuo)}</td><td class="mono">${esc(l.placa)}</td><td class="num">${l.kg!=null&&l.kg!==''?N(l.kg):'—'}</td><td class="num hide-m">${l.valorFixo?'fechado':N(l.preco,3)}</td><td class="num strong-m">${t==='receita'?'+ ':''}${R(l.valor)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">Nenhum lançamento com os filtros das colunas.</td></tr>'}
+    ${lst.map(l=>{const t=tipoDe(l.destinador);return `<tr class="click" data-id="${esc(l._id)}"><td>${fmtData(l.data)}</td><td class="mono">${esc(l.mtr||'—')}${l.motivoDivergencia?` <span class="pill warn" data-tip="${esc(l.motivoDivergencia)}">divergência</span>`:''}</td><td class="full"><span class="pill ${t}">${esc(nomeDe(l.destinador))}</span></td><td>${negPill(l.negocio)}</td><td>${esc(l.gerador)}</td><td class="hide-m">${l.fonte==='Coleta de cliente'?'<span class="pill">Coleta</span>':'<span class="pill fonte-int">Interno</span>'}</td><td class="hide-m">${esc(l.origem)}</td><td>${esc(l.residuo)}</td><td class="mono">${esc(l.placa)}</td><td class="num">${l.kg!=null&&l.kg!==''?N(l.kg):'—'}</td><td class="num hide-m">${l.valorFixo?'fechado':N(l.preco,3)}</td><td class="num strong-m">${t==='receita'?'+ ':''}${R(l.valor)}</td></tr>`}).join('')||'<tr><td colspan="12" class="empty">Nenhum lançamento com os filtros das colunas.</td></tr>'}
     </tbody></table></div>`:`<div class="empty">${S.lanc.length?'Nenhum lançamento com esses filtros.':'Nenhum lançamento em '+esc(mesLbl(S.mes))+'. Use o formulário acima para lançar a primeira viagem.'}</div>`}
   </section>`;
   bindLancForm();
@@ -744,6 +763,103 @@ function renderDest(){
   TP.ligar();
 }
 
+/* ---------- A destinar: confirma a destinação das coletas (ticket da balança) ---------- */
+const LIM_DIV=0.2;
+const dCol=id=>(S.destCol||[]).find(d=>d.id===id)||null;
+const dColNome=id=>(dCol(id)||{}).nome||nomeDe(id);
+const resNomeC=id=>((S.resCat||[]).find(r=>r.id===id)||{}).nome||'';
+const optsC=(lista,sel,vazio)=>(vazio!==undefined?`<option value="">${esc(vazio)}</option>`:'')+lista.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(sel??'')?'selected':''}>${esc(l)}</option>`).join('');
+function iniciarConf(a){
+  const blocos=[];
+  a.pendentes.forEach(l=>{let b=blocos.find(x=>x.destinadorId===l.destinadorId&&x.mtr===l.mtr);
+    if(!b){b={destinadorId:l.destinadorId,mtrDest:l.destinadorId,mtr:l.mtr,ticket:'',data:hoje,negocio:l.negocio||'',motivoDestinador:'',linhas:[]};blocos.push(b)}
+    b.linhas.push({id:l.id,residuoId:l.residuoId,kg:'',pesoMtr:l.pesoMtr===''||l.pesoMtr==null?'':+l.pesoMtr,motivoPeso:''})});
+  if(!blocos.length){ // marcada realizada sem MTR na Programação: parte do previsto
+    a.itens.forEach(it=>{let b=blocos.find(x=>x.destinadorId===it.destinadorId);
+      if(!b){b={destinadorId:it.destinadorId,mtrDest:it.destinadorId,mtr:'',ticket:'',data:hoje,negocio:'',motivoDestinador:'',linhas:[]};blocos.push(b)}
+      b.linhas.push({id:'',residuoId:it.residuoId,kg:'',pesoMtr:'',motivoPeso:''})});
+    if(!blocos.length)blocos.push({destinadorId:'',mtrDest:'',mtr:'',ticket:'',data:hoje,negocio:'',motivoDestinador:'',linhas:[{id:'',residuoId:'',kg:'',pesoMtr:'',motivoPeso:''}]});
+  }
+  const v=a.viagem||{};
+  S.adConf={chave:a.chave,blocos,kmFinal:v.kmFinal===''||v.kmFinal==null?'':v.kmFinal};
+}
+const divergencia=l=>{const pm=+l.pesoMtr,kg=+l.kg;if(!(pm>0)||!(kg>0))return 0;const d=(kg-pm)/pm;return Math.abs(d)>LIM_DIV?d:0};
+function adCardHTML(a){
+  const v=a.viagem;const aberto=S.adConf&&S.adConf.chave===a.chave;
+  const dias=a.dias===''||+a.dias<0?'':+a.dias;const pill=dias===''?'':`<span class="pill ${dias>7?'crit':dias>3?'warn':''}">${dias===0?'hoje':dias===1?'há 1 dia':'há '+dias+' dias'}</span>`;
+  const kgMtr=a.pendentes.reduce((t,l)=>t+(+l.pesoMtr||0),0);
+  return `<div class="ad ${aberto?'aberto':''}" data-ad="${esc(a.chave)}">
+    <div class="ad-h"><div><b>${esc(a.cliente||'—')}</b> <span class="sub">coleta de ${esc(fmtDataLonga(a.dataColeta))}${v?' · '+esc(v.rotulo):''}</span></div><div class="row" style="gap:6px">${pill}${!aberto&&!S.readOnly?`<button class="btn sm pri" data-adabrir="${esc(a.chave)}">Confirmar destinação</button>`:''}</div></div>
+    ${a.itens.length?`<div class="ad-prev">Previsto: ${esc(a.itens.map(i=>resNomeC(i.residuoId)+(i.pesoEstimado!==''?' '+N(i.pesoEstimado)+' kg':'')+' → '+(dColNome(i.destinadorId)||'?')).join('; '))}</div>`:''}
+    <div class="ad-prev">${a.pendentes.length?'MTR: '+esc([...new Set(a.pendentes.map(l=>l.mtr+' · '+dColNome(l.destinadorId)))].join('; '))+' · '+N(kgMtr)+' kg declarados':'<span class="diverg">Realizada sem MTR na Programação: informe o MTR, o destinador e o ticket.</span>'}</div>
+    ${aberto?confHTML(a):''}</div>`;
+}
+function linhaInfo(l,b){const d=divergencia(l);const dc=dCol(b.destinadorId);const pr=dc&&dc.precos?dc.precos[l.residuoId]:undefined;
+  return (l.pesoMtr!==''?'MTR: '+N(l.pesoMtr,0)+' kg':'sem peso de MTR')+(pr!==undefined&&pr!==''&&+l.kg?' · '+R((+l.kg)*pr):'')+(d?` · <span class="diverg">${d>0?'+':''}${Math.round(d*100)}% em relação ao MTR</span>`:'')}
+function confHTML(a){
+  const c=S.adConf;const v=a.viagem;const ds=(S.destCol||[]);
+  const resOpts=(sel)=>optsC((S.resCat||[]).filter(r=>r.ativo||r.id===sel).map(r=>[r.id,r.nome]),sel,'Resíduo…');
+  const kmIni=v&&v.kmInicial!==''&&v.kmInicial!=null?+v.kmInicial:null;const propria=v&&v.execucao!=='Terceirizada';
+  return `<div class="ad-conf">
+    ${c.blocos.map((b,j)=>{const trocou=b.mtrDest&&b.destinadorId!==b.mtrDest;
+      return `<div class="ad-mtr" data-b="${j}"><div class="ad-mtr-h">
+      <div class="fld"><label>Destinador que recebeu</label><select data-bf="destinadorId">${optsC(ds.map(d=>[d.id,d.nome]),b.destinadorId,'Escolha…')}</select></div>
+      <div class="fld"><label>Nº do MTR</label><input data-bf="mtr" class="mono" value="${esc(b.mtr)}"></div>
+      <div class="fld"><label>Nº do ticket</label><input data-bf="ticket" class="mono" value="${esc(b.ticket)}"></div>
+      <div class="fld"><label>Data da destinação</label><input data-bf="data" type="date" value="${esc(b.data)}"></div>
+      <div class="fld"><label>Negócio</label><select data-bf="negocio">${optsC([['RSS','RSS'],['Industrial','Industrial']],b.negocio,'—')}</select></div>
+      ${c.blocos.length>1&&!b.mtrDest?`<button type="button" class="btn sm danger" data-brm="${j}" aria-label="Remover MTR">×</button>`:'<span></span>'}</div>
+      ${trocou?`<div class="fld" style="margin-top:8px"><label>Motivo da troca (o MTR é de ${esc(dColNome(b.mtrDest))})</label><input data-bf="motivoDestinador" value="${esc(b.motivoDestinador)}" placeholder="Por que foi para outro destinador?"></div>`:''}
+      ${b.linhas.map((l,k)=>{const d=divergencia(l);
+        return `<div class="ad-l" data-l="${k}">
+        <select data-lf="residuoId" aria-label="Resíduo">${resOpts(l.residuoId)}</select>
+        <input data-lf="kg" type="number" step="any" min="0" inputmode="decimal" placeholder="kg do ticket" aria-label="Peso do ticket (kg)" value="${esc(l.kg)}">
+        <span class="x" data-linfo>${linhaInfo(l,b)}</span>
+        ${!l.id&&b.linhas.length>1?`<button type="button" class="btn sm" data-lrm="${k}" aria-label="Remover">×</button>`:'<span></span>'}
+        <div class="fld" data-lmot style="grid-column:1/-1${d?'':';display:none'}"><label>Motivo da diferença de peso (opcional)</label><input data-lf="motivoPeso" value="${esc(l.motivoPeso)}" placeholder="Ex.: o cliente juntou mais sacos"></div></div>`}).join('')}
+      <button type="button" class="btn sm" data-ladd="${j}" style="margin-top:8px">+ Resíduo neste MTR</button></div>`}).join('')}
+    <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn sm" data-badd>+ MTR de outro destinador</button></div>
+    ${propria&&kmIni!==null?`<div class="ad-km"><div class="fld"><label for="ad-kmf">Km na volta à base</label><input id="ad-kmf" type="number" min="0" step="1" value="${esc(c.kmFinal)}"></div>
+      <div class="hint" style="align-self:center">Saiu com ${N(kmIni)} km${v.kmPrevista?' · prevista '+N(v.kmPrevista)+' km':''}<span id="ad-rodou">${c.kmFinal!==''&&+c.kmFinal>=kmIni?' · rodou '+N(+c.kmFinal-kmIni)+' km'+(v.kmPrevista&&Math.abs((+c.kmFinal-kmIni)-v.kmPrevista)/v.kmPrevista>LIM_DIV?' <span class="diverg">(fora da prevista)</span>':''):''}</span>${v.status!=='Concluída'?' · a viagem ainda não foi concluída na Programação':''}</div></div>`:''}
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn" data-adx>Cancelar</button><button type="button" class="btn pri" data-adok>Confirmar destinação</button></div></div>`;
+}
+function renderADest(){
+  if(renderADest.ocupado)return; // o change/blur do campo que está saindo da tela não redesenha de novo
+  renderADest.ocupado=true;try{renderADest_()}finally{renderADest.ocupado=false}
+}
+function renderADest_(){
+  fecharFiltro();
+  const l=S.aDest||[];
+  $('#main').innerHTML=`<section class="panel"><div class="panel-h"><div><h2>A destinar</h2><p class="sub">Coletas realizadas na Programação com o MTR, esperando o ticket da balança do destinador. Confirme o destinador que recebeu, o resíduo e o peso do ticket. Só depois o descarte entra nos totais do mês e a solicitação segue para o BM.</p></div></div>
+    ${l.length?`<div class="ad-list">${l.map(adCardHTML).join('')}</div>`:'<div class="empty">Nenhuma coleta aguardando destinação.</div>'}</section>`;
+  bindADest();
+}
+function bindADest(){
+  const re=()=>{const y=scrollY;renderADest();scrollTo({top:y})};
+  document.querySelectorAll('[data-adabrir]').forEach(b=>b.onclick=()=>{const a=S.aDest.find(x=>x.chave===b.dataset.adabrir);iniciarConf(a);re();const el=document.querySelector('.ad.aberto [data-lf="kg"]');if(el)el.focus()});
+  const c=S.adConf;if(!c)return;
+  const card=document.querySelector('.ad.aberto');if(!card)return;
+  const a=S.aDest.find(x=>x.chave===c.chave);
+  card.querySelectorAll('[data-b]').forEach(box=>{const b=c.blocos[+box.dataset.b];
+    box.querySelectorAll('[data-bf]').forEach(el=>{el[el.tagName==='SELECT'?'onchange':'oninput']=()=>{b[el.dataset.bf]=el.value;if(el.dataset.bf==='destinadorId'){if(!b.mtrDest)b.mtrDest='';re()}}});
+    box.querySelectorAll('[data-l]').forEach(row=>{const l=b.linhas[+row.dataset.l];
+      row.querySelectorAll('[data-lf]').forEach(el=>{el[el.tagName==='SELECT'?'onchange':'oninput']=()=>{l[el.dataset.lf]=el.value;if(el.dataset.lf==='residuoId')re()}});
+      const kg=row.querySelector('[data-lf="kg"]');if(kg)kg.oninput=()=>{l.kg=kg.value;row.querySelector('[data-linfo]').innerHTML=linhaInfo(l,b);row.querySelector('[data-lmot]').style.display=divergencia(l)?'':'none'};
+      const rm=row.querySelector('[data-lrm]');if(rm)rm.onclick=()=>{b.linhas.splice(+row.dataset.l,1);re()}});
+    const la=box.querySelector('[data-ladd]');if(la)la.onclick=()=>{b.linhas.push({id:'',residuoId:'',kg:'',pesoMtr:'',motivoPeso:''});re()};
+    const br=box.querySelector('[data-brm]');if(br)br.onclick=()=>{c.blocos.splice(+box.dataset.b,1);re()}});
+  const ba=card.querySelector('[data-badd]');if(ba)ba.onclick=()=>{c.blocos.push({destinadorId:'',mtrDest:'',mtr:'',ticket:'',data:hoje,negocio:(c.blocos[0]||{}).negocio||'',motivoDestinador:'',linhas:[{id:'',residuoId:'',kg:'',pesoMtr:'',motivoPeso:''}]});re()};
+  const km=$('#ad-kmf');if(km){km.oninput=()=>{c.kmFinal=km.value;const v=a.viagem||{},ini=+v.kmInicial,r=$('#ad-rodou');if(r)r.innerHTML=km.value!==''&&+km.value>=ini?' · rodou '+N(+km.value-ini)+' km'+(v.kmPrevista&&Math.abs((+km.value-ini)-v.kmPrevista)/v.kmPrevista>LIM_DIV?' <span class="diverg">(fora da prevista)</span>':''):''}}
+  card.querySelector('[data-adx]').onclick=()=>{S.adConf=null;re()};
+  card.querySelector('[data-adok]').onclick=async ev=>{
+    const bt=ev.target;bt.disabled=true;
+    const x={solicitacaoId:a.solicitacaoId,paradaId:a.solicitacaoId?'':a.paradaId,kmFinal:c.kmFinal,
+      blocos:c.blocos.map(b=>({destinadorId:b.destinadorId,mtr:b.mtr,ticket:b.ticket,data:b.data,negocio:b.negocio,motivoDestinador:b.motivoDestinador,
+        linhas:b.linhas.filter(l=>l.residuoId||l.kg).map(l=>({id:l.id,residuoId:l.residuoId,kg:l.kg,motivoPeso:l.motivoPeso}))}))};
+    try{await api('destinacao.confirmar',{destinacao:x});S.adConf=null;toast('Destinação confirmada: entrou nos lançamentos do mês');await carregar(true)}
+    catch(er){bt.disabled=false;falha(er)}};
+}
+
 /* ---------- conferência ---------- */
 function renderPend(){
   const p=pendencias(S.lanc);
@@ -756,18 +872,18 @@ function renderPend(){
 
 function render(){
   $('#m-lbl').textContent=S.mes?mesLbl(S.mes):'—';
-  $('#ct-lanc').textContent=S.lanc.length;const np=pendencias(S.lanc).length;const cp=$('#ct-pend');cp.textContent=np;cp.classList.toggle('alert',np>0);
+  $('#ct-lanc').textContent=S.lanc.length;{const ca=$('#ct-adest');const n=(S.aDest||[]).length;ca.textContent=n;ca.classList.toggle('alert',n>0)}const np=pendencias(S.lanc).length;const cp=$('#ct-pend');cp.textContent=np;cp.classList.toggle('alert',np>0);
   if(!S.ready)return;
   // não re-renderiza formulários enquanto alguém digita
   const ae=document.activeElement;if(ae&&ae.closest&&ae.closest('#main')&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName)&&S.tab!=='painel'){render.pending=true;return}
-  ({painel:renderPainel,lanc:renderLanc,frota:renderFrota,dest:renderDest,pend:renderPend})[S.tab]();
+  ({painel:renderPainel,lanc:renderLanc,adest:renderADest,frota:renderFrota,dest:renderDest,pend:renderPend})[S.tab]();
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>setTab(b.dataset.go));
   bindNeg();
 }
 document.addEventListener('focusout',()=>setTimeout(()=>{if(render.pending&&!(document.activeElement&&document.activeElement.closest('#main')&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))){render.pending=false;render()}},50));
 function setTab(t){if(t!=='frota')S.locDraft=null;S.tab=t;document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));try{localStorage.setItem('cd-tab',t)}catch(e){}
   const ae=document.activeElement;if(ae&&ae.blur)ae.blur();render.pending=false;
-  ({painel:renderPainel,lanc:renderLanc,frota:renderFrota,dest:renderDest,pend:renderPend})[t]();document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>setTab(b.dataset.go));bindNeg();scrollTo({top:0})}
+  ({painel:renderPainel,lanc:renderLanc,adest:renderADest,frota:renderFrota,dest:renderDest,pend:renderPend})[t]();document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>setTab(b.dataset.go));bindNeg();scrollTo({top:0})}
 document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
 /* ---------- dados (Google Planilhas via Apps Script) e login ---------- */
@@ -809,6 +925,8 @@ async function carregar(silencioso){
     S.dest={};(j.destinadores||[]).forEach(d=>S.dest[d.id]=d);S.fonteDest=j.fonteDestinadores||'';RESIDUOS.splice(0,RESIDUOS.length,...(j.residuos||[]));
     S.all=(j.lancamentos||[]).map(l=>({_id:l.id,...l}));
     S.veiculos=j.veiculos||[];S.geradores=j.geradores||[];
+    S.aDest=j.aDestinar||[];S.resCat=j.residuosCatalogo||[];S.destCol=j.destinadoresColeta||[];
+    if(S.adConf&&!S.aDest.some(a=>a.chave===S.adConf.chave))S.adConf=null;
     S.locs=j.locacao||{};
     S.ready=true;mostrarUsuario();recompute();
     setSync(true,(S.readOnly?'Somente leitura · ':'')+'Atualizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
@@ -835,7 +953,7 @@ function mudaMes(d){if(!S.ready)return;S.mes=addMes(S.mes,d);S.edit=null;S.locDr
 $('#m-prev').onclick=()=>mudaMes(-1);$('#m-next').onclick=()=>mudaMes(1);
 $('#btn-atualizar').onclick=()=>carregar();
 $('#btn-sair').onclick=sair;
-setInterval(()=>{if(S.ready&&document.visibilityState==='visible'&&!digitando()&&S.tab!=="frota"&&S.tab!=="users"&&!(S.edit&&S.edit._id))carregar(true)},90000);
+setInterval(()=>{if(S.ready&&document.visibilityState==='visible'&&!digitando()&&S.tab!=="frota"&&S.tab!=="users"&&!(S.edit&&S.edit._id)&&!S.adConf)carregar(true)},90000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.ready&&!digitando()&&S.tab!=='users')carregar(true)});
 
 async function start(){
