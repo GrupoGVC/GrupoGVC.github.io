@@ -56,7 +56,7 @@ const ACOES_FAT_LEITURA = ['fat.dados'];
 const ACOES_FAT_ESCRITA = ['fat.salvar', 'fat.acao'];
 const ACOES_FROTA_LEITURA = ['frota.dados'];
 const ACOES_FROTA_ESCRITA = ['frota.salvar', 'frota.excluir', 'frota.ativo', 'frota.salvarLocacao'];
-const ACOES_ADMIN = ['listarUsuarios', 'salvarUsuario', 'resetarSenha', 'pes.gerarAcesso', 'pes.acesso', 'historico.geral', 'sol.importar', 'prog.importarEquipe', 'prog.importarProgramacao'];
+const ACOES_ADMIN = ['listarUsuarios', 'salvarUsuario', 'resetarSenha', 'pes.gerarAcesso', 'pes.acesso', 'historico.geral', 'sol.importar', 'prog.importarEquipe', 'prog.importarProgramacao', 'mapa.mesclar'];
 
 function podeLer_(u, modulo) { return NIVEIS.indexOf(u.modulos[modulo]) >= 0; }
 function podeEditar_(u, modulo) { return u.modulos[modulo] === 'editor' || u.modulos[modulo] === 'admin'; }
@@ -209,6 +209,7 @@ function rotear_(body) {
       case 'sol.rotAtivo': return rotAtivo_(String(body.id), body.ativo, u);
       case 'sol.rotGerar': return gerarRecorrentes_(u, true, true);
       case 'sol.importar': return solImportar_(body.linhas, body.simular === true, u);
+      case 'mapa.mesclar': return mesclarCadastros_(body.de, body.para, body.simular === true, u);
       case 'pes.salvar': return pesSalvar_(body.registro, u);
       case 'pes.ativo': return pesAtivo_(String(body.id), body.ativo, u);
       case 'pes.excluir': return pesExcluir_(String(body.id), u);
