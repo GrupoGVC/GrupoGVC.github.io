@@ -264,6 +264,16 @@ h3.sec{font:600 14px var(--f-body);margin:18px 0 8px;color:var(--ink)}
 .pill.st.nf{background:var(--ok-bg);color:var(--ok)}
 .pill.st.ok{background:#dff3f0;color:#0e7466}
 .pill.st.crit{background:var(--crit-bg);color:var(--crit)}
+.pill.st.dest{background:#fbecd9;color:#93520f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.dest{background:#3a2a16;color:#f0b877}}
+:root[data-theme="dark"] .pill.st.dest{background:#3a2a16;color:#f0b877}
+.itens{display:flex;flex-direction:column;gap:8px}
+.it-row{display:grid;grid-template-columns:minmax(0,1.3fr) 120px minmax(0,1.6fr) auto 34px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunken)}
+.it-row .it-v{font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.it-row .it-tr{grid-column:1/-1;font-size:12px;color:var(--warn)}
+.it-tot{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.lib-falta{font-size:12.5px;color:var(--warn);background:var(--warn-bg);border-radius:var(--r);padding:7px 10px;margin:0 0 10px}
+@media (max-width:720px){.it-row{grid-template-columns:1fr 1fr}.it-row .it-r,.it-row .it-d{grid-column:1/-1}.it-row .it-v{grid-column:1/2}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root:not([data-theme="light"]) .pill.st.fat{background:#2c2240;color:#c3a6f0}:root:not([data-theme="light"]) .pill.st.ok{background:#14302b;color:#6fd3c2}}
 :root[data-theme="dark"] .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root[data-theme="dark"] .pill.st.fat{background:#2c2240;color:#c3a6f0}:root[data-theme="dark"] .pill.st.ok{background:#14302b;color:#6fd3c2}
 .tag-imp{font:500 10.5px var(--f-mono);color:var(--ink-3);border:1px dashed var(--line);border-radius:4px;padding:0 4px;vertical-align:1px}
@@ -363,12 +373,18 @@ const conNome = id => (S.d.consultores.find(c => c.id === id) || {}).nome || '';
 const uniNome = id => (S.d.todasUnidades.find(u => u.id === id) || {}).nome || '';
 const tdNome = id => (S.d.tiposDocumento.find(t => t.id === id) || {}).nome || '';
 const resNome = id => (S.d.residuos.find(r => r.id === id) || {}).nome || '';
+const destDe = id => (S.d.destinadores || []).find(d => d.id === id) || null;
+const destNome = id => (destDe(id) || {}).nome || '';
+const kgF = v => (+v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' kg';
+const R4 = v => (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const itensDe = id => (S.d.itens || []).filter(i => i.solicitacaoId === id).sort((a, b) => a.ordem - b.ordem);
+const semDest = serv => (S.d.listas.servicoSemDestinacao || []).includes(serv || '');
 const docsDe = id => S.d.documentos.filter(d => d.solicitacaoId === id);
 const pendentes = id => docsDe(id).filter(d => d.situacao === 'Pendente').length;
 const passaUni = x => !S.uni || x.unidadeId === S.uni;
 const passaBusca = txt => !S.busca || txt.toLowerCase().includes(S.busca.toLowerCase());
 function statusPill(st) {
-  const cls = { 'Recebida': '', 'Documentação pendente': 'warn', 'Liberada para programar': 'lib', 'Programada': 'lib', 'Realizada': 'ok', 'BM enviado': 'fat', 'NF emitida': 'nf', 'Cancelada': 'crit', 'Frustrada': 'crit' }[st] || '';
+  const cls = { 'Recebida': '', 'Documentação pendente': 'warn', 'Liberada para programar': 'lib', 'Programada': 'lib', 'Realizada': 'ok', 'Destinação': 'dest', 'BM enviado': 'fat', 'NF emitida': 'nf', 'Cancelada': 'crit', 'Frustrada': 'crit' }[st] || '';
   return `<span class="pill st ${cls}">${esc(st)}</span>`;
 }
 
@@ -427,6 +443,7 @@ function formSol() {
       ${e.id ? `<p class="sub">${statusPill(e.status)} ${e.origem === 'planilha' ? '<span class="tag-imp" title="Importada da planilha de acompanhamento">planilha</span>' : ''} ${e.motivo ? '· Motivo: ' + esc(e.motivo) : ''}</p>` : '<p class="sub">O cliente vem do Mapa Operacional (código UPLOG). Os documentos exigidos para o cliente entram sozinhos no checklist.</p>'}</div>
       <button class="btn sm" id="f-cancel" type="button">Fechar</button></div>
     ${e.id ? funil(e) : ''}
+    ${e.id && ['Recebida', 'Documentação pendente', 'Frustrada', 'Cancelada'].includes(e.status) && !S.ro && faltaLiberar(e) ? `<p class="lib-falta">${esc(faltaLiberar(e))}</p>` : ''}
     <form id="f" class="form" autocomplete="off">
       <div class="fld full"><label for="f-cli">Cliente</label>
         <div class="row" style="gap:6px;flex-wrap:nowrap"><input id="f-cli" list="dl-cli" required value="${esc(cli.id ? cliRot(cli) : '')}" placeholder="Código UPLOG ou nome" ${travado ? 'disabled' : ''}>
@@ -444,7 +461,12 @@ function formSol() {
       <div class="fld"><label for="f-dp">Data prevista da coleta</label><input id="f-dp" type="date" value="${esc(e.dataPrevista)}"></div>
       <div class="fld"><label for="f-dc">Data da coleta (realizada)</label><input id="f-dc" type="date" value="${esc(e.dataColeta)}"></div>
       <div class="fld"><label for="f-val">Valor previsto (R$)</label><input id="f-val" type="number" step="any" min="0" value="${esc(e.valorPrevisto)}"></div>
-      <div class="fld full"><label>Resíduos</label><div class="chips" id="f-res">${resAtivos.map(r => `<label class="chip"><input type="checkbox" value="${esc(r.id)}" ${(e.residuoIds || []).includes(r.id) ? 'checked' : ''}> ${esc(r.nome)}</label>`).join('') || '<span class="sub">Nenhum resíduo no catálogo do Mapa.</span>'}</div></div>
+      <div class="fld full" style="grid-column:1/-1"><label>Resíduos e destinação prevista (da precificação)</label>
+        <div class="itens" id="f-itens">${itensHTML(e, travado)}</div>
+        ${travado ? '' : '<div class="row" style="gap:8px;margin-top:6px"><button class="btn sm" type="button" id="f-it-add">+ Resíduo</button><span class="hint" style="min-height:0">Um destinador ou reciclador por resíduo. O preço e se é custo ou receita vêm do Mapa.</span></div>'}</div>
+      <div class="fld"><label for="f-km">Km prevista (total)</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="f-km" type="number" step="any" min="0" value="${esc(e.kmPrevista)}" ${travado ? 'disabled' : ''}>${travado ? '' : '<button class="btn sm" type="button" id="f-km-rota" style="white-space:nowrap" title="Unidade → cliente → destinadores → unidade, pelas localizações do Mapa">Pela rota</button>'}</div><div class="hint" id="h-km"></div></div>
+      <div class="fld"><label for="f-dia">Diárias da equipe (dias)</label><input id="f-dia" type="number" step="1" min="0" value="${esc(e.diariasPrevistas)}" title="Dias de operação contados na precificação" ${travado ? 'disabled' : ''}></div>
+      <div class="fld"><label for="f-pern">Pernoites previstos</label><input id="f-pern" type="number" step="1" min="0" value="${esc(e.pernoitesPrevistos)}" ${travado ? 'disabled' : ''}></div>
       <div class="fld full"><label for="f-desc">Descrição do serviço</label><textarea id="f-desc" rows="2" placeholder="O que coletar, quantidade estimada, equipamento…">${esc(e.descricao)}</textarea></div>
       <div class="fld full"><label for="f-obs">Observações</label><textarea id="f-obs" rows="2">${esc(e.obs)}</textarea></div>
       ${e.origem === 'planilha' && (e.solicitanteNome || e.programadorNome) ? `<p class="hint full">Na planilha: solicitante ${esc(e.solicitanteNome || '—')}, programador ${esc(e.programadorNome || '—')}.</p>` : ''}
@@ -457,8 +479,79 @@ function formSol() {
     ${e.id ? `<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sm" id="f-hist">Histórico</button>${travado ? '' : '<button class="btn sm danger" id="f-del">Excluir</button>'}</div>` : ''}
   </section>`;
 }
+function iniciarItens(e) {
+  if (e._itens) return e._itens;
+  const its = e.id ? itensDe(e.id) : [];
+  e._itens = its.length ? its.map(i => ({ ...i })) : (e.residuoIds || []).map(r => ({ residuoId: r, pesoEstimado: '', destinadorId: '' }));
+  if (!e._itens.length) e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' });
+  return e._itens;
+}
+function destOpts(resId, sel) {
+  const ds = (S.d.destinadores || []);
+  const com = resId ? ds.filter(d => d.precos && d.precos[resId] !== undefined) : [];
+  const sem = ds.filter(d => !com.includes(d));
+  const rot = d => { const p = resId && d.precos ? d.precos[resId] : undefined; const n = resId && d.naturezas ? d.naturezas[resId] : (d.reciclador ? 'receita' : 'custo');
+    return d.nome + (p !== undefined && p !== '' ? ' · ' + R4(p) + '/kg' : '') + ' · ' + (n === 'receita' ? 'receita' : 'custo'); };
+  const o = l => l.map(d => `<option value="${esc(d.id)}" ${d.id === sel ? 'selected' : ''}>${esc(rot(d))}</option>`).join('');
+  const extra = sel && !ds.some(d => d.id === sel) ? `<option value="${esc(sel)}" selected>${esc(sel)} (inativo)</option>` : '';
+  return `<option value="">Destinador ou reciclador…</option>${extra}${com.length ? `<optgroup label="Com preço para este resíduo">${o(com)}</optgroup><optgroup label="Outros">${o(sem)}</optgroup>` : o(sem)}`;
+}
+function itemValor(it) {
+  const d = destDe(it.destinadorId); if (!d || !it.residuoId) return '';
+  const p = d.precos ? d.precos[it.residuoId] : undefined; const nat = (d.naturezas && d.naturezas[it.residuoId]) || (d.reciclador ? 'receita' : 'custo');
+  const pill = `<span class="pill ${nat === 'receita' ? 'receita' : 'custo'}">${nat === 'receita' ? 'receita' : 'custo'}</span>`;
+  if (p === undefined || p === '') return pill + ' sem preço no Mapa';
+  return pill + ' ' + R4(p) + '/kg' + (+it.pesoEstimado > 0 ? ' · ' + R(p * it.pesoEstimado) : '');
+}
+function itensHTML(e, travado) {
+  const its = iniciarItens(e);
+  const resAtivos = S.d.residuos.filter(r => r.ativo || its.some(i => i.residuoId === r.id));
+  return its.map((it, i) => `<div class="it-row" data-it="${i}">
+      <select class="it-r" data-itr aria-label="Resíduo ${i + 1}" ${travado ? 'disabled' : ''}>${opts(resAtivos.map(r => [r.id, r.nome]), it.residuoId, 'Resíduo…')}</select>
+      <input data-itp type="number" step="any" min="0" placeholder="kg estimado" aria-label="Peso estimado (kg)" value="${esc(it.pesoEstimado)}" ${travado ? 'disabled' : ''}>
+      <select class="it-d" data-itd aria-label="Destinador do resíduo ${i + 1}" ${travado ? 'disabled' : ''}>${destOpts(it.residuoId, it.destinadorId)}</select>
+      <span class="it-v" data-itv>${itemValor(it)}</span>
+      ${travado ? '<span></span>' : `<button type="button" class="btn sm" data-itx aria-label="Remover resíduo ${i + 1}" title="Remover">×</button>`}
+      ${it.destinadorPrevistoId && it.destinadorId && it.destinadorPrevistoId !== it.destinadorId ? `<div class="it-tr">Trocado na programação (previsto: ${esc(destNome(it.destinadorPrevistoId) || it.destinadorPrevistoId)})${it.justificativaTroca ? ' — ' + esc(it.justificativaTroca) : ''}</div>` : ''}
+    </div>`).join('') + itensTotal(its);
+}
+function itensTotal(its) {
+  let custo = 0, rec = 0, kg = 0;
+  its.forEach(it => { const d = destDe(it.destinadorId); kg += +it.pesoEstimado || 0; if (!d) return; const p = d.precos ? +d.precos[it.residuoId] || 0 : 0;
+    const nat = (d.naturezas && d.naturezas[it.residuoId]) || (d.reciclador ? 'receita' : 'custo'); if (nat === 'receita') rec += p * (+it.pesoEstimado || 0); else custo += p * (+it.pesoEstimado || 0); });
+  return kg ? `<div class="it-tot">Total estimado: ${kgF(kg)}${custo ? ' · custo de destinação ' + R(custo) : ''}${rec ? ' · receita de reciclagem ' + R(rec) : ''}</div>` : '';
+}
+function faltaLiberar(e) {
+  if (semDest(e.servico)) return '';
+  const its = (e._itens || itensDe(e.id)).filter(i => i.residuoId || i.destinadorId || i.pesoEstimado !== '');
+  const f = [];
+  if (!its.length) f.push('os resíduos com o destinador previsto');
+  its.forEach((it, i) => { const n = resNome(it.residuoId) || 'resíduo ' + (i + 1); if (!(+it.pesoEstimado > 0)) f.push('o peso estimado de ' + n); if (!it.destinadorId) f.push('o destinador de ' + n); });
+  if (!(+e.kmPrevista > 0)) f.push('a km prevista');
+  if (!(+e.diariasPrevistas > 0)) f.push('as diárias da equipe');
+  return f.length ? 'Para liberar para programar, informe ' + f.join(', ') + '.' : '';
+}
+/* km prevista pela rota: unidade → cliente → destinadores → unidade (OSRM; se falhar, linha reta × 1,3) */
+async function kmPelaRota(uniId, cliId, destIds) {
+  const C = S.d.coords || { cad: {}, uni: {} };
+  const ini = C.uni[uniId], cli = C.cad[cliId];
+  const faltam = [];
+  if (!ini) faltam.push('a unidade'); if (!cli) faltam.push('o cliente');
+  const ds = [...new Set(destIds.filter(Boolean))];
+  const pts = ds.map(id => C.cad[id]); ds.forEach((id, i) => { if (!pts[i]) faltam.push(destNome(id) || 'destinador'); });
+  if (faltam.length) return { erro: 'Sem localização no Mapa para ' + faltam.join(', ') + '.' };
+  const rota = [ini, cli, ...pts, ini];
+  try {
+    const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + rota.map(p => p[1] + ',' + p[0]).join(';') + '?overview=false');
+    const j = await r.json();
+    if (j.code === 'Ok' && j.routes && j.routes[0]) return { km: Math.round(j.routes[0].distance / 1000), fonte: 'rota' };
+  } catch (er) { /* sem rota: estimativa */ }
+  const hv = (a, b) => { const R0 = 6371, t = x => x * Math.PI / 180; const dLa = t(b[0] - a[0]), dLo = t(b[1] - a[1]); const h = Math.sin(dLa / 2) ** 2 + Math.cos(t(a[0])) * Math.cos(t(b[0])) * Math.sin(dLo / 2) ** 2; return 2 * R0 * Math.asin(Math.sqrt(h)); };
+  let km = 0; for (let i = 1; i < rota.length; i++) km += hv(rota[i - 1], rota[i]);
+  return { km: Math.round(km * 1.3), fonte: 'estimativa' };
+}
 function funil(e) {
-  const passos = ['Recebida', 'Liberada para programar', 'Programada', 'Realizada', 'BM enviado', 'NF emitida'];
+  const passos = ['Recebida', 'Liberada para programar', 'Programada', 'Realizada'].concat(e.exigeDestinacao === false ? [] : ['Destinação'], ['BM enviado', 'NF emitida']);
   const atual = e.status === 'Documentação pendente' ? 'Recebida' : e.status;
   const iA = passos.indexOf(atual);
   const fora = e.status === 'Cancelada' || e.status === 'Frustrada';
@@ -471,11 +564,11 @@ function funil(e) {
     if (['Liberada para programar', 'Programada'].includes(e.status)) b.push(['Realizada', 'Marcar realizada', e.status === 'Programada' ? 'pri' : '']);
     if (['Liberada para programar', 'Programada', 'Realizada'].includes(e.status)) b.push(['Recebida', 'Voltar para recebida', '']);
     if (['Liberada para programar', 'Programada'].includes(e.status)) b.push(['Frustrada', 'Frustrada', '']);
-    if (!fora && e.status !== 'Realizada') b.push(['Cancelada', 'Cancelar', 'danger']);
+    if (!fora && e.status !== 'Realizada' && e.status !== 'Destinação') b.push(['Cancelada', 'Cancelar', 'danger']);
   }
   return `<ol class="funil">${passos.map((p, i) => `<li class="${fora ? '' : i < iA ? 'feito' : i === iA ? 'agora' : ''}">${esc(p === 'Recebida' && e.status === 'Documentação pendente' ? 'Doc. pendente' : p)}</li>`).join('')}</ol>
     ${b.length ? `<div class="row" style="gap:6px;margin:4px 0 12px">${b.map(x => `<button class="btn sm ${x[2]}" data-st="${esc(x[0])}">${esc(x[1])}</button>`).join('')}</div>` : ''}
-    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : naProg ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
+    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : e.status === 'Destinação' ? '<p class="hint">Destinação confirmada no Controle de Destinação: segue para o BM no Faturamento.</p>' : e.status === 'Realizada' && e.exigeDestinacao !== false ? '<p class="hint">Aguardando a confirmação da destinação (ticket da balança) no Controle de Destinação, aba "A destinar".</p>' : naProg ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
 }
 function docsHTML(e, docs) {
   const L = S.d.listas;
@@ -502,13 +595,38 @@ function ligarForm() {
       ic.value = cliRot(r.cliente); $('#dl-cli').insertAdjacentHTML('beforeend', `<option value="${esc(cliRot(r.cliente))}">`); ic.onchange(); toast('Cliente cadastrado no Mapa (sem localização — complete lá depois).'); }
     catch (er) { falha(er); }
   };
+  const box = $('#f-itens');
+  const redesenharItens = () => { box.innerHTML = itensHTML(e, S.ro); ligarItens(); };
+  const ligarItens = () => {
+    $$('#f-itens [data-it]').forEach(row => {
+      const it = e._itens[+row.dataset.it];
+      const atual = () => { const v = row.querySelector('[data-itv]'); if (v) v.innerHTML = itemValor(it); const t = box.querySelector('.it-tot'); if (t) t.outerHTML = itensTotal(e._itens); else box.insertAdjacentHTML('beforeend', itensTotal(e._itens)); };
+      row.querySelector('[data-itr]').onchange = ev => { it.residuoId = ev.target.value; redesenharItens(); };
+      row.querySelector('[data-itp]').oninput = ev => { it.pesoEstimado = ev.target.value; atual(); };
+      row.querySelector('[data-itd]').onchange = ev => { it.destinadorId = ev.target.value; atual(); };
+      const x = row.querySelector('[data-itx]'); if (x) x.onclick = () => { e._itens.splice(+row.dataset.it, 1); if (!e._itens.length) e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' }); redesenharItens(); };
+    });
+  };
+  if (box) ligarItens();
+  const ia = $('#f-it-add'); if (ia) ia.onclick = () => { e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' }); redesenharItens(); const l = $$('#f-itens [data-itr]'); l[l.length - 1].focus(); };
+  const kr = $('#f-km-rota'); if (kr) kr.onclick = async () => {
+    const cliId = resolver(); const uniId = $('#f-uni').value;
+    if (!cliId || !uniId) { toast('Escolha o cliente e a unidade primeiro.'); return; }
+    kr.disabled = true; $('#h-km').textContent = 'Calculando a rota…';
+    const r = await kmPelaRota(uniId, cliId, e._itens.map(i => i.destinadorId));
+    kr.disabled = false;
+    if (r.erro) { $('#h-km').innerHTML = `<span class="warn">${esc(r.erro)}</span>`; return; }
+    $('#f-km').value = r.km;
+    $('#h-km').textContent = r.fonte === 'rota' ? 'Pela rota: unidade → cliente → destinador(es) → unidade.' : 'Estimativa em linha reta (+30%): a rota não respondeu.';
+  };
   const f = $('#f'); if (f) f.onsubmit = async ev => {
     ev.preventDefault();
     const clienteId = resolver(); if (!clienteId) { toast('Escolha um cliente da lista (ou cadastre com "+ Novo cliente").'); ic.focus(); return; }
     const reg = { id: e.id || '', clienteId, unidadeId: $('#f-uni').value, consultorId: $('#f-con').value, servico: $('#f-serv').value, demanda: $('#f-dem').value,
       perfil: $('#f-perf').value, execucao: $('#f-exec').value, dataSolicitacaoConsultor: $('#f-dsc').value, dataSolicitacao: $('#f-ds').value,
       dataPrevista: $('#f-dp').value, dataColeta: $('#f-dc').value, valorPrevisto: $('#f-val').value, descricao: $('#f-desc').value, obs: $('#f-obs').value,
-      residuoIds: $$('#f-res input:checked').map(x => x.value) };
+      kmPrevista: $('#f-km').value, diariasPrevistas: $('#f-dia').value, pernoitesPrevistos: $('#f-pern').value,
+      itens: e._itens.filter(i => i.residuoId || i.destinadorId || i.pesoEstimado !== '').map(i => ({ id: i.id || '', residuoId: i.residuoId, pesoEstimado: i.pesoEstimado, destinadorId: i.destinadorId })) };
     const b = $('#f-save'); b.disabled = true;
     try { const r = await Portal.api('sol.salvar', { registro: reg }); toast(e.id ? 'Solicitação atualizada' : 'Solicitação registrada'); S.edit = { id: r.id }; await carregar(true); }
     catch (er) { b.disabled = false; falha(er); }
@@ -703,7 +821,7 @@ async function excluirCad(tabela, x) {
   catch (e) { if (e && e.erro === 'em_uso') { if (await Portal.confirmarInativar(e, x.nome)) { await Portal.api('sol.ativoCadastro', { tabela, id: x.id, ativo: false }); toast('Inativado'); await carregar(true); } } else falha(e); }
 }
 const EM_ANDAMENTO = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada'];
-const REALIZADAS = ['Realizada', 'BM enviado', 'NF emitida'];
+const REALIZADAS = ['Realizada', 'Destinação', 'BM enviado', 'NF emitida'];
 function renderConsultores() {
   // só consulta: o cadastro (e o acesso ao portal) fica no módulo Pessoas
   if (!S.mesCon) S.mesCon = hojeISO().slice(0, 7);
@@ -801,6 +919,9 @@ function renderDocumentos() {
   </section>
   <section class="panel"><div class="panel-h"><div><h2>Serviços</h2><p class="sub">Lista do campo "Serviço" da solicitação. Um por linha, na ordem em que devem aparecer.</p></div></div>
     <textarea id="serv" rows="5" ${S.ro ? 'disabled' : ''} style="max-width:420px">${esc(S.d.listas.servico.join('\n'))}</textarea>
+    <h3 class="sec" style="margin-top:12px">Serviços sem destinação</h3>
+    <p class="sub">Marque os serviços que não levam resíduo para destinador (ex.: só locação). Eles não pedem destinador para liberar nem MTR na coleta, e vão de Realizada direto para o BM.</p>
+    <div class="chips" id="serv-sd">${S.d.listas.servico.map(v => `<label class="chip"><input type="checkbox" value="${esc(v)}" ${semDest(v) ? 'checked' : ''} ${S.ro ? 'disabled' : ''}> ${esc(v)}</label>`).join('')}</div>
     ${S.ro ? '' : '<div class="row" style="margin-top:8px"><button class="btn" id="serv-salvar">Salvar serviços</button></div>'}</section>`;
   TD.ligar();
   const dc = $('#d-cli'); dc.onchange = () => { const v = dc.value.trim(); const c = S.d.clientes.find(c => cliRot(c) === v) || S.d.clientes.find(c => c.codigoUplog === v); S.abrir = c ? c.id : null; render(); };
@@ -812,7 +933,11 @@ function renderDocumentos() {
   $$('[data-thist]').forEach(b => b.onclick = () => Portal.mostrarHistorico('TiposDocumento', b.dataset.thist, achar(b.dataset.thist).nome));
   $$('[data-tdel]').forEach(b => b.onclick = () => excluirCad('TiposDocumento', achar(b.dataset.tdel)));
   $$('[data-treat]').forEach(b => b.onclick = async () => { await Portal.api('sol.ativoCadastro', { tabela: 'TiposDocumento', id: b.dataset.treat, ativo: true }).catch(falha); await carregar(true); });
-  const sv = $('#serv-salvar'); if (sv) sv.onclick = async () => { try { await Portal.api('sol.salvarLista', { lista: 'servico', valores: $('#serv').value.split('\n') }); toast('Serviços salvos'); await carregar(true); } catch (e) { falha(e); } };
+  const sv = $('#serv-salvar'); if (sv) sv.onclick = async () => { try {
+    const vals = $('#serv').value.split('\n').map(x => x.trim()).filter(Boolean);
+    await Portal.api('sol.salvarLista', { lista: 'servico', valores: vals });
+    await Portal.api('sol.salvarLista', { lista: 'servicoSemDestinacao', valores: $$('#serv-sd input:checked').map(x => x.value).filter(v => vals.includes(v)) });
+    toast('Serviços salvos'); await carregar(true); } catch (e) { falha(e); } };
 }
 
 /* ---------- importar a planilha de acompanhamento (admin do portal) ---------- */
