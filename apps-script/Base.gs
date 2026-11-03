@@ -48,8 +48,10 @@ const TABELAS = {
   Solicitacoes:         { prefixo: 'SOL', colunas: ['id', 'unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds',
                                                       'descricao', 'dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'valorPrevisto',
                                                       'status', 'motivo', 'obs', 'solicitanteNome', 'programadorNome', 'origem', 'idOrigem', 'rotinaId',
-                                                      'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'ativo'],
-                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'], data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'] },
+                                                      'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos',
+                                                      // cobrança por km rodado: o solicitante escolhe o km real ou o previsto (Km.gs)
+                                                      'kmCobranca', 'kmCobrado', 'kmDefinidoPor', 'kmDefinidoEm', 'kmObs', 'ativo'],
+                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'kmCobrado'], data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'kmDefinidoEm'] },
   // Resíduos da solicitação, com a destinação prevista na precificação (o destinador pode ser trocado na Programação, com justificativa)
   SolicitacaoItens:     { prefixo: 'SIT', colunas: ['id', 'solicitacaoId', 'ordem', 'residuoId', 'pesoEstimado', 'destinadorId', 'destinadorPrevistoId', 'precoKg', 'natureza',
                                                       'justificativaTroca'], numero: ['ordem', 'pesoEstimado', 'precoKg'] },
@@ -424,7 +426,7 @@ const ROTULOS_CAMPOS = {
   unidadeMedida: 'Unidade de medida', valorUnitario: 'Valor unitário', sentido: 'Sentido',
   kmPrevista: 'Km prevista', diariasPrevistas: 'Diárias previstas', pesoEstimado: 'Peso estimado (kg)', destinadorPrevistoId: 'Destinador previsto',
   justificativaTroca: 'Justificativa da troca de destinador', kmInicial: 'Km inicial', kmFinal: 'Km na volta à base', fonte: 'Origem do descarte', pesoMtr: 'Peso no MTR (kg)',
-  motivoDivergencia: 'Divergência', cdfId: 'CDF', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados',
+  motivoDivergencia: 'Divergência', cdfId: 'CDF', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados', kmCobranca: 'Km da cobrança', kmCobrado: 'Km cobrado', kmDefinidoPor: 'Km definido por', kmDefinidoEm: 'Km definido em', kmObs: 'Observação do km',
   apelido: 'Nome na programação', funcao: 'Função', funcoes: 'Funções', pessoaId: 'Pessoa', vinculo: 'Vínculo', cpf: 'CPF', cnhCategoria: 'Categoria da CNH', cnhValidade: 'Validade da CNH', fotoId: 'Foto',
   dataSaida: 'Data de saída', dataRetornoPrevisto: 'Retorno previsto', dataRetorno: 'Retorno à base', motoristaId: 'Motorista', transportadorId: 'Transportadora',
   custoTerceiro: 'Custo do terceiro (R$)', pernoitesPrevistos: 'Pernoites previstos', pernoitesRealizados: 'Pernoites realizados', valorNoite: 'Valor do pernoite (R$)',

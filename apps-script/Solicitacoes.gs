@@ -17,8 +17,8 @@ const SOL_LISTAS = {
   execucao: ['Própria', 'Terceirizada', 'Mista'],
   servico: ['Coleta e destinação'],
   situacaoDocumento: ['Pendente', 'Recebido', 'Dispensado'],
-  modalidadePreco: ['Por kg', 'Transporte + kg', 'Valorização com transporte', 'Valorização sem transporte'],
-  unidadeMedida: ['kg', 't', 'un', 'viagem', 'm³', 'diária', 'mês'],
+  modalidadePreco: ['Por kg', 'Transporte + kg', 'Valorização com transporte', 'Valorização sem transporte', 'Km rodado + kg', 'Km rodado + valorização'],
+  unidadeMedida: ['kg', 't', 'un', 'viagem', 'km', 'm³', 'diária', 'mês'],
 };
 // Sugestões iniciais; a lista é editável na aba Configurações das Solicitações.
 const TIPOS_DOCUMENTO_INICIAIS = ['Pedido / ordem de compra', 'Integração de segurança', 'Documentação da equipe (ASO, NRs)', 'Autorização de acesso', 'Ficha / FISPQ do resíduo'];
@@ -59,6 +59,7 @@ function solPublica_(r) {
   o.residuoIds = separar_(r.residuoIds);
   ['kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'].forEach(function (c) { o[c] = numOuVazio_(r[c]); });
   o.exigeDestinacao = exigeDestinacao_(r);
+  o.kmCobrado = numOuVazio_(r.kmCobrado); o.kmDefinidoEm = dataTexto_(r.kmDefinidoEm);
   return o;
 }
 /** Situação de faturamento de cada solicitação (BM/NF ativos). */
@@ -84,8 +85,10 @@ function solDados_(u) {
     const x = { viagemId: v.id, data: dataTexto_(p.data) || dataTexto_(v.dataSaida), placa: String(v.placa || ''), resultado: String(p.resultado || ''), execucao: String(v.execucao) };
     if (!prog[p.solicitacaoId] || prog[p.solicitacaoId].data <= x.data) prog[p.solicitacaoId] = x;
   });
-  const sols = ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId); }).map(function (r) {
-    const o = solPublica_(r); o.faturamento = fat[r.id] || null; o.programacao = prog[r.id] || null; return o;
+  const brutas = ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId); });
+  const km = infoKm_(brutas);
+  const sols = brutas.map(function (r) {
+    const o = solPublica_(r); o.faturamento = fat[r.id] || null; o.programacao = prog[r.id] || null; o.km = km[r.id] || null; return o;
   });
   const visiveis = {}; sols.forEach(function (s) { visiveis[s.id] = 1; });
   return { ok: true,
@@ -104,6 +107,8 @@ function solDados_(u) {
     destinadores: destinadoresProgramacao_(),
     coords: coordenadasCadastros_(),
     rotinas: ler_('Rotinas').filter(function (r) { return veUnidade_(u, r.unidadeId); }).map(rotPublica_),
+    precosKm: ler_('PrecosCliente').filter(function (p) { return p.ativo && modalidadeKm_(p.modalidade) && p.valorTransporte !== ''; })
+      .map(function (p) { return { cadastroId: String(p.cadastroId), valorKm: num_(p.valorTransporte), modalidade: String(p.modalidade), vigenciaInicio: dataTexto_(p.vigenciaInicio), vigenciaFim: dataTexto_(p.vigenciaFim) }; }),
     frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,
     podeImportar: !!u.adminPortal };
 }
@@ -166,6 +171,11 @@ function solSalvar_(reg, u) {
   if (atual) {
     if (atual.status === 'Realizada' && !r.dataColeta) return erroDados_('Solicitação realizada precisa da data da coleta.');
     if (r.clienteId !== String(atual.clienteId) && faturamentoPorSolicitacao_()[id]) return erroDados_('Esta solicitação já está num BM. Para trocar o cliente, cancele o BM no Faturamento.');
+    // km previsto escolhido para a cobrança acompanha a km prevista enquanto a coleta não está no BM
+    if (atual.kmCobranca === 'Previsto' && r.kmPrevista !== numOuVazio_(atual.kmPrevista) && !faturamentoPorSolicitacao_()[id]) {
+      if (!(r.kmPrevista > 0)) return erroDados_('O km previsto foi escolhido para a cobrança: informe a km prevista.');
+      r.kmCobrado = r.kmPrevista;
+    }
     atualizar_('Solicitacoes', id, r, u, 'solicitacoes', { registroNome: rotuloSol_(r) });
     return { ok: true, id: id };
   }

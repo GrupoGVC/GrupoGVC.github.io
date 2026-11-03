@@ -171,6 +171,8 @@ function sincronizarSolicitacao_(solId, u) {
     campos.status = s.status === 'Frustrada' ? 'Frustrada' : 'Liberada para programar';
   }
   atualizar_('Solicitacoes', solId, campos, u, 'programacao', { registroNome: rotuloSol_(s) });
+  // serviço sem destinação: já pode ir para o BM, então o km é definido agora
+  if (campos.status === 'Realizada' && s.status !== 'Realizada' && !exigeDestinacao_(s)) avisarDefinirKm_(porId_('Solicitacoes', solId));
 }
 /** Conferências da viagem: devolve {erros, avisos}. Erros bloqueiam; avisos pedem confirmação. */
 function conferirViagem_(v, equipeIds, id) {

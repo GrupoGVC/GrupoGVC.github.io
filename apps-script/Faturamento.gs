@@ -28,12 +28,14 @@ function precoPublico_(r) {
   return o;
 }
 function fatDados_(u) {
-  const sols = ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId) && (prontaParaBm_(r) || ['BM enviado', 'NF emitida'].indexOf(String(r.status)) >= 0); })
-    .map(solPublica_);
+  const brutas = ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId) && (prontaParaBm_(r) || ['BM enviado', 'NF emitida'].indexOf(String(r.status)) >= 0); });
+  const km = infoKm_(brutas);
+  const sols = brutas.map(function (r) { const o = solPublica_(r); o.km = km[r.id] || null; return o; });
   return { ok: true,
     unidades: unidadesDoUsuario_(u), todasUnidades: unidadesLista_(),
     faturamentos: ler_('Faturamentos').filter(function (f) { return veUnidade_(u, f.unidadeId); }).map(fatPublico_),
     solicitacoes: sols,
+    aguardandoKm: sols.filter(function (s) { return s.km && s.km.pendente; }).length,
     aguardandoDestinacao: ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId) && r.status === 'Realizada' && exigeDestinacao_(r); }).length,
     clientes: clientesLista_(),
     consultores: consultoresLista_().map(function (r) { return { id: r.id, nome: r.nome }; }),
@@ -93,12 +95,14 @@ function fatSalvar_(reg, u) {
       const outro = jaNoBm[s.id];
       if (outro && outro.id !== reg.id) { erro = 'A solicitação de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' já está no BM ' + (outro.bmNumero || outro.id) + '.'; return; }
       if (!outro && !prontaParaBm_(s)) { erro = s.status === 'Realizada' ? 'A coleta de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' ainda aguarda a confirmação da destinação no Controle de Destinação.' : 'Só entram no BM solicitações com a destinação confirmada.'; return; }
+      if (!outro && !s.kmCobranca && precoKmVigente_(s.clienteId, dataRefKm_(s))) { erro = 'A coleta de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' aguarda o solicitante definir o km da cobrança (real ou previsto) em Solicitações.'; return; }
       unidadeId = unidadeId || String(s.unidadeId || '');
     }
     it.valor = arred2_(it.quantidade * it.valorUnitario);
     itens.push(it);
   });
   if (erro) return erroDados_(erro);
+  const kmMudou = kmAlteradoNoBm_(itens, atual ? onde_('FaturamentoItens', 'faturamentoId', atual.id) : []);
   const solIds = itens.map(function (it) { return it.solicitacaoId; }).filter(String).filter(function (v, i, a) { return a.indexOf(v) === i; });
   if (!solIds.length) return erroDados_('Inclua pelo menos uma solicitação realizada no BM.');
   const total = arred2_(itens.reduce(function (t, it) { return t + (it.sentido === 'Desconto' ? -it.valor : it.valor); }, 0));
@@ -125,7 +129,21 @@ function fatSalvar_(reg, u) {
     hist_(u, 'faturamento', 'Faturamentos', id, rotuloFat_(campos), 'alterou', 'Itens do BM', '', resumoItens_(itens), '');
     statusSolicitacoes_(solIds, 'BM enviado', u);
   }
+  kmMudou.forEach(function (k) { hist_(u, 'faturamento', 'Faturamentos', id, rotuloFat_(campos), 'alterou', 'Km do transporte',
+    k.kmCobrado + ' km (' + k.escolha.toLowerCase() + ', definido por ' + k.por + ')', k.quantidade + ' km', 'Coleta de ' + k.data + ': o km do BM é diferente do definido pelo solicitante.'); });
   return { ok: true, id: id };
+}
+/** Itens de km (transporte por km rodado) com quantidade diferente do km definido pelo solicitante, que mudaram nesta gravação. */
+function kmAlteradoNoBm_(itens, antigos) {
+  const out = [];
+  itens.forEach(function (it) {
+    if (it.unidadeMedida !== 'km' || !it.solicitacaoId) return;
+    const p = it.precoClienteId ? porId_('PrecosCliente', it.precoClienteId) : null; if (!p || !modalidadeKm_(p.modalidade)) return;
+    const s = porId_('Solicitacoes', it.solicitacaoId); if (!s || !s.kmCobranca || num_(s.kmCobrado) === it.quantidade) return;
+    if (antigos.some(function (a) { return String(a.solicitacaoId) === it.solicitacaoId && a.unidadeMedida === 'km' && num_(a.quantidade) === it.quantidade; })) return;
+    out.push({ kmCobrado: num_(s.kmCobrado), quantidade: it.quantidade, escolha: String(s.kmCobranca), por: String(s.kmDefinidoPor || ''), data: dataTexto_(s.dataColeta).split('-').reverse().join('/') });
+  });
+  return out;
 }
 function solicitacoesDoBm_(id) {
   return onde_('FaturamentoItens', 'faturamentoId', id).map(function (it) { return String(it.solicitacaoId); }).filter(String)
@@ -177,6 +195,7 @@ function fatAcao_(id, acao, x, u) {
 /* ---------------- preço de venda por cliente (mantido no Mapa Operacional) ---------------- */
 // Modalidades: Por kg · Transporte + kg · Valorização com transporte (cobra transporte, paga o kg ao cliente)
 //              · Valorização sem transporte (só o kg, pago ao cliente / desconto)
+//              · Km rodado + kg / Km rodado + valorização: valorTransporte = R$ por km (Km.gs)
 function precosVenda_(cadastroId) {
   return { ok: true, precos: onde_('PrecosCliente', 'cadastroId', cadastroId).map(precoPublico_)
     .sort(function (a, b) { return (b.ativo - a.ativo) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)); }),
@@ -198,11 +217,12 @@ function salvarPrecoVenda_(reg, u) {
               vigenciaInicio: dataTexto_(reg.vigenciaInicio), vigenciaFim: dataTexto_(reg.vigenciaFim), obs: String(reg.obs || '').trim() };
   if (!porId_('Cadastros', r.cadastroId)) return erroDados_('Cadastro não encontrado.');
   if (listaValores_('modalidadePreco').indexOf(r.modalidade) < 0) return erroDados_('Escolha a modalidade.');
-  const comTransporte = r.modalidade === 'Transporte + kg' || r.modalidade === 'Valorização com transporte';
+  const comTransporte = modalidadeComTransporte_(r.modalidade), porKm = modalidadeKm_(r.modalidade);
   if (!comTransporte) r.valorTransporte = '';
   if (r.residuoId && !porId_('Residuos', r.residuoId)) return erroDados_('Resíduo não encontrado.');
-  if (!r.residuoId && r.modalidade !== 'Transporte + kg' && r.modalidade !== 'Valorização com transporte') return erroDados_('Escolha o resíduo.');
-  if (r.precoKg === '' && !(comTransporte && r.valorTransporte !== '')) return erroDados_('Informe o preço por kg' + (comTransporte ? ' e/ou o valor do transporte.' : '.'));
+  if (!r.residuoId && !comTransporte) return erroDados_('Escolha o resíduo.');
+  if (!r.residuoId && r.valorTransporte === '') return erroDados_(porKm ? 'Informe o valor do transporte por km.' : 'Informe o valor do transporte.');
+  if (r.precoKg === '' && !(comTransporte && r.valorTransporte !== '')) return erroDados_('Informe o preço por kg' + (comTransporte ? ' e/ou o valor do transporte' + (porKm ? ' por km.' : '.') : '.'));
   if (!r.vigenciaInicio) return erroDados_('Informe a data de início da vigência.');
   if (r.vigenciaFim && r.vigenciaFim < r.vigenciaInicio) return erroDados_('O fim da vigência é antes do início.');
   if (atual) { atualizar_('PrecosCliente', atual.id, r, u, 'mapa', { tabela: 'Cadastros', registroId: r.cadastroId, registroNome: rotuloPreco_(r), prefixoCampo: 'Preço de venda · ' }); return { ok: true, id: atual.id }; }

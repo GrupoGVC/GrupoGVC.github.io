@@ -15,7 +15,7 @@
 const FONTE_COLETA = 'Coleta de cliente', FONTE_INTERNA = 'Operação interna';
 const SIT_PENDENTE = 'Pendente', SIT_DESTINADO = 'Destinado';
 const LIMITE_DIVERGENCIA = 0.2; // 20% de diferença de peso ou km acende o alerta
-const TIPOS_EMAIL = { programacao: 'Programação confirmada ou alterada', dp: 'Pernoite a pagar (DP)' };
+const TIPOS_EMAIL = { programacao: 'Programação confirmada ou alterada', dp: 'Pernoite a pagar (DP)', km: 'Definir o km da cobrança' };
 
 /* ---------------- utilidades ---------------- */
 function exigeDestinacao_(s) { return !!s && listaValores_('servicoSemDestinacao').indexOf(String(s.servico || '')) < 0; }
@@ -312,7 +312,11 @@ function confirmarDestinacao_(x, u) {
     });
   });
   pend.forEach(function (l) { if (!usados[l.id]) atualizar_('Lancamentos', l.id, { ativo: false, obs: (String(l.obs || '') + ' Não destinado na confirmação.').trim() }, u, 'destinacao', { registroNome: 'MTR ' + l.mtr }); });
-  if (s) atualizar_('Solicitacoes', s.id, { status: 'Destinação' }, u, 'destinacao', { registroNome: rotuloSol_(s) });
+  if (s) {
+    const ja = s.status === 'Destinação';
+    atualizar_('Solicitacoes', s.id, { status: 'Destinação' }, u, 'destinacao', { registroNome: rotuloSol_(s) });
+    if (!ja) avisarDefinirKm_(porId_('Solicitacoes', s.id));
+  }
   return { ok: true };
 }
 

@@ -42,7 +42,7 @@ const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa
                             'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda'];
 const ACOES_SOL_LEITURA = ['sol.dados', 'sol.previstoReal'];
 const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.excluir', 'sol.salvarCadastro', 'sol.excluirCadastro', 'sol.ativoCadastro',
-                           'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar'];
+                           'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar', 'sol.definirKm'];
 const ACOES_MINHAS = ['minhas.dados', 'minhas.linhaTempo'];
 const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
 const ACOES_PROG_ESCRITA = ['prog.salvarViagem', 'prog.viagemAcao'];
@@ -197,6 +197,7 @@ function rotear_(body) {
       case 'mapa.excluirPrecoVenda': return excluirPrecoVenda_(String(body.id), u);
       case 'sol.salvar': return solSalvar_(body.registro, u);
       case 'sol.status': return solStatus_(String(body.id), String(body.status), body.dados, u);
+      case 'sol.definirKm': return solDefinirKm_(body, u);
       case 'sol.documento': return solDocumento_(body.doc, u);
       case 'sol.excluir': return solExcluir_(String(body.id), u);
       case 'sol.salvarCadastro': return solSalvarCadastro_(String(body.tabela), body.registro, u);

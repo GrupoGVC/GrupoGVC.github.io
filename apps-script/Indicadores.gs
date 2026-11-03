@@ -79,7 +79,7 @@ function previstoReal_(de, ate, u) {
     const trocas = its.filter(function (it) { return it.destinadorPrevistoId && it.destinadorId && it.destinadorPrevistoId !== it.destinadorId; }).length +
       ls.filter(function (l) { return l.destinadorPrevistoId && String(l.destinadorPrevistoId) !== String(l.destinadorId); }).length;
     return { id: s.id, clienteId: String(s.clienteId), consultorId: String(s.consultorId || ''), unidadeId: String(s.unidadeId || ''), dataColeta: dataTexto_(s.dataColeta),
-      status: String(s.status), servico: String(s.servico || ''), destinada: destinada, viagens: vids.length, trocas: trocas, prev: prev, real: real,
+      status: String(s.status), servico: String(s.servico || ''), destinada: destinada, kmCobranca: String(s.kmCobranca || ''), kmCobrado: numOuVazio_(s.kmCobrado), viagens: vids.length, trocas: trocas, prev: prev, real: real,
       destinos: Object.keys(porD).map(function (k) { const x = porD[k]; return { destinadorId: k, prevKg: r2_(x.prevKg), prevValor: r2_(x.prevValor), realKg: r2_(x.realKg), realValor: r2_(x.realValor), natureza: x.natureza || 'custo' }; }) };
   });
   const usados = {}; linhas.forEach(function (l) { usados[l.clienteId] = 1; l.destinos.forEach(function (x) { usados[x.destinadorId] = 1; }); });
