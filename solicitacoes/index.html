@@ -272,6 +272,16 @@ h3.sec{font:600 14px var(--f-body);margin:18px 0 8px;color:var(--ink)}
 .it-row .it-v{font-size:12.5px;color:var(--ink-2);white-space:nowrap}
 .it-row .it-tr{grid-column:1/-1;font-size:12px;color:var(--warn)}
 .it-tot{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.km-box{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin:0 0 12px;background:var(--surface)}
+.km-box.pend{border-color:var(--warn);background:var(--warn-bg)}
+.km-box h3{margin:0 0 6px;font-size:14px}
+.km-ops{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin:6px 0}
+.km-op{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;cursor:pointer;background:var(--sunken)}
+.km-op.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.km-op.off{opacity:.55;cursor:not-allowed}
+.km-op .km-t{display:flex;gap:6px;align-items:center;font-weight:600}
+.km-op .km-t input{width:auto;margin:0}
+.km-op .km-v{font-variant-numeric:tabular-nums}
 .lib-falta{font-size:12.5px;color:var(--warn);background:var(--warn-bg);border-radius:var(--r);padding:7px 10px;margin:0 0 10px}
 @media (max-width:720px){.it-row{grid-template-columns:1fr 1fr}.it-row .it-r,.it-row .it-d{grid-column:1/-1}.it-row .it-v{grid-column:1/2}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root:not([data-theme="light"]) .pill.st.fat{background:#2c2240;color:#c3a6f0}:root:not([data-theme="light"]) .pill.st.ok{background:#14302b;color:#6fd3c2}}
@@ -339,6 +349,60 @@ const $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const R = v => v === '' || v == null ? '—' : (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const D = iso => iso ? iso.split('-').reverse().join('/') : '';
+/* ---------- cobrança por km rodado ---------- */
+function precoKmDe(clienteId, data) {
+  const c = cliDe(clienteId) || {}; const ids = [clienteId, c.principalId].filter(Boolean); data = data || hojeISO();
+  return (S.d.precosKm || []).filter(p => ids.includes(p.cadastroId) && (!p.vigenciaInicio || p.vigenciaInicio <= data) && (!p.vigenciaFim || p.vigenciaFim >= data))
+    .sort((a, b) => ids.indexOf(a.cadastroId) - ids.indexOf(b.cadastroId) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)))[0] || null;
+}
+function kmEstimadoTxt(clienteId, km, data) {
+  const p = clienteId ? precoKmDe(clienteId, data) : null; if (!p) return '';
+  return +km > 0 ? `Transporte estimado (km rodado): ${esc(km)} km × ${R(p.valorKm)} = <b>${R(+km * p.valorKm)}</b>` : `O cliente paga o transporte por km rodado (${R(p.valorKm)}/km): informe a km prevista.`;
+}
+const kmPendente = s => !!(s.km && s.km.pendente);
+function kmHTML(e) {
+  const k = e.km; if (!k) return '';
+  const pronta = e.status === 'Destinação' || (e.status === 'Realizada' && e.exigeDestinacao === false);
+  const pode = !S.ro && !k.noBm && pronta && !!k.precoId;
+  const editando = pode && (!k.escolha || e._kmEdit);
+  const vk = +k.valorKm || 0;
+  const sel = e._kmSel || k.escolha || '';
+  const dif = k.kmReal !== '' && +k.kmPrevista > 0 ? Math.round((k.kmReal - k.kmPrevista) / k.kmPrevista * 100) : null;
+  const viag = (k.viagens || []).map(v => `Viagem ${esc(v.placa || v.id)} de ${esc(D(v.saida))}: ${v.kmViagem === '' ? 'sem km registrado' : esc(v.kmViagem) + ' km rodados'}${v.paradas > 1 ? ' · parte desta coleta ' + Math.round(v.parte * 100) + '% (rateio pela km prevista)' : ''}`).join('<br>');
+  const op = (tipo, km, extra, ok) => `<label class="km-op ${ok ? '' : 'off'} ${sel === tipo ? 'sel' : ''}">
+      <span class="km-t">${editando ? `<input type="radio" name="km-esc" value="${tipo}" ${ok ? '' : 'disabled'} ${sel === tipo ? 'checked' : ''}>` : ''}Km ${tipo === 'Real' ? 'real (odômetro)' : 'previsto'}</span>
+      <span class="km-v">${ok ? esc(km) + ' km × ' + R(vk) + ' = <b>' + R(km * vk) + '</b>' : '—'}</span>
+      <span class="hint" style="min-height:0">${extra}</span></label>`;
+  const ops = `<div class="km-ops">
+    ${op('Previsto', k.kmPrevista, 'Informada na solicitação.', +k.kmPrevista > 0)}
+    ${op('Real', k.kmReal, (k.kmReal === '' ? '<span class="warn">' + esc(k.motivoReal) + '</span>' : (dif !== null ? (dif > 0 ? '+' : '') + dif + '% em relação ao previsto.<br>' : '')) + (viag ? (k.kmReal === '' ? '<br>' : '') + viag : ''), k.kmReal !== '')}</div>`;
+  let corpo;
+  if (k.escolha && !editando) {
+    corpo = `<p style="margin:0 0 4px">Km cobrado: <b>${esc(k.kmCobrado)} km (${esc(k.escolha.toLowerCase())})</b> × ${R(vk)} = <b>${R((+k.kmCobrado || 0) * vk)}</b></p>
+      <p class="hint" style="margin:0">Definido por ${esc(k.definidoPor || '—')} em ${esc(D(k.definidoEm))}${k.obs ? ' · ' + esc(k.obs) : ''}.</p>${ops}
+      ${k.noBm ? '<p class="hint">Já está num BM: para mudar o km, o Faturamento precisa cancelar o BM.</p>' : pode ? '<button class="btn sm" type="button" id="km-alt">Alterar escolha</button>' : ''}`;
+  } else if (editando) {
+    corpo = `<p class="hint" style="margin:0">Escolha qual km vai para o BM. O Faturamento só monta o BM depois desta escolha.</p>${ops}
+      <div class="row" style="gap:6px;align-items:flex-end"><div class="fld" style="flex:1;margin:0"><label for="km-obs">Observação (opcional)</label><input id="km-obs" value="${esc(e._kmObs != null ? e._kmObs : k.obs || '')}"></div>
+      ${k.escolha ? '<button class="btn sm" type="button" id="km-canc">Cancelar</button>' : ''}<button class="btn sm pri" type="button" id="km-ok" ${sel ? '' : 'disabled'}>Confirmar km</button></div>`;
+  } else {
+    corpo = `${ops}<p class="hint" style="margin:0">${!k.precoId ? 'Sem preço por km vigente na data da coleta.' : e.status === 'Realizada' ? 'O km da cobrança é escolhido depois da confirmação da destinação no Controle de Destinação.' : S.ro ? 'Só quem edita Solicitações define o km.' : ''}</p>`;
+  }
+  return `<div class="km-box ${k.pendente ? 'pend' : ''}" id="km-box"><h3>🚚 Km da cobrança · ${esc(k.modalidade || 'km rodado')} · ${R(vk)}/km ${k.pendente ? '<span class="pill warn">Definir km</span>' : ''}</h3>${corpo}</div>`;
+}
+function ligarKm(e) {
+  const box = $('#km-box'); if (!box) return;
+  const redesenhar = () => { box.outerHTML = kmHTML(e); ligarKm(e); };
+  box.querySelectorAll('input[name="km-esc"]').forEach(r => r.onchange = () => { e._kmObs = ($('#km-obs') || {}).value; e._kmSel = r.value; redesenhar(); });
+  const alt = $('#km-alt'); if (alt) alt.onclick = () => { e._kmEdit = true; redesenhar(); };
+  const cc = $('#km-canc'); if (cc) cc.onclick = () => { e._kmEdit = false; e._kmSel = ''; e._kmObs = null; redesenhar(); };
+  const ok = $('#km-ok'); if (ok) ok.onclick = async () => {
+    const esc2 = e._kmSel || e.km.escolha; if (!esc2) return;
+    ok.disabled = true;
+    try { const r = await Portal.api('sol.definirKm', { id: e.id, escolha: esc2, obs: $('#km-obs').value }); toast('Km da cobrança: ' + r.km + ' km (' + esc2.toLowerCase() + ')'); S.edit = { id: e.id }; await carregar(true); }
+    catch (er) { ok.disabled = false; falha(er); }
+  };
+}
 const hojeISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const NIVEL_LBL = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 const TABS = ['fila', 'todas', 'recorrentes', 'consultores', 'previsto', 'documentos', 'importar'];
@@ -426,7 +490,7 @@ function setTab(t) {
 $$('nav.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function render() {
   if (!S.d) return;
-  const abertas = S.d.solicitacoes.filter(s => ABERTAS.includes(s.status) && passaUni(s));
+  const abertas = S.d.solicitacoes.filter(s => (ABERTAS.includes(s.status) || kmPendente(s)) && passaUni(s));
   $('#ct-fila').textContent = abertas.length;
   ({ fila: renderFila, todas: renderTodas, recorrentes: renderRecorrentes, consultores: renderConsultores, previsto: renderPrevisto, documentos: renderDocumentos, importar: renderImportar })[S.tab]();
 }
@@ -446,6 +510,7 @@ function formSol() {
       ${e.id ? `<p class="sub">${statusPill(e.status)} ${e.origem === 'planilha' ? '<span class="tag-imp" title="Importada da planilha de acompanhamento">planilha</span>' : ''} ${e.motivo ? '· Motivo: ' + esc(e.motivo) : ''}</p>` : '<p class="sub">O cliente vem do Mapa Operacional (código UPLOG). Os documentos exigidos para o cliente entram sozinhos no checklist.</p>'}</div>
       <button class="btn sm" id="f-cancel" type="button">Fechar</button></div>
     ${e.id ? funil(e) : ''}
+    ${e.id ? kmHTML(e) : ''}
     ${e.id && ['Recebida', 'Documentação pendente', 'Frustrada', 'Cancelada'].includes(e.status) && !S.ro && faltaLiberar(e) ? `<p class="lib-falta">${esc(faltaLiberar(e))}</p>` : ''}
     <form id="f" class="form" autocomplete="off">
       <div class="fld full"><label for="f-cli">Cliente</label>
@@ -467,7 +532,7 @@ function formSol() {
       <div class="fld full" style="grid-column:1/-1"><label>Resíduos e destinação prevista (da precificação)</label>
         <div class="itens" id="f-itens">${itensHTML(e, travado)}</div>
         ${travado ? '' : '<div class="row" style="gap:8px;margin-top:6px"><button class="btn sm" type="button" id="f-it-add">+ Resíduo</button><span class="hint" style="min-height:0">Um destinador ou reciclador por resíduo. O preço e se é custo ou receita vêm do Mapa.</span></div>'}</div>
-      <div class="fld"><label for="f-km">Km prevista (total)</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="f-km" type="number" step="any" min="0" value="${esc(e.kmPrevista)}" ${travado ? 'disabled' : ''}>${travado ? '' : '<button class="btn sm" type="button" id="f-km-rota" style="white-space:nowrap" title="Unidade → cliente → destinadores → unidade, pelas localizações do Mapa">Pela rota</button>'}</div><div class="hint" id="h-km"></div></div>
+      <div class="fld"><label for="f-km">Km prevista (total)</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="f-km" type="number" step="any" min="0" value="${esc(e.kmPrevista)}" ${travado ? 'disabled' : ''}>${travado ? '' : '<button class="btn sm" type="button" id="f-km-rota" style="white-space:nowrap" title="Unidade → cliente → destinadores → unidade, pelas localizações do Mapa">Pela rota</button>'}</div><div class="hint" id="h-km"></div><div class="hint" id="h-kmv">${kmEstimadoTxt(e.clienteId, e.kmPrevista, e.dataColeta || e.dataPrevista)}</div></div>
       <div class="fld"><label for="f-dia">Diárias da equipe (dias)</label><input id="f-dia" type="number" step="1" min="0" value="${esc(e.diariasPrevistas)}" title="Dias de operação contados na precificação" ${travado ? 'disabled' : ''}></div>
       <div class="fld"><label for="f-pern">Pernoites previstos</label><input id="f-pern" type="number" step="1" min="0" value="${esc(e.pernoitesPrevistos)}" ${travado ? 'disabled' : ''}></div>
       <div class="fld full"><label for="f-desc">Descrição do serviço</label><textarea id="f-desc" rows="2" placeholder="O que coletar, quantidade estimada, equipamento…">${esc(e.descricao)}</textarea></div>
@@ -571,7 +636,7 @@ function funil(e) {
   }
   return `<ol class="funil">${passos.map((p, i) => `<li class="${fora ? '' : i < iA ? 'feito' : i === iA ? 'agora' : ''}">${esc(p === 'Recebida' && e.status === 'Documentação pendente' ? 'Doc. pendente' : p)}</li>`).join('')}</ol>
     ${b.length ? `<div class="row" style="gap:6px;margin:4px 0 12px">${b.map(x => `<button class="btn sm ${x[2]}" data-st="${esc(x[0])}">${esc(x[1])}</button>`).join('')}</div>` : ''}
-    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : e.status === 'Destinação' ? '<p class="hint">Destinação confirmada no Controle de Destinação: segue para o BM no Faturamento.</p>' : e.status === 'Realizada' && e.exigeDestinacao !== false ? '<p class="hint">Aguardando a confirmação da destinação (ticket da balança) no Controle de Destinação, aba "A destinar".</p>' : naProg ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
+    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : e.status === 'Destinação' ? (kmPendente(e) ? '<p class="hint">Destinação confirmada. Falta definir o km da cobrança (abaixo) para o Faturamento montar o BM.</p>' : '<p class="hint">Destinação confirmada no Controle de Destinação: segue para o BM no Faturamento.</p>') : e.status === 'Realizada' && e.exigeDestinacao !== false ? '<p class="hint">Aguardando a confirmação da destinação (ticket da balança) no Controle de Destinação, aba "A destinar".</p>' : naProg ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
 }
 function docsHTML(e, docs) {
   const L = S.d.listas;
@@ -612,6 +677,10 @@ function ligarForm() {
   };
   if (box) ligarItens();
   const ia = $('#f-it-add'); if (ia) ia.onclick = () => { e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' }); redesenharItens(); const l = $$('#f-itens [data-itr]'); l[l.length - 1].focus(); };
+  const kmv = () => { const h = $('#h-kmv'); if (h) h.innerHTML = kmEstimadoTxt(resolver(), $('#f-km').value, $('#f-dc').value || $('#f-dp').value); };
+  const fkm = $('#f-km'); if (fkm) fkm.addEventListener('input', kmv);
+  if (ic) ic.addEventListener('change', kmv);
+  ligarKm(e);
   const kr = $('#f-km-rota'); if (kr) kr.onclick = async () => {
     const cliId = resolver(); const uniId = $('#f-uni').value;
     if (!cliId || !uniId) { toast('Escolha o cliente e a unidade primeiro.'); return; }
@@ -619,7 +688,7 @@ function ligarForm() {
     const r = await kmPelaRota(uniId, cliId, e._itens.map(i => i.destinadorId));
     kr.disabled = false;
     if (r.erro) { $('#h-km').innerHTML = `<span class="warn">${esc(r.erro)}</span>`; return; }
-    $('#f-km').value = r.km;
+    $('#f-km').value = r.km; kmv();
     $('#h-km').textContent = r.fonte === 'rota' ? 'Pela rota: unidade → cliente → destinador(es) → unidade.' : 'Estimativa em linha reta (+30%): a rota não respondeu.';
   };
   const f = $('#f'); if (f) f.onsubmit = async ev => {
@@ -688,24 +757,26 @@ function linhaSol(s, comFat) {
     <td data-label="Consultor">${esc(conNome(s.consultorId) || '—')}</td>
     <td data-label="Solicitada" class="mono">${esc(D(s.dataSolicitacao))}</td>
     <td data-label="${comFat ? 'Coleta' : 'Prevista'}" class="mono">${esc(D(comFat ? s.dataColeta : (s.dataPrevista || s.dataColeta)))}</td>
-    <td data-label="Status">${statusPill(s.status)}${pend ? ` <span class="pill warn" title="Documentos pendentes">${pend} doc</span>` : ''}</td>
+    <td data-label="Status">${statusPill(s.status)}${kmPendente(s) ? ' <span class="pill warn" title="Escolher o km real ou o previsto">Definir km</span>' : ''}${pend ? ` <span class="pill warn" title="Documentos pendentes">${pend} doc</span>` : ''}</td>
     ${comFat ? `<td data-label="Valor" class="num">${R(s.faturamento ? (s.faturamento.nfValor !== '' ? s.faturamento.nfValor : s.faturamento.bmValor) : s.valorPrevisto)}</td><td data-label="BM/NF" class="mono">${s.faturamento ? esc((s.faturamento.nfNumero ? 'NF ' + s.faturamento.nfNumero : s.faturamento.bmNumero ? 'BM ' + s.faturamento.bmNumero : s.faturamento.status) + (s.faturamento.nfData ? ' · ' + D(s.faturamento.nfData) : '')) : ''}</td>` : ''}
   </tr>`;
 }
 function ligarLinhas() { $$('[data-sol]').forEach(tr => { tr.onclick = () => abrir(tr.dataset.sol); tr.onkeydown = ev => { if (ev.key === 'Enter') abrir(tr.dataset.sol); }; }); }
 function renderFila() {
-  const base = S.d.solicitacoes.filter(s => ABERTAS.includes(s.status) && passaUni(s));
-  const cont = st => base.filter(s => s.status === st).length;
-  const lista = base.filter(s => (!S.st || s.status === S.st) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog, conNome(s.consultorId), s.descricao].join(' ')))
+  const base = S.d.solicitacoes.filter(s => (ABERTAS.includes(s.status) || kmPendente(s)) && passaUni(s));
+  const cont = st => base.filter(s => st === 'km' ? kmPendente(s) : s.status === st).length;
+  const nKm = cont('km');
+  const lista = base.filter(s => (!S.st || (S.st === 'km' ? kmPendente(s) : s.status === S.st)) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog, conNome(s.consultorId), s.descricao].join(' ')))
     .sort((a, b) => ABERTAS.indexOf(a.status) - ABERTAS.indexOf(b.status) || String(a.dataPrevista || a.dataSolicitacao).localeCompare(String(b.dataPrevista || b.dataSolicitacao)));
   const T = Portal.tabela('sol-fila', colsSol(false), { titulo: 'Fila de solicitações', arquivo: 'solicitacoes-fila', unidade: 'solicitações', aoMudar: render, extrasExport: EXTRAS_SOL,
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => filtrosTopo(S.st && 'Status: ' + S.st, S.busca && 'Busca: "' + S.busca + '"') });
   const listaTela = lista; const listaF = T.aplicar(listaTela);
   const atrasadas = base.filter(s => (s.status === 'Liberada para programar' || s.status === 'Programada') && (s.dataPrevista || s.dataColeta) && (s.dataPrevista || s.dataColeta) < hojeISO()).length;
   $('#main').innerHTML = formSol() + `<section class="panel">
-    <div class="panel-h"><div><h2>Fila de solicitações</h2><p class="sub">Tudo que ainda não foi realizado. Clique numa linha para ver, mudar o status ou conferir os documentos.</p></div></div>
+    <div class="panel-h"><div><h2>Fila de solicitações</h2><p class="sub">Tudo que ainda não foi realizado, mais as destinadas que esperam a escolha do km da cobrança. Clique numa linha para ver, mudar o status ou conferir os documentos.</p></div></div>
+    ${nKm ? `<div class="al"><span class="pill warn">Definir km</span><b>${nKm} coleta(s) destinada(s) de cliente que paga o transporte por km rodado: escolha o km real ou o previsto para liberar o BM.</b> <button class="btn sm" type="button" data-fst="km">Ver</button></div>` : ''}
     ${atrasadas ? `<div class="al"><span class="pill warn">Atenção</span><b>${atrasadas} solicitação(ões) liberada(s)/programada(s) com data prevista já passada. Confira se foram realizadas.</b></div>` : ''}
-    <div class="toolbar"><div class="seg" role="group" aria-label="Status">${[['', 'Todas', base.length], ...ABERTAS.map(st => [st, st, cont(st)])].map(([v, l, n]) => `<button type="button" data-fst="${esc(v)}" aria-pressed="${S.st === v}">${esc(l)} <span class="ct">${n}</span></button>`).join('')}</div>
+    <div class="toolbar"><div class="seg" role="group" aria-label="Status">${[['', 'Todas', base.length], ...ABERTAS.map(st => [st, st, cont(st)]), ...(nKm ? [['km', 'Definir km', nKm]] : [])].map(([v, l, n]) => `<button type="button" data-fst="${esc(v)}" aria-pressed="${S.st === v}">${esc(l)} <span class="ct">${n}</span></button>`).join('')}</div>
       <input type="search" id="busca" placeholder="Buscar cliente, código, consultor…" value="${esc(S.busca)}" aria-label="Buscar">
       <span style="margin-left:auto">${T.botao()}</span>${S.ro ? '' : '<button class="btn pri" id="novo">+ Solicitação</button>'}</div>
     ${T.info(listaF.length, listaTela.length)}
@@ -1021,6 +1092,7 @@ function renderPrevisto() {
       cols.push(deltaCol('d_' + m, 'Δ ' + rot.replace(' de destinação', '').replace(' de recicláveis', '').toLowerCase(), g => g['p_' + m], g => g['r_' + m]));
     });
     cols.push({ k: 'tr', label: 'Trocas de destinador', v: g => String(g.trocas), ord: g => g.trocas, num: true });
+    if (P.dim === 'coleta') cols.push({ k: 'kc', label: 'Km cobrado', v: g => { const l = por[g.chave][0]; return l.kmCobranca ? l.kmCobrado + ' km (' + l.kmCobranca.toLowerCase() + ')' : ''; }, ord: g => +por[g.chave][0].kmCobrado || 0 });
   }
   const T = Portal.tabela('sol-pr-' + (P.dim === 'destinador' ? 'dest' : 'grp'), cols, { titulo: 'Previsto × real por ' + PR_DIM.find(d => d[0] === P.dim)[1].toLowerCase(), arquivo: 'previsto-real-' + P.dim, unidade: 'linhas', aoMudar: render,
     subtitulo: () => ['Coletas de ' + mesTxt(P.de) + ' a ' + mesTxt(P.ate), S.uni ? 'Unidade: ' + uniNome(S.uni) : '', P.soPrev ? 'Só coletas com previsto' : ''].filter(Boolean).join(' · ') });
