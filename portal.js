@@ -24,6 +24,8 @@
       desc: 'Para consultores: acompanhe os pedidos dos seus clientes, da chegada até a nota fiscal.' },
     faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
       desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
+    ambiental: { nome: 'Ambiental', caminho: 'ambiental/',
+      desc: 'Todos os MTRs de coletas e da operação interna, a destinar e destinados, e o registro dos CDFs recebidos dos destinadores.' },
     pessoas: { nome: 'Pessoas', caminho: 'pessoas/',
       desc: 'Cadastro único de motoristas, ajudantes, consultores e equipe do escritório, com funções, CNH e acesso ao portal.' },
   };
