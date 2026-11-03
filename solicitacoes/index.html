@@ -303,6 +303,8 @@ table.itens td input,table.itens td select{min-width:70px}
 .ind .d{font-size:12px;color:var(--ink-2)}
 .ind.txt .v{font-size:19px;line-height:1.5}
 .ind.crit .v{color:var(--crit)} .ind.warn .v{color:var(--warn)} .ind.zero .v{color:var(--ink-3)}
+.pr-fora{color:var(--warn);font-weight:700} .pr-ok{color:var(--ok)}
+.pr-t td,.pr-t th{white-space:nowrap}
 .ind[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
 </style>
 <script src="../config.js"></script>
@@ -322,6 +324,7 @@ table.itens td input,table.itens td select{min-width:70px}
       <button role="tab" data-tab="todas" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg><span class="t-long">Todas</span><span class="t-short">Todas</span></button>
       <button role="tab" data-tab="recorrentes" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4"/></svg><span class="t-long">Recorrentes</span><span class="t-short">Recorr.</span></button>
       <button role="tab" data-tab="consultores" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5"/><path d="M16 4.5a3 3 0 0 1 0 6M18 15c1.6.6 2.6 2.2 3 5"/></svg><span class="t-long">Consultores</span><span class="t-short">Consult.</span></button>
+      <button role="tab" data-tab="previsto" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/><path d="M3 7l6-3 6 5 6-4" stroke-dasharray="2 2"/></svg><span class="t-long">Previsto × real</span><span class="t-short">Prev×real</span></button>
       <button role="tab" data-tab="documentos" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg><span class="t-long">Documentos</span><span class="t-short">Docs</span></button>
       <button role="tab" data-tab="importar" aria-selected="false" id="tab-importar" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg><span class="t-long">Importar planilha</span><span class="t-short">Importar</span></button>
     </nav>
@@ -338,10 +341,10 @@ const R = v => v === '' || v == null ? '—' : (+v || 0).toLocaleString('pt-BR',
 const D = iso => iso ? iso.split('-').reverse().join('/') : '';
 const hojeISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const NIVEL_LBL = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
-const TABS = ['fila', 'todas', 'recorrentes', 'consultores', 'documentos', 'importar'];
+const TABS = ['fila', 'todas', 'recorrentes', 'consultores', 'previsto', 'documentos', 'importar'];
 const DIAS_SEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const ABERTAS = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada', 'Frustrada'];
-const S = { tab: 'fila', d: null, ro: true, uni: '', busca: '', st: '', mes: '', inativos: false, edit: null, abrir: null, mesCon: '', indCon: '' };
+const S = { tab: 'fila', d: null, ro: true, uni: '', busca: '', st: '', mes: '', inativos: false, edit: null, abrir: null, mesCon: '', indCon: '', pr: { de: '', ate: '', dim: 'cliente', dados: null, chave: '', carregando: '', soPrev: true } };
 
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 3600); }
 function setSync(ok, txt) { const s = $('#sync'); s.classList.toggle('on', ok); s.querySelector('span').textContent = txt; }
@@ -425,7 +428,7 @@ function render() {
   if (!S.d) return;
   const abertas = S.d.solicitacoes.filter(s => ABERTAS.includes(s.status) && passaUni(s));
   $('#ct-fila').textContent = abertas.length;
-  ({ fila: renderFila, todas: renderTodas, recorrentes: renderRecorrentes, consultores: renderConsultores, documentos: renderDocumentos, importar: renderImportar })[S.tab]();
+  ({ fila: renderFila, todas: renderTodas, recorrentes: renderRecorrentes, consultores: renderConsultores, previsto: renderPrevisto, documentos: renderDocumentos, importar: renderImportar })[S.tab]();
 }
 
 /* ---------- formulário da solicitação ---------- */
@@ -942,6 +945,102 @@ function renderDocumentos() {
 
 /* ---------- importar a planilha de acompanhamento (admin do portal) ---------- */
 let XLSX_PROMISE = null;
+/* ---------- Previsto × real (indicadores) ---------- */
+const PR_MET = [['kg', 'Peso (kg)', 'kg'], ['km', 'Km', 'km'], ['custo', 'Custo de destinação', 'R$'], ['receita', 'Receita de recicláveis', 'R$'], ['diarias', 'Diárias', 'd'], ['pernoites', 'Pernoites', 'n']];
+const PR_DIM = [['cliente', 'Cliente'], ['destinador', 'Destinador'], ['consultor', 'Consultor'], ['unidade', 'Unidade'], ['coleta', 'Coleta']];
+const prFmt = (v, u) => v === '' || v == null ? '—' : u === 'R$' ? R(v) : (+v || 0).toLocaleString('pt-BR', { maximumFractionDigits: u === 'kg' || u === 'km' ? 0 : 2 });
+const prDelta = (p, r) => p === '' || r === '' || p == null || r == null || !(+p) ? '' : (r - p) / p;
+const prDeltaTxt = d => d === '' ? '' : (d > 0 ? '+' : '') + Math.round(d * 100) + '%';
+function prDeltaCel(d, lim) { return d === '' ? '<span class="sub">—</span>' : `<span class="${Math.abs(d) > lim ? 'pr-fora' : 'pr-ok'}">${prDeltaTxt(d)}</span>`; }
+/** Soma previsto e real só das coletas que têm os dois (para comparar o que é comparável). */
+function prSoma(linhas, m) {
+  let p = 0, r = 0, n = 0;
+  linhas.forEach(l => { if (l.prev[m] !== '' && l.real[m] !== '') { p += +l.prev[m] || 0; r += +l.real[m] || 0; n++; } });
+  return { p: n ? Math.round(p * 100) / 100 : '', r: n ? Math.round(r * 100) / 100 : '', n };
+}
+async function carregarPR() {
+  const chave = S.pr.de + '|' + S.pr.ate;
+  if (S.pr.carregando === chave) return;
+  S.pr.carregando = chave;
+  try { const r = await Portal.api('sol.previstoReal', { de: S.pr.de, ate: S.pr.ate }); if (S.pr.carregando !== chave) return; S.pr.dados = r; S.pr.chave = chave; }
+  catch (e) { S.pr.erro = (e && e.mensagem) || 'Não consegui carregar os indicadores.'; }
+  S.pr.carregando = '';
+  if (S.tab === 'previsto') render();
+}
+function renderPrevisto() {
+  const P = S.pr;
+  if (!P.de) { P.ate = hojeISO().slice(0, 7); const d = new Date(); d.setMonth(d.getMonth() - 2); P.de = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  const chave = P.de + '|' + P.ate;
+  const meses = []; { let m = '2026-01'; const fim = hojeISO().slice(0, 7); while (m <= fim) { meses.unshift(m); const [y, mm] = m.split('-').map(Number); m = mm === 12 ? (y + 1) + '-01' : y + '-' + String(mm + 1).padStart(2, '0'); } }
+  const mesTxt = m => m.split('-').reverse().join('/');
+  const topo = `<div class="toolbar"><span class="sub" style="margin:0">Coletas de</span><select id="pr-de" style="width:auto" aria-label="De">${opts(meses.map(m => [m, mesTxt(m)]), P.de)}</select>
+    <span class="sub" style="margin:0">até</span><select id="pr-ate" style="width:auto" aria-label="Até">${opts(meses.map(m => [m, mesTxt(m)]), P.ate)}</select>
+    <span class="sub" style="margin:0 0 0 8px">Agrupar por</span><div class="seg" role="group" aria-label="Agrupar por">${PR_DIM.map(([k, l]) => `<button type="button" data-prdim="${k}" aria-pressed="${P.dim === k}">${l}</button>`).join('')}</div>
+    <span id="pr-exp" style="margin-left:auto"></span></div>`;
+  const cab = `<div class="panel-h"><div><h2>Previsto × real</h2><p class="sub">O que o solicitante previu (resíduos, peso, destinador, km, diárias e pernoites da precificação) contra o que aconteceu: peso do ticket da balança, valores lançados no Controle, km rodada e dias da viagem. Diferença acima de ${Math.round(((P.dados && P.dados.limite) || 0.2) * 100)}% fica destacada.</p></div></div>`;
+  const ligarTopo = () => {
+    $('#pr-de').onchange = e => { P.de = e.target.value; if (P.de > P.ate) P.ate = P.de; render(); };
+    $('#pr-ate').onchange = e => { P.ate = e.target.value; if (P.ate < P.de) P.de = P.ate; render(); };
+    $$('[data-prdim]').forEach(b => b.onclick = () => { P.dim = b.dataset.prdim; render(); });
+  };
+  if (P.chave !== chave) {
+    $('#main').innerHTML = `<section class="panel">${cab}${topo}<div class="notice">${P.erro ? esc(P.erro) : 'Calculando os indicadores…'}</div></section>`;
+    ligarTopo(); P.erro = ''; carregarPR(); return;
+  }
+  const lim = P.dados.limite || 0.2;
+  const todas = P.dados.linhas.filter(l => passaUni(l));
+  const linhas = P.soPrev ? todas.filter(l => l.prev.kg !== '' || l.prev.km !== '') : todas;
+  const nomeCad = id => P.dados.nomes[id] || cliNome(id) || id || '—';
+  const kpis = PR_MET.map(([m, rot, u]) => { const s = prSoma(linhas, m); const d = prDelta(s.p, s.r);
+    return `<div class="ind ${d !== '' && Math.abs(d) > lim ? 'warn' : s.n ? '' : 'zero'}"><span class="k">${esc(rot)}</span><span class="v">${s.n ? prDeltaTxt(d) || '—' : '—'}</span><span class="d">${s.n ? `prev. ${prFmt(s.p, u)} · real ${prFmt(s.r, u)}` : 'sem dados para comparar'}${s.n ? ` · ${s.n} coleta(s)` : ''}</span></div>`; }).join('');
+  const destinadas = linhas.filter(l => l.destinada).length, trocas = linhas.reduce((t, l) => t + (l.trocas ? 1 : 0), 0);
+  // grupos
+  let grupos = [], cols = [];
+  const deltaCol = (k, label, p, r) => ({ k, label, v: g => prDeltaTxt(prDelta(p(g), r(g))), ord: g => { const d = prDelta(p(g), r(g)); return d === '' ? -999 : d; }, num: true, x: g => { const d = prDelta(p(g), r(g)); return d === '' ? '' : Math.round(d * 1000) / 10; } });
+  if (P.dim === 'destinador') {
+    const por = {};
+    linhas.forEach(l => l.destinos.forEach(x => { const g = por[x.destinadorId] || (por[x.destinadorId] = { chave: x.destinadorId, nome: nomeCad(x.destinadorId), n: 0, nat: x.natureza, pKg: 0, rKg: 0, pV: 0, rV: 0, pKgC: 0, pVC: 0 });
+      g.n++; g.pKg += x.prevKg; g.pV += x.prevValor; g.rKg += x.realKg; g.rV += x.realValor; if (l.destinada) { g.pKgC += x.prevKg; g.pVC += x.prevValor; } }));
+    grupos = Object.values(por);
+    cols = [{ k: 'g', label: 'Destinador', v: g => g.nome }, { k: 'nat', label: 'Natureza', v: g => g.nat === 'receita' ? 'Receita' : 'Custo' }, { k: 'n', label: 'Coletas', v: g => String(g.n), ord: g => g.n, num: true },
+      { k: 'pkg', label: 'kg previsto', v: g => prFmt(g.pKg, 'kg'), ord: g => g.pKg, num: true, x: g => g.pKg }, { k: 'rkg', label: 'kg real', v: g => prFmt(g.rKg, 'kg'), ord: g => g.rKg, num: true, x: g => g.rKg },
+      deltaCol('dkg', 'Δ kg', g => g.pKgC, g => g.rKg),
+      { k: 'pv', label: 'Valor previsto', v: g => R(g.pV), ord: g => g.pV, num: true, x: g => g.pV, fmt: FMT_R }, { k: 'rv', label: 'Valor real', v: g => R(g.rV), ord: g => g.rV, num: true, x: g => g.rV, fmt: FMT_R },
+      deltaCol('dv', 'Δ valor', g => g.pVC, g => g.rV)];
+  } else {
+    const chaveDe = { cliente: l => l.clienteId, consultor: l => l.consultorId, unidade: l => l.unidadeId, coleta: l => l.id }[P.dim];
+    const rotDe = { cliente: id => nomeCad(id), consultor: id => conNome(id) || '(sem consultor)', unidade: id => uniNome(id) || '(sem unidade)', coleta: id => { const l = linhas.find(x => x.id === id); return nomeCad(l.clienteId) + ' · ' + D(l.dataColeta); } }[P.dim];
+    const por = {};
+    linhas.forEach(l => { const k = chaveDe(l) || ''; (por[k] = por[k] || []).push(l); });
+    grupos = Object.keys(por).map(k => { const g = { chave: k, nome: rotDe(k), n: por[k].length, trocas: por[k].filter(l => l.trocas).length, destinadas: por[k].filter(l => l.destinada).length };
+      PR_MET.forEach(([m]) => { const s = prSoma(por[k], m); g['p_' + m] = s.p; g['r_' + m] = s.r; }); return g; });
+    cols = [{ k: 'g', label: PR_DIM.find(d => d[0] === P.dim)[1], v: g => g.nome }, { k: 'n', label: 'Coletas', v: g => String(g.n), ord: g => g.n, num: true }];
+    PR_MET.forEach(([m, rot, u]) => {
+      cols.push({ k: 'p_' + m, label: rot.replace(' de destinação', '').replace(' de recicláveis', '') + ' prev.', v: g => prFmt(g['p_' + m], u), ord: g => +g['p_' + m] || 0, num: true, x: g => g['p_' + m], fmt: u === 'R$' ? FMT_R : undefined });
+      cols.push({ k: 'r_' + m, label: rot.replace(' de destinação', '').replace(' de recicláveis', '') + ' real', v: g => prFmt(g['r_' + m], u), ord: g => +g['r_' + m] || 0, num: true, x: g => g['r_' + m], fmt: u === 'R$' ? FMT_R : undefined });
+      cols.push(deltaCol('d_' + m, 'Δ ' + rot.replace(' de destinação', '').replace(' de recicláveis', '').toLowerCase(), g => g['p_' + m], g => g['r_' + m]));
+    });
+    cols.push({ k: 'tr', label: 'Trocas de destinador', v: g => String(g.trocas), ord: g => g.trocas, num: true });
+  }
+  const T = Portal.tabela('sol-pr-' + (P.dim === 'destinador' ? 'dest' : 'grp'), cols, { titulo: 'Previsto × real por ' + PR_DIM.find(d => d[0] === P.dim)[1].toLowerCase(), arquivo: 'previsto-real-' + P.dim, unidade: 'linhas', aoMudar: render,
+    subtitulo: () => ['Coletas de ' + mesTxt(P.de) + ' a ' + mesTxt(P.ate), S.uni ? 'Unidade: ' + uniNome(S.uni) : '', P.soPrev ? 'Só coletas com previsto' : ''].filter(Boolean).join(' · ') });
+  const lista = T.aplicar(grupos.sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR')));
+  const celula = (c, g) => { const val = c.v(g);
+    if (c.k.startsWith('d')) { const pk = c.k === 'dkg' ? g.pKgC : c.k === 'dv' ? g.pVC : g['p_' + c.k.slice(2)], rk = c.k === 'dkg' ? g.rKg : c.k === 'dv' ? g.rV : g['r_' + c.k.slice(2)]; return `<td data-label="${esc(c.label)}" class="num">${prDeltaCel(prDelta(pk, rk), lim)}</td>`; }
+    return `<td data-label="${esc(c.label)}" class="${c.num ? 'num' : c.k === 'g' ? 'full' : ''}">${c.k === 'g' ? '<b>' + esc(val) + '</b>' : esc(val)}</td>`; };
+  $('#main').innerHTML = `<section class="panel">${cab}${topo.replace('<span id="pr-exp" style="margin-left:auto"></span>', '<span id="pr-exp" style="margin-left:auto">' + T.botao() + '</span>')}
+    <div class="inds">${kpis}</div>
+    <p class="hint" style="margin:-4px 0 10px">${linhas.length} coleta(s) realizada(s) no período · ${destinadas} com destinação confirmada · ${trocas} com troca de destinador.
+      <label class="chip" style="margin-left:8px"><input type="checkbox" id="pr-so" ${P.soPrev ? 'checked' : ''}> Só coletas com previsto</label></p>
+    ${T.info(lista.length, grupos.length)}
+    ${grupos.length ? `<div class="tbl-wrap rtw"><table class="rt pr-t"><thead>${T.cab()}</thead><tbody>${lista.map(g => `<tr>${cols.map(c => celula(c, g)).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="empty">Nada com os filtros das colunas.</td></tr>`}</tbody></table></div>`
+      : '<div class="empty">Nenhuma coleta realizada no período.</div>'}
+    <p class="hint" style="margin-top:10px">Peso real = ticket da balança (só coletas com a destinação confirmada). Km real = km na volta − km inicial; diárias = dias da viagem concluída; pernoites = realizados. Viagem com mais de uma coleta: km, diárias e pernoites divididos pela km prevista de cada uma. As somas e o Δ usam só as coletas que têm o previsto e o real. Valor previsto pelo destinador escolhido pelo solicitante.</p>
+  </section>`;
+  ligarTopo(); T.ligar();
+  $('#pr-so').onchange = e => { P.soPrev = e.target.checked; render(); };
+}
+
 function carregarXlsx() {
   if (window.XLSX) return Promise.resolve();
   return XLSX_PROMISE || (XLSX_PROMISE = new Promise((ok, erro) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = () => { XLSX_PROMISE = null; erro(new Error('Não consegui carregar o leitor de planilhas.')); }; document.head.appendChild(s); }));
