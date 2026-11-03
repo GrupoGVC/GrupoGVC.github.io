@@ -299,7 +299,7 @@ table.itens td input,table.itens td select{min-width:70px}
       <div class="row" style="gap:10px"><div class="sync" id="sync"><i></i><span>Conectando…</span></div><button class="btn sm" id="btn-atualizar" hidden>Atualizar</button><span id="u-box" class="row" style="gap:8px" hidden><span class="sync" style="flex-direction:column;align-items:flex-end;gap:0;line-height:1.2"><b id="u-nome" style="color:var(--ink);font-weight:600"></b><span id="u-nivel"></span></span><a class="btn sm" href="../" title="Voltar ao portal">⌂ Portal</a><button class="btn sm" id="btn-sair">Sair</button></span></div>
     </div>
     <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="afaturar" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg><span class="t-long">Realizadas — falta BM</span><span class="t-short">A faturar</span> <span class="ct" id="ct-af">0</span></button>
+      <button role="tab" data-tab="afaturar" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg><span class="t-long">Destinadas — falta BM</span><span class="t-short">A faturar</span> <span class="ct" id="ct-af">0</span></button>
       <button role="tab" data-tab="abertos" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z"/><path d="M8 9h8M8 12h5"/></svg><span class="t-long">BMs enviados</span><span class="t-short">BMs</span> <span class="ct" id="ct-ab">0</span></button>
       <button role="tab" data-tab="emitidas" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span class="t-long">NFs emitidas</span><span class="t-short">NFs</span></button>
     </nav>
@@ -380,9 +380,11 @@ function setTab(t) {
   render(); scrollTo({ top: 0 });
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+// o servidor só manda as realizadas que já podem ir para o BM (destinação confirmada ou serviço sem destinação)
+const prontaBm = s => s.status === 'Destinação' || s.status === 'Realizada';
 function render() {
   if (!S.d) return;
-  const afat = S.d.solicitacoes.filter(s => s.status === 'Realizada' && passaUni(s));
+  const afat = S.d.solicitacoes.filter(s => prontaBm(s) && passaUni(s));
   const abertos = S.d.faturamentos.filter(f => (f.status === 'BM enviado' || f.status === 'Aprovado') && passaUni(f));
   $('#ct-af').textContent = afat.length; $('#ct-ab').textContent = abertos.length;
   if (S.bm) return renderBM();
@@ -406,14 +408,14 @@ const COLS_FAT = [
 const EXTRAS_FAT = [{ label: 'Código UPLOG', x: f => cliDe(f.clienteId).codigoUplog || '' }, { label: 'Valor do BM', x: f => f.bmValor === '' ? '' : +f.bmValor },
   { label: 'Valor da NF', x: f => f.nfValor === '' ? '' : +f.nfValor }, { label: 'Origem', x: f => f.origem || '' }];
 function renderAFaturar() {
-  const solsTela = S.d.solicitacoes.filter(s => s.status === 'Realizada' && passaUni(s) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog].join(' ')));
+  const solsTela = S.d.solicitacoes.filter(s => prontaBm(s) && passaUni(s) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog].join(' ')));
   const T = Portal.tabela('fat-afaturar', [
     { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '' },
     { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
     { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) },
     { k: 'desc', label: 'Descrição', v: s => s.descricao },
     { k: 'val', label: 'Valor previsto', v: s => R(s.valorPrevisto), ord: s => +s.valorPrevisto || 0, num: true, x: s => s.valorPrevisto === '' ? '' : +s.valorPrevisto, fmt: FMT_R },
-  ], { titulo: 'Realizadas — falta BM', arquivo: 'faturamento-falta-bm', unidade: 'coletas', aoMudar: render,
+  ], { titulo: 'Destinadas — falta BM', arquivo: 'faturamento-falta-bm', unidade: 'coletas', aoMudar: render,
     extrasExport: [{ label: 'Cliente', x: s => cliNome(s.clienteId) }, { label: 'Código UPLOG', x: s => cliDe(s.clienteId).codigoUplog || '' }],
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"'].filter(Boolean),
     totais: l => ({ 'Valor previsto': l.reduce((t, s) => t + (+s.valorPrevisto || 0), 0) }) });
@@ -422,7 +424,8 @@ function renderAFaturar() {
   sols.forEach(s => { (grupos[s.clienteId] = grupos[s.clienteId] || []).push(s); });
   const ids = Object.keys(grupos).sort((a, b) => cliNome(a).localeCompare(cliNome(b), 'pt-BR'));
   $('#main').innerHTML = `<section class="panel">
-    <div class="panel-h"><div><h2>Realizadas — falta BM</h2><p class="sub">Coletas realizadas que ainda não entraram num BM. Marque as do mesmo cliente que vão no mesmo BM e clique em "Montar BM".</p></div></div>
+    <div class="panel-h"><div><h2>Destinadas — falta BM</h2><p class="sub">Coletas com a destinação confirmada no Controle (ou de serviço sem destinação) que ainda não entraram num BM. Marque as do mesmo cliente que vão no mesmo BM e clique em "Montar BM".</p></div></div>
+    ${S.d.aguardandoDestinacao ? `<div class="al"><span class="pill warn">${S.d.aguardandoDestinacao} coleta(s)</span><b>Realizadas aguardando a confirmação da destinação no Controle de Destinação (aba A destinar). Entram aqui depois do ticket da balança.</b></div>` : ''}
     <div class="toolbar"><input type="search" id="busca" placeholder="Buscar cliente ou código…" value="${esc(S.busca)}" aria-label="Buscar"><span class="sub" style="margin:0 0 0 auto">${sols.length} coleta(s) de ${ids.length} cliente(s)</span>${T.botao()}</div>
     ${T.info(sols.length, solsTela.length)}
     ${ids.length ? ids.map(cid => { const c = cliDe(cid); let l = grupos[cid].sort((a, b) => String(a.dataColeta).localeCompare(String(b.dataColeta)));
@@ -470,7 +473,7 @@ function renderBM() {
   const precos = S.d.precos.filter(p => p.cadastroId === b.clienteId || (c.principalId && p.cadastroId === c.principalId))
     .filter(p => (!p.vigenciaInicio || p.vigenciaInicio <= hoje) && (!p.vigenciaFim || p.vigenciaFim >= hoje));
   // solicitações que podem entrar: realizadas do mesmo cliente + as que já estão no BM
-  const disponiveis = S.d.solicitacoes.filter(s => s.clienteId === b.clienteId && (s.status === 'Realizada' || b.solIds.includes(s.id)));
+  const disponiveis = S.d.solicitacoes.filter(s => s.clienteId === b.clienteId && (prontaBm(s) || b.solIds.includes(s.id)));
   const total = totalItens(b.itens);
   const um = S.d.listas.unidadeMedida;
   $('#main').innerHTML = `<section class="panel form-panel" id="form-panel">
@@ -650,7 +653,7 @@ function ligarAcoesFat() {
   $$('[data-nf]').forEach(b => b.onclick = async () => { const f = achar(b.dataset.nf);
     const v = await pedir('Emitir NF · BM ' + (f.bmNumero || 's/nº'), [{ rotulo: 'Nº da NF' }, { rotulo: 'Data de emissão', tipo: 'date', valor: hojeISO() }, { rotulo: 'Valor da NF (R$)', tipo: 'number', valor: f.bmValor, dica: 'Valor do BM: ' + R(f.bmValor) }], 'Registrar NF');
     if (v) acao(f.id, 'nf', { nfNumero: v[0], nfData: v[1], nfValor: v[2] }, 'NF registrada — processo encerrado'); });
-  $$('[data-canc]').forEach(b => b.onclick = async () => { const v = await pedir('Cancelar BM', [{ rotulo: 'Motivo', tipo: 'area', dica: 'As coletas voltam para "Realizadas — falta BM".' }], 'Cancelar BM'); if (v) acao(b.dataset.canc, 'cancelar', { motivo: v[0] }, 'BM cancelado'); });
+  $$('[data-canc]').forEach(b => b.onclick = async () => { const v = await pedir('Cancelar BM', [{ rotulo: 'Motivo', tipo: 'area', dica: 'As coletas voltam para "Destinadas — falta BM".' }], 'Cancelar BM'); if (v) acao(b.dataset.canc, 'cancelar', { motivo: v[0] }, 'BM cancelado'); });
   $$('[data-reab]').forEach(b => b.onclick = () => { if (confirm('Reabrir este BM? A NF registrada continua no histórico; o BM volta para "Aprovado".')) acao(b.dataset.reab, 'reabrir', {}, 'BM reaberto'); });
 }
 
