@@ -32,7 +32,8 @@ const TABELAS = {
   Lancamentos:          { prefixo: 'LAN', colunas: ['id', 'unidadeId', 'data', 'mes', 'mtr', 'ticket', 'destinadorId', 'gerador', 'origem', 'residuoId',
                                                       'transportadora', 'placa', 'kg', 'preco', 'valorFixo', 'valor', 'negocio', 'obs', 'idOrigem', 'paradaId', 'viagemId',
                                                       // etapa Destinação: origem do descarte, pendente (MTR emitido) ou destinado (ticket da balança)
-                                                      'fonte', 'situacao', 'solicitacaoId', 'itemId', 'pesoMtr', 'destinadorPrevistoId', 'motivoDivergencia', 'dataColeta', 'ativo'],
+                                                      'fonte', 'situacao', 'solicitacaoId', 'itemId', 'pesoMtr', 'destinadorPrevistoId', 'motivoDivergencia', 'dataColeta',
+                                                      'cdfId', 'ativo'],
                           texto: ['mes', 'mtr', 'ticket', 'placa', 'idOrigem'], numero: ['kg', 'preco', 'valorFixo', 'valor', 'pesoMtr'], data: ['data', 'dataColeta'] },
   // Locação mensal: um item (veículo ou caixa) por mês. tipo/placa/fornecedor guardam como estava naquele mês.
   LocacaoMensal:        { prefixo: 'LOM', colunas: ['id', 'unidadeId', 'mes', 'veiculoId', 'caixaId', 'tipo', 'placa', 'locadoraId', 'fornecedor', 'valor', 'ativo'],
@@ -87,6 +88,7 @@ const TABELAS = {
   Rotinas:              { prefixo: 'ROT', colunas: ['id', 'unidadeId', 'clienteId', 'consultorId', 'servico', 'residuoIds', 'descricao', 'frequencia', 'diaSemana', 'diaMes',
                                                       'dataInicio', 'dataFim', 'valorPrevisto', 'geradaAte', 'obs', 'ativo'],
                           texto: ['residuoIds'], numero: ['diaSemana', 'diaMes', 'valorPrevisto'], data: ['dataInicio', 'dataFim', 'geradaAte'] },
+  Cdfs:                 { prefixo: 'CDF', colunas: ['id', 'numero', 'data', 'destinadorId', 'obs', 'ativo'], texto: ['numero'], data: ['data'] },
   Listas:               { prefixo: 'LIS', colunas: ['id', 'lista', 'valor', 'ordem', 'ativo'], numero: ['ordem'] },
   Parametros:           { prefixo: 'PRM', colunas: ['id', 'chave', 'valor', 'vigenciaInicio', 'descricao'], data: ['vigenciaInicio'] },
 };
@@ -106,7 +108,8 @@ const REFERENCIAS = {
                  ['Paradas', 'clienteId', 'parada(s) de viagem na Programação'],
                  ['Viagens', 'transportadorId', 'viagem(ns) terceirizada(s) na Programação'],
                  ['Rotinas', 'clienteId', 'coleta(s) recorrente(s)'],
-                 ['Unidades', 'cadastroId', 'unidade do grupo GVC']],
+                 ['Unidades', 'cadastroId', 'unidade do grupo GVC'],
+                 ['Cdfs', 'destinadorId', 'CDF(s) no módulo Ambiental']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['SolicitacaoItens', 'residuoId', 'resíduo(s) de solicitações'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
@@ -421,7 +424,7 @@ const ROTULOS_CAMPOS = {
   unidadeMedida: 'Unidade de medida', valorUnitario: 'Valor unitário', sentido: 'Sentido',
   kmPrevista: 'Km prevista', diariasPrevistas: 'Diárias previstas', pesoEstimado: 'Peso estimado (kg)', destinadorPrevistoId: 'Destinador previsto',
   justificativaTroca: 'Justificativa da troca de destinador', kmInicial: 'Km inicial', kmFinal: 'Km na volta à base', fonte: 'Origem do descarte', pesoMtr: 'Peso no MTR (kg)',
-  motivoDivergencia: 'Divergência', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados',
+  motivoDivergencia: 'Divergência', cdfId: 'CDF', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados',
   apelido: 'Nome na programação', funcao: 'Função', funcoes: 'Funções', pessoaId: 'Pessoa', vinculo: 'Vínculo', cpf: 'CPF', cnhCategoria: 'Categoria da CNH', cnhValidade: 'Validade da CNH', fotoId: 'Foto',
   dataSaida: 'Data de saída', dataRetornoPrevisto: 'Retorno previsto', dataRetorno: 'Retorno à base', motoristaId: 'Motorista', transportadorId: 'Transportadora',
   custoTerceiro: 'Custo do terceiro (R$)', pernoitesPrevistos: 'Pernoites previstos', pernoitesRealizados: 'Pernoites realizados', valorNoite: 'Valor do pernoite (R$)',

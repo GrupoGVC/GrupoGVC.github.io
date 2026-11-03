@@ -31,7 +31,7 @@ const DIAS_SESSAO = 30;
 
 // Planilha antiga do Mapa (origem da migração; não é mais usada depois dela).
 const MAPA_PLANILHA_ID = '176bQkfOlMFCuKuACKfaogA1liMAxaTIIg-W_wPbV_9E';
-const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação', dp: 'DP', minhas: 'Minhas solicitações', pessoas: 'Pessoas' };
+const MODULOS = { destinacao: 'Controle de Destinação', mapa: 'Mapa Operacional', frota: 'Frota', solicitacoes: 'Solicitações', faturamento: 'Faturamento', programacao: 'Programação', dp: 'DP', minhas: 'Minhas solicitações', pessoas: 'Pessoas', ambiental: 'Ambiental' };
 const NIVEIS = ['leitor', 'editor', 'admin'];
 const MESES_JANELA = 6;
 
@@ -40,7 +40,7 @@ const ACOES_DESTINACAO_ESCRITA = ['salvarLancamento', 'excluirLancamento', 'defi
 const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista', 'mapa.precosVenda', 'mapa.geo'];
 const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa.reativar', 'mapa.listaAdd', 'mapa.listaDel', 'mapa.listaInativar', 'mapa.listaSet',
                             'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda'];
-const ACOES_SOL_LEITURA = ['sol.dados'];
+const ACOES_SOL_LEITURA = ['sol.dados', 'sol.previstoReal'];
 const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.excluir', 'sol.salvarCadastro', 'sol.excluirCadastro', 'sol.ativoCadastro',
                            'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar'];
 const ACOES_MINHAS = ['minhas.dados', 'minhas.linhaTempo'];
@@ -48,6 +48,8 @@ const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
 const ACOES_PROG_ESCRITA = ['prog.salvarViagem', 'prog.viagemAcao'];
 const ACOES_PES_LEITURA = ['pes.dados', 'pes.verFoto'];
 const ACOES_PES_ESCRITA = ['pes.salvar', 'pes.ativo', 'pes.excluir', 'pes.foto', 'pes.salvarFuncoes'];
+const ACOES_AMB_LEITURA = ['amb.dados'];
+const ACOES_AMB_ESCRITA = ['amb.cdf'];
 const ACOES_DP_LEITURA = ['dp.dados'];
 const ACOES_DP_ESCRITA = ['dp.acao'];
 const ACOES_FAT_LEITURA = ['fat.dados'];
@@ -109,7 +111,7 @@ function rotear_(body) {
   }
   if (ACOES_SOL_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'solicitacoes')) return semPermissao_('Você não tem acesso às Solicitações.');
-    return solDados_(u);
+    return acao === 'sol.previstoReal' ? previstoReal_(body.de, body.ate, u) : solDados_(u);
   }
   if (ACOES_PROG_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'programacao')) return semPermissao_('Você não tem acesso à Programação.');
@@ -122,6 +124,10 @@ function rotear_(body) {
   if (ACOES_MINHAS.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'minhas')) return semPermissao_('Você não tem acesso a "Minhas solicitações".');
     return acao === 'minhas.dados' ? minhasDados_(u) : minhasLinhaTempo_(String(body.id), u);
+  }
+  if (ACOES_AMB_LEITURA.indexOf(acao) >= 0) {
+    if (!podeLer_(u, 'ambiental')) return semPermissao_('Você não tem acesso ao módulo Ambiental.');
+    return ambDados_(u);
   }
   if (ACOES_DP_LEITURA.indexOf(acao) >= 0) {
     if (!podeLer_(u, 'dp')) return semPermissao_('Você não tem acesso ao DP.');
@@ -152,6 +158,8 @@ function rotear_(body) {
     if (!podeEditar_(u, 'pessoas') && !u.adminPortal) return semPermissao_(podeLer_(u, 'pessoas') ? 'Seu acesso ao cadastro de Pessoas é só de leitura.' : 'Você não tem acesso ao cadastro de Pessoas.');
   } else if (ACOES_PROG_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'programacao')) return semPermissao_(podeLer_(u, 'programacao') ? 'Seu acesso à Programação é só de leitura.' : 'Você não tem acesso à Programação.');
+  } else if (ACOES_AMB_ESCRITA.indexOf(acao) >= 0) {
+    if (!podeEditar_(u, 'ambiental')) return semPermissao_(podeLer_(u, 'ambiental') ? 'Seu acesso ao módulo Ambiental é só de leitura.' : 'Você não tem acesso ao módulo Ambiental.');
   } else if (ACOES_DP_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'dp')) return semPermissao_(podeLer_(u, 'dp') ? 'Seu acesso ao DP é só de leitura.' : 'Você não tem acesso ao DP.');
   } else if (ACOES_FAT_ESCRITA.indexOf(acao) >= 0) {
@@ -213,6 +221,7 @@ function rotear_(body) {
       case 'prog.importarEquipe': return progImportarEquipe_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'prog.importarProgramacao': return progImportarProgramacao_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'dp.acao': return dpAcao_(String(body.tipo), body.dados, u);
+      case 'amb.cdf': return ambCdf_(String(body.tipo), body.cdf, u);
       case 'fat.salvar': return fatSalvar_(body.registro, u);
       case 'fat.acao': return fatAcao_(String(body.id), String(body.tipo), body.dados, u);
     }

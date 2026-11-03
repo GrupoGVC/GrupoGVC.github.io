@@ -19,7 +19,8 @@ const PES_SUGESTAO_NIVEIS = {
   'Acompanhamento': { mapa: 'editor', solicitacoes: 'editor', faturamento: 'leitor' },
   'Faturamento': { faturamento: 'editor', solicitacoes: 'leitor' },
   'DP': { dp: 'editor', pessoas: 'leitor' },
-  'Gestão': { destinacao: 'leitor', mapa: 'leitor', frota: 'leitor', solicitacoes: 'leitor', faturamento: 'leitor', programacao: 'leitor', dp: 'leitor', pessoas: 'leitor' },
+  'Ambiental': { ambiental: 'editor', destinacao: 'leitor', mapa: 'leitor' },
+  'Gestão': { destinacao: 'leitor', mapa: 'leitor', frota: 'leitor', solicitacoes: 'leitor', faturamento: 'leitor', programacao: 'leitor', dp: 'leitor', pessoas: 'leitor', ambiental: 'leitor' },
 };
 
 /* ---------------- funções da pessoa ---------------- */

@@ -129,6 +129,8 @@ function salvarLancamento_(l, u) {
   const rotulo = (campos.mtr ? 'MTR ' + campos.mtr : 'sem MTR') + ' · ' + dest.nome;
   const atual = l.id ? acharLanc_(l.id) : null;
   if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Este lançamento é de outra unidade.');
+  if (atual && atual.cdfId && (campos.mtr !== String(atual.mtr || '').trim() || campos.destinadorId !== String(atual.destinadorId)))
+    return erroDados_('Este MTR já tem CDF registrado no módulo Ambiental: o nº do MTR e o destinador não mudam. Desfaça o CDF lá antes, se precisar.');
   // placa e gerador vêm das listas (Frota e Mapa); um lançamento antigo pode manter o valor que já tinha
   campos.placa = normPlaca_(campos.placa);
   if (campos.placa && !(atual && normPlaca_(atual.placa) === campos.placa) &&
@@ -159,6 +161,7 @@ function salvarLancamento_(l, u) {
 function excluirLancamento_(id, u) {
   const atual = acharLanc_(id);
   if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Este lançamento é de outra unidade.');
+  if (atual && atual.ativo && atual.cdfId) return erroDados_('Este MTR já tem CDF registrado no módulo Ambiental. Desfaça o CDF lá antes de excluir.');
   if (atual && atual.ativo) atualizar_('Lancamentos', atual.id, { ativo: false }, u, 'destinacao',
     { registroNome: (atual.mtr ? 'MTR ' + atual.mtr : 'sem MTR') });
   return { ok: true };
