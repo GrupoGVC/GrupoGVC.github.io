@@ -557,6 +557,7 @@ function fichaHTML(e) {
       <div class="fld cnh-f"><label for="p-cat">Categoria da CNH</label><select id="p-cat" ${ro ? 'disabled' : ''}>${opts(L.categoriaCnh, e.cnhCategoria, '—')}</select></div>
       <div class="fld cnh-f"><label for="p-val">Validade da CNH</label><input id="p-val" type="date" value="${esc(e.cnhValidade)}" ${ro ? 'readonly' : ''}></div>
       <div class="fld full"><label for="p-obs">Observações</label><input id="p-obs" value="${esc(e.obs)}" ${ro ? 'readonly' : ''}></div>
+      ${Object.keys(S.d.tiposEmail || {}).length ? `<div class="fld full"><label>Receber e-mails do portal</label><div class="chips" id="p-emails">${Object.entries(S.d.tiposEmail).map(([k, n]) => `<label class="chip"><input type="checkbox" data-em="${esc(k)}" ${(e.emailsDesligados || []).includes(k) ? '' : 'checked'} ${ro ? 'disabled' : ''}> ${esc(n)}</label>`).join('')}</div><div class="hint">Desmarque para esta pessoa não receber aquele aviso. Vale para o e-mail da ficha e o do login.</div></div>` : ''}
       ${ro ? '' : '<div class="row full" style="justify-content:flex-end"><button class="btn pri" id="p-salvar">Salvar</button></div>'}
     </form>
     ${e.id ? `<div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap"><button class="btn sm" id="p-hist">Histórico</button>${ro ? '' : e.ativo ? '<button class="btn sm danger" id="p-del">Excluir</button><button class="btn sm" id="p-inat">Inativar</button>' : '<button class="btn sm" id="p-reat">Reativar</button>'}</div>` : ''}
@@ -605,6 +606,7 @@ function lerFicha() {
     unidadeId: $('#p-uni').value, vinculo: $('#p-vin').value, email: $('#p-email').value, telefone: $('#p-tel').value,
     cnhCategoria: $('#p-cat').value, cnhValidade: $('#p-val').value, obs: $('#p-obs').value };
   if ($('#p-cpf')) reg.cpf = $('#p-cpf').value;
+  if ($('#p-emails')) reg.emailsDesligados = $$('[data-em]').filter(c => !c.checked).map(c => c.dataset.em);
   return reg;
 }
 function ligarFicha() {
