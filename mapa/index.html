@@ -6393,17 +6393,18 @@ const pvResNome = id => (PV.residuos.find(r => r.id === id) || {}).nome || '';
 function pvRender() {
   const b = document.getElementById('pv-body'); if (!b) return;
   const e = PV.edit;
-  const comTransp = m => m === 'Transporte + kg' || m === 'Valorização com transporte';
-  b.innerHTML = `<div class="pv-hint">Preço cobrado do cliente. Valorização = o kg é pago ao cliente e entra como desconto no BM.</div>
+  const porKm = m => /^Km rodado/.test(m || '');
+  const comTransp = m => m === 'Transporte + kg' || m === 'Valorização com transporte' || porKm(m);
+  b.innerHTML = `<div class="pv-hint">Preço cobrado do cliente. Valorização = o kg é pago ao cliente e entra como desconto no BM. Km rodado = transporte em R$ por km; o solicitante escolhe o km real ou o previsto antes do BM.</div>
     ${PV.precos.length ? PV.precos.map(p => `<div class="pv-row ${p.ativo ? '' : 'inativo'}"><div><b>${pvEsc(p.residuoId ? pvResNome(p.residuoId) : 'Transporte')}</b> · ${pvEsc(p.modalidade)}
-        <div class="pv-sub">${[p.valorTransporte !== '' ? 'transporte ' + pvR(p.valorTransporte) : '', p.precoKg !== '' ? pvR(p.precoKg) + '/kg' : ''].filter(Boolean).join(' + ')} · desde ${pvD(p.vigenciaInicio)}${p.vigenciaFim ? ' até ' + pvD(p.vigenciaFim) : ''}${p.ativo ? '' : ' · inativo'}${p.obs ? ' · ' + pvEsc(p.obs) : ''}</div></div>
+        <div class="pv-sub">${[p.valorTransporte !== '' ? 'transporte ' + pvR(p.valorTransporte) + (porKm(p.modalidade) ? '/km' : '') : '', p.precoKg !== '' ? pvR(p.precoKg) + '/kg' : ''].filter(Boolean).join(' + ')} · desde ${pvD(p.vigenciaInicio)}${p.vigenciaFim ? ' até ' + pvD(p.vigenciaFim) : ''}${p.ativo ? '' : ' · inativo'}${p.obs ? ' · ' + pvEsc(p.obs) : ''}</div></div>
         <div class="pv-acts">${somenteLeitura || !p.ativo ? '' : `<button type="button" class="pv-mini" onclick="pvEditar('${p.id}')">Editar</button><button type="button" class="pv-mini del" onclick="pvExcluir('${p.id}')">Excluir</button>`}</div></div>`).join('')
       : '<div class="pv-hint" style="margin-top:6px">Nenhum preço de venda cadastrado.</div>'}
     ${somenteLeitura ? '' : e ? `<div class="pv-form">
       <div><label for="pv-mod">Modalidade</label><select id="pv-mod" onchange="pvCampo('modalidade', this.value); pvRender()">${['', ...PV.modalidades].map(m => `<option value="${pvEsc(m)}" ${m === e.modalidade ? 'selected' : ''}>${pvEsc(m || 'Escolha…')}</option>`).join('')}</select></div>
       <div><label for="pv-res">Resíduo</label><select id="pv-res" onchange="pvCampo('residuoId', this.value)"><option value="">${comTransp(e.modalidade) ? 'Só transporte' : 'Escolha…'}</option>${PV.residuos.map(r => `<option value="${r.id}" ${r.id === e.residuoId ? 'selected' : ''}>${pvEsc(r.nome)}</option>`).join('')}</select></div>
-      ${comTransp(e.modalidade) ? `<div><label for="pv-tr">Transporte (R$ por viagem)</label><input id="pv-tr" type="number" step="any" min="0" value="${pvEsc(e.valorTransporte)}" oninput="pvCampo('valorTransporte', this.value)"></div>` : ''}
-      <div><label for="pv-kg">${/Valorização/.test(e.modalidade) ? 'Pago ao cliente (R$/kg)' : 'Preço (R$/kg)'}</label><input id="pv-kg" type="number" step="any" min="0" value="${pvEsc(e.precoKg)}" oninput="pvCampo('precoKg', this.value)"></div>
+      ${comTransp(e.modalidade) ? `<div><label for="pv-tr">Transporte (R$ por ${porKm(e.modalidade) ? 'km rodado' : 'viagem'})</label><input id="pv-tr" type="number" step="any" min="0" value="${pvEsc(e.valorTransporte)}" oninput="pvCampo('valorTransporte', this.value)"></div>` : ''}
+      <div><label for="pv-kg">${/valoriza/i.test(e.modalidade) ? 'Pago ao cliente (R$/kg)' : 'Preço (R$/kg)'}</label><input id="pv-kg" type="number" step="any" min="0" value="${pvEsc(e.precoKg)}" oninput="pvCampo('precoKg', this.value)"></div>
       <div><label for="pv-ini">Vigência a partir de</label><input id="pv-ini" type="date" value="${pvEsc(e.vigenciaInicio)}" oninput="pvCampo('vigenciaInicio', this.value)"></div>
       <div><label for="pv-fim">Até (opcional)</label><input id="pv-fim" type="date" value="${pvEsc(e.vigenciaFim)}" oninput="pvCampo('vigenciaFim', this.value)"></div>
       <div class="pv-full"><label for="pv-obs">Observação</label><input id="pv-obs" value="${pvEsc(e.obs)}" oninput="pvCampo('obs', this.value)"></div>
