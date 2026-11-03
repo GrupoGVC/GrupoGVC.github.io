@@ -84,7 +84,7 @@ function viagemPublica_(v) {
   const o = publico_('Viagens', v);
   ['dataSaida', 'dataRetornoPrevisto', 'dataRetorno'].forEach(function (c) { o[c] = dataTexto_(v[c]); });
   ['custoTerceiro', 'valorNoite'].forEach(function (c) { o[c] = v[c] === '' ? '' : num_(v[c]); });
-  ['pernoitesPrevistos', 'pernoitesRealizados'].forEach(function (c) { o[c] = v[c] === '' ? '' : num_(v[c]); });
+  ['pernoitesPrevistos', 'pernoitesRealizados', 'kmInicial', 'kmFinal'].forEach(function (c) { o[c] = v[c] === '' ? '' : num_(v[c]); });
   return o;
 }
 function paradaPublica_(p) {
@@ -119,6 +119,7 @@ function progDados_(u) {
               resultado: listaValores_('resultadoParada'), execucao: listaValores_('execucaoViagem') },
     adiantamentos: ler_('Adiantamentos').filter(function (a) { return vis[a.viagemId]; }).map(adiPublico_),
     lancamentos: ler_('Lancamentos').filter(function (l) { return l.ativo && vis[l.viagemId]; }).map(lancParadaPublico_),
+    itens: (function () { const ids = {}; sols.forEach(function (x) { ids[x.id] = 1; }); return ler_('SolicitacaoItens').filter(function (it) { return ids[it.solicitacaoId]; }).map(itemPublico_); })(),
     destinadores: destinadoresProgramacao_(),
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome), ativo: r.ativo }; }),
     podeImportar: !!u.adminPortal };
@@ -227,28 +228,35 @@ function progSalvarViagem_(reg, confirmar, u) {
               transportadorId: String(reg.transportadorId || ''), custoTerceiro: reg.custoTerceiro === '' || reg.custoTerceiro == null ? '' : num_(reg.custoTerceiro),
               pernoitesPrevistos: reg.pernoitesPrevistos === '' || reg.pernoitesPrevistos == null ? '' : Math.max(0, Math.round(num_(reg.pernoitesPrevistos))),
               obs: String(reg.obs || '').trim() };
+  ['kmInicial', 'kmFinal'].forEach(function (c) { if (c in reg) v[c] = reg[c] === '' || reg[c] == null ? '' : Math.max(0, num_(reg[c])); });
+  const kmIni = 'kmInicial' in v ? v.kmInicial : (atual ? numOuVazio_(atual.kmInicial) : '');
+  const kmFim = 'kmFinal' in v ? v.kmFinal : (atual ? numOuVazio_(atual.kmFinal) : '');
+  if (kmIni !== '' && kmFim !== '' && kmFim < kmIni) return erroDados_('A km na volta à base é menor que a km inicial.');
   if (!porId_('Unidades', v.unidadeId)) return erroDados_('Escolha a unidade.');
   if (!veUnidade_(u, v.unidadeId)) return erroDados_('Você não tem acesso a esta unidade.');
   if (listaValores_('execucaoViagem').indexOf(v.execucao) < 0) return erroDados_('Escolha se a viagem é própria ou terceirizada.');
   if (!v.dataSaida) return erroDados_('Informe a data de saída.');
   if (v.dataRetornoPrevisto && v.dataRetornoPrevisto < v.dataSaida) return erroDados_('O retorno previsto é antes da saída.');
   let equipeIds = (reg.equipe || []).map(String).filter(String).filter(function (x, i, a) { return a.indexOf(x) === i && x !== v.motoristaId; });
-  if (v.execucao === 'Terceirizada') { v.veiculoId = ''; v.motoristaId = ''; equipeIds = []; v.pernoitesPrevistos = 0; }
+  if (v.execucao === 'Terceirizada') { v.veiculoId = ''; v.motoristaId = ''; equipeIds = []; v.pernoitesPrevistos = 0; if ('kmInicial' in v) v.kmInicial = ''; if ('kmFinal' in v) v.kmFinal = ''; }
   else { v.transportadorId = ''; v.custoTerceiro = ''; if (v.pernoitesPrevistos === '') v.pernoitesPrevistos = diasEntre_(v.dataSaida, v.dataRetornoPrevisto || v.dataSaida); }
   const ve = porId_('Veiculos', v.veiculoId); v.placa = ve ? String(ve.placa) : '';
   const conf = conferirViagem_(v, equipeIds, atual ? atual.id : '');
   // paradas
   const paradas = [];
   let erroP = '';
+  const trocas = [];
+  const pAntes = atual ? onde_('Paradas', 'viagemId', atual.id) : [];
   (reg.paradas || []).forEach(function (p, i) {
     if (erroP) return;
     const x = { id: String(p.id || ''), ordem: i + 1, solicitacaoId: String(p.solicitacaoId || ''), clienteId: String(p.clienteId || ''), data: dataTexto_(p.data) || v.dataSaida,
                 resultado: listaValores_('resultadoParada').indexOf(p.resultado) >= 0 ? p.resultado : 'Pendente', motivo: String(p.motivo || '').trim(),
                 caixaEntregueId: String(p.caixaEntregueId || ''), caixaRetiradaId: String(p.caixaRetiradaId || ''),
                 peso: p.peso === '' || p.peso == null ? '' : num_(p.peso), destinacao: String(p.destinacao || '').trim(), obs: String(p.obs || '').trim() };
-    const lancs = Array.isArray(p.lancamentos) ? p.lancamentos : null; // null = não mexe (tela antiga)
+    const mtrs = Array.isArray(p.mtrs) ? p.mtrs : null; // null = não mexe (tela antiga)
+    let sol = null;
     if (x.solicitacaoId) {
-      const s = porId_('Solicitacoes', x.solicitacaoId);
+      const s = porId_('Solicitacoes', x.solicitacaoId); sol = s;
       if (!s) { erroP = 'Parada ' + (i + 1) + ': solicitação não encontrada.'; return; }
       x.clienteId = x.clienteId || String(s.clienteId);
       const outra = paradasAtivasDaSolicitacao_(s.id).filter(function (y) { return y.p.viagemId !== (atual && atual.id) && y.p.resultado === 'Pendente'; })[0];
@@ -257,18 +265,57 @@ function progSalvarViagem_(reg, confirmar, u) {
     if (!porId_('Cadastros', x.clienteId)) { erroP = 'Parada ' + (i + 1) + ': escolha o cliente.'; return; }
     if ((x.resultado === 'Frustrada' || x.resultado === 'No-show') && !x.motivo) { erroP = 'Parada ' + (i + 1) + ': informe o motivo (' + x.resultado + ').'; return; }
     [x.caixaEntregueId, x.caixaRetiradaId].forEach(function (c) { if (c && !porId_('Caixas', c)) erroP = 'Parada ' + (i + 1) + ': caixa não encontrada.'; });
-    if (lancs) {
-      if (lancs.length && x.resultado !== 'Realizada') { erroP = 'Parada ' + (i + 1) + ': a destinação só é lançada quando a parada é realizada.'; return; }
-      const e = validarLancamentosParada_(lancs, i + 1); if (e) { erroP = e; return; }
-      x._lancs = lancs;
-      if (lancs.length && x.peso === '') x.peso = lancs.reduce(function (t, l) { return t + num_(l.kg); }, 0);
+    const antes = x.id ? pAntes.filter(function (y) { return y.id === x.id; })[0] : null;
+    if (antes && antes.resultado === 'Realizada' && x.resultado !== 'Realizada' && paradaTemDestinado_(antes.id)) {
+      erroP = 'Parada ' + (i + 1) + ': a destinação desta coleta já foi confirmada no Controle de Destinação; ela não pode deixar de estar realizada.'; return; }
+    if (mtrs) {
+      const ms = mtrs.filter(function (b) { return b && (b.destinadorId || b.mtr || (b.linhas || []).length); });
+      if (ms.length && x.resultado !== 'Realizada') { erroP = 'Parada ' + (i + 1) + ': o MTR só é registrado quando a coleta é realizada.'; return; }
+      const e = validarMtrsParada_(ms, i + 1); if (e) { erroP = e; return; }
+      x._mtrs = ms;
+      if (ms.length && x.peso === '') x.peso = ms.reduce(function (t, b) { return t + (b.linhas || []).reduce(function (t2, l) { return t2 + num_(l.kg); }, 0); }, 0);
     }
+    if (x.resultado === 'Realizada' && sol && exigeDestinacao_(sol) && !(antes && antes.resultado === 'Realizada' && (!mtrs || paradaTemDestinado_(antes.id)))) {
+      if (!x._mtrs || !x._mtrs.length) { erroP = 'Parada ' + (i + 1) + ' (' + rotuloSol_(sol) + '): para marcar como realizada, informe o MTR de cada destinador, com os resíduos e o peso do MTR.'; return; }
+    }
+    if (x.resultado === 'Realizada' && v.execucao !== 'Terceirizada' && kmIni === '' && !(antes && antes.resultado === 'Realizada')) {
+      erroP = 'Informe a km inicial do veículo (antes de sair para a coleta) para registrar coleta realizada.'; return; }
+    // troca do destinador previsto (justificativa obrigatória), conferida antes de gravar
+    if (sol && Array.isArray(p.itens)) p.itens.forEach(function (it) {
+      if (erroP || !it || !it.id) return;
+      const atualIt = porId_('SolicitacaoItens', it.id);
+      if (!atualIt || String(atualIt.solicitacaoId) !== sol.id) { erroP = 'Parada ' + (i + 1) + ': resíduo da solicitação não encontrado. Atualize a página.'; return; }
+      const novo = String(it.destinadorId || '');
+      if (novo === String(atualIt.destinadorId || '')) return;
+      if (!ehDestinador_(porId_('Cadastros', novo))) { erroP = 'Parada ' + (i + 1) + ': escolha o destinador de ' + nomeRes_(atualIt.residuoId) + '.'; return; }
+      if (novo !== String(atualIt.destinadorPrevistoId || '') && !String(it.justificativa || '').trim()) {
+        erroP = 'Parada ' + (i + 1) + ': informe a justificativa da troca do destinador de ' + nomeRes_(atualIt.residuoId) + ' (previsto: ' + nomeCad_(atualIt.destinadorPrevistoId) + ').'; return; }
+      trocas.push({ sol: sol, it: it });
+    });
+    // o MTR de cada resíduo vai para o destinador do resíduo (o já trocado, com justificativa)
+    if (!erroP && sol && x._mtrs) x._mtrs.forEach(function (b) {
+      (b.linhas || []).forEach(function (l) {
+        if (erroP || !l || !l.itemId) return;
+        const it = porId_('SolicitacaoItens', l.itemId); if (!it || !it.destinadorId) return; // sem destinador previsto (coleta antiga): o MTR define
+        const tr = (p.itens || []).filter(function (y) { return y && String(y.id) === String(it.id) && y.destinadorId; })[0];
+        const efetivo = String(tr ? tr.destinadorId : it.destinadorId);
+        if (efetivo !== String(b.destinadorId))
+          erroP = 'Parada ' + (i + 1) + ': ' + nomeRes_(it.residuoId) + ' está previsto para ' + nomeCad_(efetivo) + ', mas o MTR é de ' + nomeCad_(b.destinadorId) + '. Troque o destinador do resíduo (com a justificativa) ou corrija o MTR.';
+      });
+    });
     paradas.push(x);
   });
   if (erroP) conf.erros.push(erroP);
   if (!paradas.length) conf.erros.push('Inclua pelo menos uma parada (cliente).');
+  pAntes.filter(function (a) { return !paradas.some(function (x) { return x.id === a.id; }) && paradaTemDestinado_(a.id); })
+    .forEach(function (a) { conf.erros.push('A parada de ' + nomeCad_(a.clienteId) + ' já tem a destinação confirmada no Controle e não pode sair da viagem.'); });
   if (conf.erros.length) return { ok: false, erro: 'dados_invalidos', mensagem: conf.erros.join(' '), erros: conf.erros, avisos: conf.avisos };
   if (conf.avisos.length && !confirmar) return { ok: false, erro: 'avisos', avisos: conf.avisos, mensagem: 'Confira antes de salvar: ' + conf.avisos.join(' ') };
+  // antes de gravar: o que já estava programado (para avisar o solicitante e o consultor)
+  const chaveV = function (o, eq) { return [dataTexto_(o.dataSaida), dataTexto_(o.dataRetornoPrevisto), o.execucao, o.veiculoId, o.motoristaId, o.transportadorId, eq.slice().sort().join(',')].join('|'); };
+  const antesChave = atual ? chaveV(atual, onde_('ViagemEquipe', 'viagemId', atual.id).map(function (e) { return String(e.colaboradorId); })) : '';
+  const antesSols = {}; pAntes.forEach(function (a) { if (a.solicitacaoId && a.resultado === 'Pendente') antesSols[a.solicitacaoId] = 1; });
+  trocas.forEach(function (t) { trocarDestinadorItem_(t.sol, t.it, u); });
   // grava viagem
   let id;
   const nomeV = rotuloViagem_(v);
@@ -293,7 +340,7 @@ function progSalvarViagem_(reg, confirmar, u) {
   const realizouAgora = [];
   paradas.forEach(function (x) {
     const a = x.id ? pAtuais.filter(function (y) { return y.id === x.id; })[0] : null;
-    const dados = Object.assign({}, x); delete dados.id; delete dados._lancs;
+    const dados = Object.assign({}, x); delete dados.id; delete dados._mtrs;
     if (a) {
       x._id = a.id;
       if (a.solicitacaoId) solAfetadas[a.solicitacaoId] = 1;
@@ -318,11 +365,18 @@ function progSalvarViagem_(reg, confirmar, u) {
   realizouAgora.forEach(function (x) { moverCaixas_(x, u); });
   const vGravada = porId_('Viagens', id);
   paradas.forEach(function (x) {
-    if (x._lancs) sincronizarLancamentosParada_(vGravada, Object.assign({}, x, { id: x._id }), x._lancs, u);
+    if (x._mtrs && x.resultado === 'Realizada') sincronizarMtrsParada_(vGravada, Object.assign({}, x, { id: x._id }), x._mtrs, u);
     else if (x.resultado !== 'Realizada') inativarLancamentosParada_(x._id, u, 'A parada deixou de estar realizada.');
   });
   Object.keys(solAfetadas).forEach(function (sid) { sincronizarSolicitacao_(sid, u); });
   sincronizarAdiantamentos_(id, u);
+  if (vGravada.origem !== 'planilha') {
+    const pend = paradas.filter(function (x) { return x.solicitacaoId && x.resultado === 'Pendente'; }).map(function (x) { return x.solicitacaoId; });
+    const novos = pend.filter(function (sid) { return !antesSols[sid]; });
+    const mudou = atual && antesChave !== chaveV(vGravada, equipeIds);
+    avisarProgramacao_(vGravada, novos, false);
+    if (mudou) avisarProgramacao_(vGravada, pend.filter(function (sid) { return antesSols[sid]; }), true);
+  }
   return { ok: true, id: id, avisos: conf.avisos };
 }
 /** Parada realizada: a caixa entregue fica no cliente; a retirada volta para a base. */
@@ -346,10 +400,26 @@ function progViagemAcao_(id, tipo, x, u) {
     const ret = dataTexto_(x.dataRetorno); if (!ret) return erroDados_('Informe a data de retorno à base.');
     if (ret < dataTexto_(v.dataSaida)) return erroDados_('O retorno é antes da saída.');
     const campos = { dataRetorno: ret, status: 'Concluída' };
+    if (v.execucao !== 'Terceirizada') {
+      const ini = numOuVazio_(v.kmInicial);
+      const fim = x.kmFinal === '' || x.kmFinal == null ? numOuVazio_(v.kmFinal) : num_(x.kmFinal);
+      if (ini !== '' && fim === '') return erroDados_('Informe a km do veículo na volta à base.');
+      if (ini !== '' && fim < ini) return erroDados_('A km na volta à base (' + fim + ') é menor que a km inicial (' + ini + ').');
+      if (fim !== '') campos.kmFinal = fim;
+    }
     if (v.execucao !== 'Terceirizada') campos.pernoitesRealizados = x.pernoitesRealizados === '' || x.pernoitesRealizados == null ? diasEntre_(dataTexto_(v.dataSaida), ret) : Math.max(0, Math.round(num_(x.pernoitesRealizados)));
     if (v.execucao === 'Terceirizada' && x.custoTerceiro !== undefined && x.custoTerceiro !== '') campos.custoTerceiro = num_(x.custoTerceiro);
     atualizar_('Viagens', id, campos, u, 'programacao', { registroNome: nomeV });
     sincronizarAdiantamentos_(id, u);
+    return { ok: true };
+  }
+  if (tipo === 'kmInicial') {
+    if (v.status !== 'Programada') return erroDados_('Só viagem programada recebe a km inicial.');
+    if (v.execucao === 'Terceirizada') return erroDados_('Viagem terceirizada não tem km do veículo.');
+    const km = x.kmInicial === '' || x.kmInicial == null ? -1 : num_(x.kmInicial);
+    if (!(km >= 0)) return erroDados_('Informe a km do veículo antes de sair.');
+    const fim = numOuVazio_(v.kmFinal); if (fim !== '' && fim < km) return erroDados_('A km inicial é maior que a km na volta à base.');
+    atualizar_('Viagens', id, { kmInicial: km }, u, 'programacao', { registroNome: nomeV });
     return { ok: true };
   }
   if (tipo === 'reabrir') {

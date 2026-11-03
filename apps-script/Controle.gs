@@ -52,7 +52,9 @@ function lancPublico_(r, nomesRes) {
     destinador: String(r.destinadorId || ''), gerador: String(r.gerador || ''), origem: String(r.origem || ''),
     residuo: nomeResiduoControle_(nomesRes, r.residuoId), residuoId: String(r.residuoId || ''),
     transportadora: String(r.transportadora || ''), placa: String(r.placa || '').toUpperCase(),
-    kg: kg, preco: preco, valor: valor, obs: String(r.obs || ''), negocio: normNegocio_(r.negocio), unidadeId: String(r.unidadeId || '') };
+    kg: kg, preco: preco, valor: valor, obs: String(r.obs || ''), negocio: normNegocio_(r.negocio), unidadeId: String(r.unidadeId || ''),
+    fonte: String(r.fonte || FONTE_INTERNA), solicitacaoId: String(r.solicitacaoId || ''), pesoMtr: numOuVazio_(r.pesoMtr), motivoDivergencia: String(r.motivoDivergencia || ''),
+    destinadorPrevisto: String(r.destinadorPrevistoId || '') };
   if (fixo !== null) o.valorFixo = fixo;
   const a = auditoria_(r); Object.keys(a).forEach(function (k) { o[k] = a[k]; });
   return o;
@@ -61,7 +63,8 @@ function lancPublico_(r, nomesRes) {
 function dados_(mes, u) {
   const nomesRes = nomesPorId_('Residuos');
   // a programadora vê só a unidade dela (lançamentos sem unidade, como os antigos, aparecem para todos)
-  const lanc = ler_('Lancamentos').filter(function (r) { return r.ativo && veUnidade_(u, r.unidadeId); }).map(function (r) { return lancPublico_(r, nomesRes); });
+  // os pendentes (MTR da coleta, aguardando a balança do destinador) ficam na aba "A destinar", fora dos totais
+  const lanc = ler_('Lancamentos').filter(function (r) { return r.ativo && r.situacao !== SIT_PENDENTE && veUnidade_(u, r.unidadeId); }).map(function (r) { return lancPublico_(r, nomesRes); });
   let ultimo = '';
   lanc.forEach(function (l) { if (l.mes > ultimo) ultimo = l.mes; });
   if (!/^\d{4}-\d{2}$/.test(mes || '')) mes = ultimo || Utilities.formatDate(new Date(), tz_(), 'yyyy-MM');
@@ -77,7 +80,9 @@ function dados_(mes, u) {
   return { ok: true, usuario: { email: u.email, nome: u.nome, nivel: u.nivel }, mes: mes, ultimoMes: ultimo,
            destinadores: destinadoresControle_(), fonteDestinadores: 'mapa', residuos: residuos,
            veiculos: veiculosControle_(u), geradores: geradoresControle_(),
-           lancamentos: lanc.filter(function (l) { return janela.indexOf(l.mes) >= 0; }), locacao: locacao };
+           lancamentos: lanc.filter(function (l) { return janela.indexOf(l.mes) >= 0; }), locacao: locacao,
+           aDestinar: aDestinar_(u), residuosCatalogo: ler_('Residuos').map(function (x) { return { id: x.id, nome: String(x.nome), ativo: x.ativo }; }),
+           destinadoresColeta: destinadoresProgramacao_() };
 }
 
 /* Opções do lançamento: placas = veículos ativos da Frota (sem os devolvidos), da unidade de quem lança;
@@ -130,11 +135,16 @@ function salvarLancamento_(l, u) {
       !veiculosControle_(u).some(function (v) { return v.placa === campos.placa; }))
     return { ok: false, erro: 'dados_invalidos', mensagem: 'A placa ' + campos.placa + ' não está entre os veículos ativos da Frota. Escolha uma da lista (ou cadastre o veículo na Frota).' };
   const gerNorm = semAcento_(campos.gerador).trim();
+  const interna = !atual || String(atual.fonte || FONTE_INTERNA) === FONTE_INTERNA;
   if (gerNorm && !(atual && semAcento_(atual.gerador).trim() === gerNorm)) {
-    const g = geradoresControle_().filter(function (x) { return semAcento_(x.nome) === gerNorm; })[0];
-    if (!g) return { ok: false, erro: 'dados_invalidos', mensagem: 'O gerador "' + campos.gerador + '" não é um cliente ou unidade GVC ativo no Mapa Operacional. Escolha um da lista.' };
+    // lançamento direto = operação interna: o gerador é uma unidade GVC (as coletas de clientes vêm da aba A destinar)
+    const g = geradoresControle_().filter(function (x) { return semAcento_(x.nome) === gerNorm && (x.unidade || !interna); })[0];
+    if (!g) return { ok: false, erro: 'dados_invalidos', mensagem: interna
+      ? 'Lançamento direto no Controle é da operação interna: o gerador precisa ser uma unidade GVC. O descarte das coletas de clientes é confirmado na aba "A destinar".'
+      : 'O gerador "' + campos.gerador + '" não é um cliente ativo no Mapa Operacional. Escolha um da lista.' };
     campos.gerador = g.nome;
   }
+  if (!atual) { campos.fonte = FONTE_INTERNA; campos.situacao = SIT_DESTINADO; }
   if (atual) {
     if (!atual.ativo) campos.ativo = true;
     atualizar_('Lancamentos', atual.id, campos, u, 'destinacao', { registroNome: rotulo });

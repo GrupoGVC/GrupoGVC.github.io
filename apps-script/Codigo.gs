@@ -8,6 +8,7 @@
  *   Auth.gs       login, sessões e usuários
  *   Mapa.gs       Mapa Operacional (cadastros, locais, resíduos, preços, equipamentos)
  *   Controle.gs   Controle de Destinação (lançamentos e locação)
+ *   Destinacao.gs etapa Destinação: resíduos e destinador previstos, MTR na coleta, confirmação pelo ticket, e-mails da programação
  *   Frota.gs      Frota (tipos de veículo, veículos, caixas, locação mensal) e migração da Fase 1
  *   Solicitacoes.gs  Solicitações, consultores, documentos, importação da planilha Coletas e migração da Fase 2
  *   Faturamento.gs   BM/NF e preço de venda por cliente
@@ -35,7 +36,7 @@ const NIVEIS = ['leitor', 'editor', 'admin'];
 const MESES_JANELA = 6;
 
 const ACOES_DESTINACAO_LEITURA = ['dados'];
-const ACOES_DESTINACAO_ESCRITA = ['salvarLancamento', 'excluirLancamento', 'definirNegocioLote', 'salvarLocacao', 'salvarDestinador'];
+const ACOES_DESTINACAO_ESCRITA = ['salvarLancamento', 'excluirLancamento', 'definirNegocioLote', 'salvarLocacao', 'salvarDestinador', 'destinacao.confirmar'];
 const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista', 'mapa.precosVenda', 'mapa.geo'];
 const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa.reativar', 'mapa.listaAdd', 'mapa.listaDel', 'mapa.listaInativar', 'mapa.listaSet',
                             'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda'];
@@ -168,6 +169,7 @@ function rotear_(body) {
       case 'definirNegocioLote': return definirNegocioLote_(body.ids, body.negocio, u);
       case 'salvarLocacao': return salvarLocacao_(body.mes, body.veiculos || [], u);
       case 'salvarDestinador': return salvarDestinador_();
+      case 'destinacao.confirmar': return confirmarDestinacao_(body.destinacao, u);
       case 'listarUsuarios': return listarUsuarios_();
       case 'salvarUsuario': return salvarUsuario_(body.usuario, u);
       case 'resetarSenha': return resetarSenha_(body.email, u);

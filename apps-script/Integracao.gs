@@ -43,13 +43,16 @@ function migrarFase5_() {
 function destinadoresProgramacao_() {
   return ler_('Cadastros').filter(function (c) { const t = separar_(c.tipos); return c.ativo && (t.indexOf('destinador') >= 0 || t.indexOf('reciclador') >= 0); })
     .map(function (c) {
-      const precos = {}; onde_('CadastroResiduos', 'cadastroId', c.id).forEach(function (r) { precos[r.residuoId] = r.precoKg === '' || r.precoKg == null ? '' : num_(r.precoKg); });
-      return { id: c.id, nome: String(c.nome || c.razaoSocial || c.id), precos: precos };
+      const precos = {}, naturezas = {};
+      onde_('CadastroResiduos', 'cadastroId', c.id).forEach(function (r) { precos[r.residuoId] = r.precoKg === '' || r.precoKg == null ? '' : num_(r.precoKg); naturezas[r.residuoId] = naturezaDestino_(c.id, r.residuoId); });
+      const t = separar_(c.tipos);
+      return { id: c.id, nome: String(c.nome || c.razaoSocial || c.id), precos: precos, naturezas: naturezas, reciclador: t.indexOf('reciclador') >= 0 && t.indexOf('destinador') < 0 };
     }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
 }
 function lancParadaPublico_(l) {
   return { id: l.id, paradaId: String(l.paradaId || ''), viagemId: String(l.viagemId || ''), destinadorId: String(l.destinadorId || ''), residuoId: String(l.residuoId || ''),
-           kg: l.kg === '' ? '' : num_(l.kg), preco: num_(l.preco), valor: num_(l.valor), mtr: String(l.mtr || ''), ticket: String(l.ticket || ''), negocio: String(l.negocio || '') };
+           kg: l.kg === '' ? '' : num_(l.kg), preco: num_(l.preco), valor: num_(l.valor), mtr: String(l.mtr || ''), ticket: String(l.ticket || ''), negocio: String(l.negocio || ''),
+           situacao: String(l.situacao || SIT_DESTINADO), pesoMtr: numOuVazio_(l.pesoMtr), itemId: String(l.itemId || ''), destinadorPrevistoId: String(l.destinadorPrevistoId || '') };
 }
 function validarLancamentosParada_(lancs, n) {
   for (let i = 0; i < lancs.length; i++) {
@@ -109,8 +112,10 @@ function destinacaoPorSolicitacao_() {
   });
   const out = {};
   Object.keys(viagensSol).forEach(function (s) { out[s] = { viagens: Object.keys(viagensSol[s]).length, kg: {} }; });
+  // só o peso confirmado na destinação (ticket da balança) vai para o BM
   ler_('Lancamentos').forEach(function (l) {
-    const s = parSol[l.paradaId]; if (!s || !l.ativo) return;
+    if (!l.ativo || l.situacao === SIT_PENDENTE) return;
+    const s = l.solicitacaoId && out[l.solicitacaoId] ? String(l.solicitacaoId) : parSol[l.paradaId]; if (!s || !out[s]) return;
     out[s].kg[l.residuoId] = (out[s].kg[l.residuoId] || 0) + num_(l.kg);
   });
   return out;
@@ -188,7 +193,24 @@ function gerarRecorrentes_(u, forcar, jaComTrava) {
       });
       if (dataTexto_(r.geradaAte) < horizonte) atualizar_('Rotinas', r.id, { geradaAte: horizonte }, u, null);
     });
-    inserirLote_('Solicitacoes', novas, u);
+    // a destinação prevista (resíduos, pesos, destinadores, km e diárias) repete a da última solicitação da rotina
+    const modelo = {};
+    ler_('Solicitacoes').filter(function (s) { return s.rotinaId; }).sort(function (a, b) { return String(dataTexto_(a.dataPrevista)).localeCompare(String(dataTexto_(b.dataPrevista))); })
+      .forEach(function (s) { const its = itensDaSolicitacao_(s.id); if (its.length) modelo[s.rotinaId] = { s: s, itens: its }; });
+    novas.forEach(function (n) { const m = modelo[n.rotinaId]; if (m) { n.kmPrevista = numOuVazio_(m.s.kmPrevista); n.diariasPrevistas = numOuVazio_(m.s.diariasPrevistas); n.pernoitesPrevistos = numOuVazio_(m.s.pernoitesPrevistos); } });
+    const criadas = inserirLote_('Solicitacoes', novas, u);
+    const itensNovos = [];
+    criadas.forEach(function (c) {
+      const m = modelo[c.rotinaId];
+      const base = m ? m.itens.map(function (it) { return { residuoId: it.residuoId, pesoEstimado: it.pesoEstimado, destinadorId: it.destinadorPrevistoId || it.destinadorId }; })
+        : separar_(c.residuoIds).map(function (rid) { return { residuoId: rid, pesoEstimado: '', destinadorId: '' }; });
+      base.forEach(function (it, i) {
+        if (!porId_('Residuos', it.residuoId)) return;
+        itensNovos.push({ solicitacaoId: c.id, ordem: i + 1, residuoId: it.residuoId, pesoEstimado: it.pesoEstimado, destinadorId: it.destinadorId, destinadorPrevistoId: it.destinadorId,
+          precoKg: it.destinadorId ? precoDestino_(it.destinadorId, it.residuoId) : '', natureza: it.destinadorId ? naturezaDestino_(it.destinadorId, it.residuoId) : '', justificativaTroca: '' });
+      });
+    });
+    inserirLote_('SolicitacaoItens', itensNovos, u);
     Object.keys(porRotina).forEach(function (rid) { const r = porId_('Rotinas', rid);
       hist_(u, 'solicitacoes', 'Rotinas', rid, rotuloRotina_(r), 'gerou', '', '', '', porRotina[rid] + ' solicitação(ões) até ' + horizonte.split('-').reverse().join('/') + '.'); });
     if (lock) gravarHistorico_();

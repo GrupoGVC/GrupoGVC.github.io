@@ -127,6 +127,7 @@ function pesPublica_(p, u, veCpf) {
   o.cpfValido = !cpf || cpfValido_(cpf);
   o.cpf = veCpf ? cpfFormatado_(cpf) : cpfMascarado_(cpf);
   o.podeEditar = podeEditarPessoa_(u, p);
+  o.emailsDesligados = separar_(p.emailsDesligados);
   const us = acessoDaPessoa_(p.id);
   o.acesso = null;
   if (us) {
@@ -158,6 +159,7 @@ function pesDados_(u) {
     podeEditarFuncoes: !!u.adminPortal || u.modulos.pessoas === 'admin',
     listas: { funcoes: listaValores_('funcaoPessoa'), vinculo: listaValores_('vinculoColaborador'), categoriaCnh: listaValores_('categoriaCnhPessoa') },
     funcoesFixas: PES_FUNCOES_FIXAS,
+    tiposEmail: TIPOS_EMAIL,
     parametros: { diasAvisoCnh: num_(parametro_('diasAvisoCnh')) || 30 },
     modulos: u.adminPortal ? MODULOS : null,
     sugestoes: u.adminPortal ? PES_SUGESTAO_NIVEIS : null,
@@ -216,6 +218,7 @@ function pesSalvar_(reg, u) {
     if (c && ler_('Pessoas').some(function (x) { return cpfDigitos_(x.cpf) === c && x.id !== reg.id; })) return erroDados_('Já existe uma pessoa com este CPF.');
     r.cpf = c;
   }
+  if (Array.isArray(reg.emailsDesligados)) r.emailsDesligados = reg.emailsDesligados.map(String).filter(function (t, i, l) { return TIPOS_EMAIL[t] && l.indexOf(t) === i; }).join('; ');
   if (r.nome === r.nome.toLowerCase() || r.nome === r.nome.toUpperCase()) r.nome = nomeProprio_(r.nome);
   if (!r.apelido) r.apelido = apelidoDe_(r.nome);
   let id;

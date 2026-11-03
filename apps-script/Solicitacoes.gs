@@ -3,12 +3,13 @@
  * exigidos por cliente e importação da planilha "Acompanhamento de solicitação" (aba Coletas).
  *
  * Funil: Recebida → Documentação pendente → Liberada para programar → Programada → Realizada
- *        → BM enviado → NF emitida (fim).  Também: Cancelada e Frustrada (volta para a fila).
+ *        → Destinação (confirmada no Controle de Destinação) → BM enviado → NF emitida (fim).
+ *        Também: Cancelada e Frustrada (volta para a fila). Serviço sem destinação pula a Destinação (Destinacao.gs).
  * "BM enviado" e "NF emitida" só mudam pelo módulo Faturamento.
  * Programada/Realizada são manuais até a Programação (Fase 3) existir.
  * ===================================================================== */
 
-const SOL_STATUS = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada', 'Realizada', 'BM enviado', 'NF emitida', 'Cancelada', 'Frustrada'];
+const SOL_STATUS = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada', 'Realizada', 'Destinação', 'BM enviado', 'NF emitida', 'Cancelada', 'Frustrada'];
 const SOL_STATUS_FATURAMENTO = ['BM enviado', 'NF emitida'];
 const SOL_LISTAS = {
   demanda: ['Spot', 'Recorrente'],
@@ -56,6 +57,8 @@ function solPublica_(r) {
   ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'].forEach(function (c) { o[c] = dataTexto_(r[c]); });
   o.valorPrevisto = r.valorPrevisto === '' ? '' : num_(r.valorPrevisto);
   o.residuoIds = separar_(r.residuoIds);
+  ['kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'].forEach(function (c) { o[c] = numOuVazio_(r[c]); });
+  o.exigeDestinacao = exigeDestinacao_(r);
   return o;
 }
 /** Situação de faturamento de cada solicitação (BM/NF ativos). */
@@ -96,7 +99,10 @@ function solDados_(u) {
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome), ativo: r.ativo }; }),
     status: SOL_STATUS,
     listas: { demanda: listaValores_('demanda'), perfil: listaValores_('perfil'), execucao: listaValores_('execucao'),
-              servico: listaValores_('servico'), situacaoDocumento: listaValores_('situacaoDocumento') },
+              servico: listaValores_('servico'), situacaoDocumento: listaValores_('situacaoDocumento'), servicoSemDestinacao: listaValores_('servicoSemDestinacao') },
+    itens: ler_('SolicitacaoItens').filter(function (it) { return visiveis[it.solicitacaoId]; }).map(itemPublico_),
+    destinadores: destinadoresProgramacao_(),
+    coords: coordenadasCadastros_(),
     rotinas: ler_('Rotinas').filter(function (r) { return veUnidade_(u, r.unidadeId); }).map(rotPublica_),
     frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,
     podeImportar: !!u.adminPortal };
@@ -134,11 +140,29 @@ function solSalvar_(reg, u) {
   if (id && !atual) return erroDados_('Solicitação não encontrada. Atualize a página.');
   if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
   const campos = ['unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds', 'descricao',
-                  'dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'valorPrevisto', 'obs'];
+                  'dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'valorPrevisto', 'obs', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'];
   const r = {};
   campos.forEach(function (c) { r[c] = c in reg ? reg[c] : (atual ? atual[c] : ''); });
   ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'].forEach(function (c) { r[c] = dataTexto_(r[c]); });
+  ['kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'].forEach(function (c) {
+    r[c] = r[c] === '' || r[c] == null ? '' : num_(r[c]);
+    if (r[c] !== '' && r[c] < 0) r[c] = '';
+  });
+  if (r.diariasPrevistas !== '') r.diariasPrevistas = Math.round(r.diariasPrevistas);
+  if (r.pernoitesPrevistos !== '') r.pernoitesPrevistos = Math.round(r.pernoitesPrevistos);
+  const temItens = Array.isArray(reg.itens);
+  if (temItens) r.residuoIds = reg.itens.map(function (x) { return String((x || {}).residuoId || ''); }).filter(String);
   const erro = validarSol_(r, atual, u); if (erro) return erroDados_(erro);
+  // depois de liberada, os dados da precificação não podem ficar incompletos
+  if (atual && ['Liberada para programar', 'Programada'].indexOf(String(atual.status)) >= 0) {
+    const falta = faltaParaLiberar_(Object.assign({}, atual, r, { id: atual.id }), temItens ? reg.itens : null);
+    if (falta) return erroDados_(falta.replace('Para liberar, informe', 'Esta solicitação já foi liberada: informe'));
+  }
+  if (temItens) {
+    const sAlvo = atual || { id: '' };
+    const e2 = sAlvo.id ? salvarItensSolicitacao_(Object.assign({}, atual, r, { id: atual.id }), reg.itens, u) : '';
+    if (e2) return erroDados_(e2);
+  }
   if (atual) {
     if (atual.status === 'Realizada' && !r.dataColeta) return erroDados_('Solicitação realizada precisa da data da coleta.');
     if (r.clienteId !== String(atual.clienteId) && faturamentoPorSolicitacao_()[id]) return erroDados_('Esta solicitação já está num BM. Para trocar o cliente, cancele o BM no Faturamento.');
@@ -147,6 +171,7 @@ function solSalvar_(reg, u) {
   }
   r.status = 'Recebida'; r.origem = 'portal'; r.ativo = true;
   const nova = inserir_('Solicitacoes', r, u, 'solicitacoes', rotuloSol_(r));
+  if (temItens) { const e3 = salvarItensSolicitacao_(nova, reg.itens, u); if (e3) return { ok: true, id: nova.id, aviso: e3 }; }
   // documentos padrão do cliente (e do cadastro principal), para o serviço escolhido ou para todos
   const cli = porId_('Cadastros', r.clienteId);
   const donos = [r.clienteId].concat(cli && cli.cadastroPrincipalId ? [String(cli.cadastroPrincipalId)] : []);
@@ -170,6 +195,8 @@ function solStatus_(id, status, dados, u) {
   if (!veUnidade_(u, s.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
   if (SOL_STATUS.indexOf(status) < 0) return erroDados_('Status inválido.');
   if (SOL_STATUS_FATURAMENTO.indexOf(status) >= 0) return erroDados_('BM enviado e NF emitida são registrados no módulo Faturamento.');
+  if (status === 'Destinação') return erroDados_('A destinação é confirmada no Controle de Destinação (aba A destinar).');
+  if (s.status === 'Destinação') return erroDados_('A destinação desta coleta já foi confirmada no Controle de Destinação. O próximo passo é o BM, no Faturamento.');
   if (faturamentoPorSolicitacao_()[id]) return erroDados_('Esta solicitação já está num BM do Faturamento. Para mudar o status, cancele o BM primeiro.');
   // pendente ou realizada numa viagem: quem manda é a Programação (frustrada/no-show libera a mudança manual, ex.: cancelar)
   const naProg = paradasAtivasDaSolicitacao_(id).filter(function (x) { return !x.p.resultado || x.p.resultado === 'Pendente' || x.p.resultado === 'Realizada'; });
@@ -178,6 +205,7 @@ function solStatus_(id, status, dados, u) {
   if (status === 'Liberada para programar') {
     const pend = docsPendentes_(id);
     if (pend.length) return erroDados_('Ainda faltam documentos: ' + pend.map(function (d) { return (porId_('TiposDocumento', d.tipoDocumentoId) || {}).nome; }).join(', ') + '. Marque como recebido ou dispensado.');
+    const falta = faltaParaLiberar_(s); if (falta) return erroDados_(falta);
   }
   if (status === 'Realizada') {
     const dc = dataTexto_(dados.dataColeta || s.dataColeta);
@@ -272,9 +300,9 @@ function solDocsPadrao_(cadastroId, itens, u) {
 }
 /** Valores de uma lista editável (ex.: serviços). */
 function solSalvarLista_(lista, valores, u) {
-  if (['servico'].indexOf(lista) < 0) return erroDados_('Lista não editável.');
+  if (['servico', 'servicoSemDestinacao'].indexOf(lista) < 0) return erroDados_('Lista não editável.');
   const novos = (valores || []).map(function (v) { return String(v).trim(); }).filter(String);
-  if (!novos.length) return erroDados_('A lista precisa de pelo menos um valor.');
+  if (!novos.length && lista === 'servico') return erroDados_('A lista precisa de pelo menos um valor.');
   const atuais = ler_('Listas').filter(function (x) { return x.lista === lista; });
   atuais.forEach(function (x) {
     const i = novos.indexOf(String(x.valor));

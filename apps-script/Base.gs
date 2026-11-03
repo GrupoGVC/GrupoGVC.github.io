@@ -30,8 +30,10 @@ const TABELAS = {
   Equipamentos:         { prefixo: 'EQP', colunas: ['id', 'nome', 'ativo'] },
   CadastroEquipamentos: { prefixo: 'CEQ', colunas: ['id', 'cadastroId', 'equipamentoId'] },
   Lancamentos:          { prefixo: 'LAN', colunas: ['id', 'unidadeId', 'data', 'mes', 'mtr', 'ticket', 'destinadorId', 'gerador', 'origem', 'residuoId',
-                                                      'transportadora', 'placa', 'kg', 'preco', 'valorFixo', 'valor', 'negocio', 'obs', 'idOrigem', 'paradaId', 'viagemId', 'ativo'],
-                          texto: ['mes', 'mtr', 'ticket', 'placa', 'idOrigem'], numero: ['kg', 'preco', 'valorFixo', 'valor'], data: ['data'] },
+                                                      'transportadora', 'placa', 'kg', 'preco', 'valorFixo', 'valor', 'negocio', 'obs', 'idOrigem', 'paradaId', 'viagemId',
+                                                      // etapa Destinação: origem do descarte, pendente (MTR emitido) ou destinado (ticket da balança)
+                                                      'fonte', 'situacao', 'solicitacaoId', 'itemId', 'pesoMtr', 'destinadorPrevistoId', 'motivoDivergencia', 'dataColeta', 'ativo'],
+                          texto: ['mes', 'mtr', 'ticket', 'placa', 'idOrigem'], numero: ['kg', 'preco', 'valorFixo', 'valor', 'pesoMtr'], data: ['data', 'dataColeta'] },
   // Locação mensal: um item (veículo ou caixa) por mês. tipo/placa/fornecedor guardam como estava naquele mês.
   LocacaoMensal:        { prefixo: 'LOM', colunas: ['id', 'unidadeId', 'mes', 'veiculoId', 'caixaId', 'tipo', 'placa', 'locadoraId', 'fornecedor', 'valor', 'ativo'],
                           texto: ['mes', 'placa'], numero: ['valor'] },
@@ -44,8 +46,12 @@ const TABELAS = {
   Consultores:          { prefixo: 'CON', colunas: ['id', 'nome', 'email', 'telefone', 'ativo'], texto: ['email', 'telefone'] },
   Solicitacoes:         { prefixo: 'SOL', colunas: ['id', 'unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds',
                                                       'descricao', 'dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'valorPrevisto',
-                                                      'status', 'motivo', 'obs', 'solicitanteNome', 'programadorNome', 'origem', 'idOrigem', 'rotinaId', 'ativo'],
-                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto'], data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'] },
+                                                      'status', 'motivo', 'obs', 'solicitanteNome', 'programadorNome', 'origem', 'idOrigem', 'rotinaId',
+                                                      'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'ativo'],
+                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'], data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'] },
+  // Resíduos da solicitação, com a destinação prevista na precificação (o destinador pode ser trocado na Programação, com justificativa)
+  SolicitacaoItens:     { prefixo: 'SIT', colunas: ['id', 'solicitacaoId', 'ordem', 'residuoId', 'pesoEstimado', 'destinadorId', 'destinadorPrevistoId', 'precoKg', 'natureza',
+                                                      'justificativaTroca'], numero: ['ordem', 'pesoEstimado', 'precoKg'] },
   TiposDocumento:       { prefixo: 'TDO', colunas: ['id', 'nome', 'ativo'] },
   DocumentosPadrao:     { prefixo: 'DPA', colunas: ['id', 'cadastroId', 'tipoDocumentoId', 'servico'] },
   SolicitacaoDocumentos:{ prefixo: 'SDO', colunas: ['id', 'solicitacaoId', 'tipoDocumentoId', 'situacao', 'link', 'obs'] },
@@ -59,15 +65,15 @@ const TABELAS = {
   // Cadastro único de pessoas (motoristas, ajudantes, consultores, equipe do escritório). Quem vem da antiga
   // equipe (COL-) e dos antigos consultores (CON-) manteve o código; os novos são PES-. unidadeId vazio = todas.
   Pessoas:              { prefixo: 'PES', colunas: ['id', 'nome', 'apelido', 'funcoes', 'unidadeId', 'vinculo', 'cpf', 'email', 'telefone', 'cnhCategoria', 'cnhValidade',
-                                                      'fotoId', 'obs', 'ativo'],
-                          texto: ['funcoes', 'cpf', 'email', 'telefone', 'fotoId', 'cnhCategoria'], data: ['cnhValidade'] },
+                                                      'fotoId', 'obs', 'emailsDesligados', 'ativo'],
+                          texto: ['funcoes', 'cpf', 'email', 'telefone', 'fotoId', 'cnhCategoria', 'emailsDesligados'], data: ['cnhValidade'] },
   // Fase 3: Programação (Colaboradores e Consultores ficaram só como arquivo da migração para Pessoas)
   Colaboradores:        { prefixo: 'COL', colunas: ['id', 'unidadeId', 'nome', 'apelido', 'funcao', 'vinculo', 'cpf', 'cnhCategoria', 'cnhValidade', 'telefone', 'fotoId', 'obs', 'ativo'],
                           texto: ['cpf', 'telefone', 'fotoId', 'cnhCategoria'], data: ['cnhValidade'] },
   Viagens:              { prefixo: 'VIA', colunas: ['id', 'unidadeId', 'execucao', 'dataSaida', 'dataRetornoPrevisto', 'dataRetorno', 'veiculoId', 'placa', 'motoristaId',
                                                       'transportadorId', 'custoTerceiro', 'pernoitesPrevistos', 'pernoitesRealizados', 'valorNoite', 'status', 'motivo', 'obs',
-                                                      'origem', 'idOrigem', 'ativo'],
-                          texto: ['placa', 'idOrigem'], numero: ['custoTerceiro', 'pernoitesPrevistos', 'pernoitesRealizados', 'valorNoite'],
+                                                      'origem', 'idOrigem', 'kmInicial', 'kmFinal', 'ativo'],
+                          texto: ['placa', 'idOrigem'], numero: ['custoTerceiro', 'pernoitesPrevistos', 'pernoitesRealizados', 'valorNoite', 'kmInicial', 'kmFinal'],
                           data: ['dataSaida', 'dataRetornoPrevisto', 'dataRetorno'] },
   ViagemEquipe:         { prefixo: 'VEQ', colunas: ['id', 'viagemId', 'colaboradorId', 'funcao'] },
   Paradas:              { prefixo: 'PAR', colunas: ['id', 'viagemId', 'ordem', 'solicitacaoId', 'clienteId', 'data', 'resultado', 'motivo', 'caixaEntregueId', 'caixaRetiradaId',
@@ -88,6 +94,7 @@ const TABELAS = {
 // Onde cada tabela é usada. Se houver uso, o registro não pode ser excluído — só inativado.
 const REFERENCIAS = {
   Cadastros:    [['Lancamentos', 'destinadorId', 'lançamento(s) no Controle de Destinação'],
+                 ['SolicitacaoItens', 'destinadorId', 'destinação prevista em solicitações'],
                  ['Cadastros', 'cadastroPrincipalId', 'cadastro(s) auxiliar(es) ligados a ele'],
                  ['Veiculos', 'locadoraId', 'veículo(s) na Frota (como locadora)'],
                  ['Caixas', 'locadoraId', 'caixa(s) na Frota (como locadora)'],
@@ -101,6 +108,7 @@ const REFERENCIAS = {
                  ['Rotinas', 'clienteId', 'coleta(s) recorrente(s)'],
                  ['Unidades', 'cadastroId', 'unidade do grupo GVC']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
+                 ['SolicitacaoItens', 'residuoId', 'resíduo(s) de solicitações'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
                  ['PrecosCliente', 'residuoId', 'preço(s) de venda de clientes']],
   Equipamentos: [['CadastroEquipamentos', 'equipamentoId', 'cadastro(s) no Mapa Operacional']],
@@ -130,6 +138,7 @@ const REFERENCIAS = {
   TiposDocumento: [['DocumentosPadrao', 'tipoDocumentoId', 'cliente(s) com este documento como padrão'],
                    ['SolicitacaoDocumentos', 'tipoDocumentoId', 'solicitação(ões) com este documento']],
   Solicitacoes: [['FaturamentoItens', 'solicitacaoId', 'BM/NF no Faturamento'],
+                 ['Lancamentos', 'solicitacaoId', 'lançamento(s) de destinação no Controle'],
                  ['Paradas', 'solicitacaoId', 'parada(s) de viagem na Programação']],
   PrecosCliente: [['FaturamentoItens', 'precoClienteId', 'item(ns) de BM/NF no Faturamento']],
 };
@@ -137,7 +146,7 @@ const REFERENCIAS = {
 const FILHAS = {
   Cadastros: [['CadastroResiduos', 'cadastroId'], ['CadastroEquipamentos', 'cadastroId'], ['CadastroLocais', 'cadastroId'], ['Locais', 'cadastroId'],
               ['DocumentosPadrao', 'cadastroId']],
-  Solicitacoes: [['SolicitacaoDocumentos', 'solicitacaoId']],
+  Solicitacoes: [['SolicitacaoDocumentos', 'solicitacaoId'], ['SolicitacaoItens', 'solicitacaoId']],
   Faturamentos: [['FaturamentoItens', 'faturamentoId']],
   Viagens: [['ViagemEquipe', 'viagemId'], ['Paradas', 'viagemId']],
 };
@@ -410,6 +419,9 @@ const ROTULOS_CAMPOS = {
   valorTransporte: 'Valor do transporte (R$)', vigenciaInicio: 'Vigência a partir de', vigenciaFim: 'Vigência até', bmNumero: 'Nº do BM', bmData: 'Data de envio do BM',
   bmValor: 'Valor do BM', aprovacaoData: 'Data de aprovação', nfNumero: 'Nº da NF', nfData: 'Data da NF', nfValor: 'Valor da NF', quantidade: 'Quantidade',
   unidadeMedida: 'Unidade de medida', valorUnitario: 'Valor unitário', sentido: 'Sentido',
+  kmPrevista: 'Km prevista', diariasPrevistas: 'Diárias previstas', pesoEstimado: 'Peso estimado (kg)', destinadorPrevistoId: 'Destinador previsto',
+  justificativaTroca: 'Justificativa da troca de destinador', kmInicial: 'Km inicial', kmFinal: 'Km na volta à base', fonte: 'Origem do descarte', pesoMtr: 'Peso no MTR (kg)',
+  motivoDivergencia: 'Divergência', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados',
   apelido: 'Nome na programação', funcao: 'Função', funcoes: 'Funções', pessoaId: 'Pessoa', vinculo: 'Vínculo', cpf: 'CPF', cnhCategoria: 'Categoria da CNH', cnhValidade: 'Validade da CNH', fotoId: 'Foto',
   dataSaida: 'Data de saída', dataRetornoPrevisto: 'Retorno previsto', dataRetorno: 'Retorno à base', motoristaId: 'Motorista', transportadorId: 'Transportadora',
   custoTerceiro: 'Custo do terceiro (R$)', pernoitesPrevistos: 'Pernoites previstos', pernoitesRealizados: 'Pernoites realizados', valorNoite: 'Valor do pernoite (R$)',

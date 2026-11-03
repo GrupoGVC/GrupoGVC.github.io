@@ -2,7 +2,8 @@
  * Faturamento (analista de faturamento). Um BM = uma NF (1 para 1).
  * O BM junta uma ou mais solicitações realizadas do mesmo cliente, com itens detalhados
  * (cobrança ou desconto de valorização). Fluxo: BM enviado → Aprovado → NF emitida (fim).
- * Cancelar o BM devolve as solicitações para "Realizada".
+ * Entram no BM as solicitações em "Destinação" (ou "Realizada", se o serviço não tem destinação).
+ * Cancelar o BM devolve as solicitações para a etapa anterior (Destinação ou Realizada).
  * ===================================================================== */
 
 const FAT_STATUS = ['BM enviado', 'Aprovado', 'NF emitida', 'Cancelado'];
@@ -27,12 +28,13 @@ function precoPublico_(r) {
   return o;
 }
 function fatDados_(u) {
-  const sols = ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId) && ['Realizada', 'BM enviado', 'NF emitida'].indexOf(String(r.status)) >= 0; })
+  const sols = ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId) && (prontaParaBm_(r) || ['BM enviado', 'NF emitida'].indexOf(String(r.status)) >= 0); })
     .map(solPublica_);
   return { ok: true,
     unidades: unidadesDoUsuario_(u), todasUnidades: unidadesLista_(),
     faturamentos: ler_('Faturamentos').filter(function (f) { return veUnidade_(u, f.unidadeId); }).map(fatPublico_),
     solicitacoes: sols,
+    aguardandoDestinacao: ler_('Solicitacoes').filter(function (r) { return veUnidade_(u, r.unidadeId) && r.status === 'Realizada' && exigeDestinacao_(r); }).length,
     clientes: clientesLista_(),
     consultores: consultoresLista_().map(function (r) { return { id: r.id, nome: r.nome }; }),
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome) }; }),
@@ -53,8 +55,10 @@ function resumoItens_(itens) {
 /** Muda o status das solicitações do BM (sem passar pela trava de status do módulo Solicitações). */
 function statusSolicitacoes_(ids, status, u, motivo) {
   ids.forEach(function (id) {
-    const s = porId_('Solicitacoes', id); if (!s || s.status === status) return;
-    atualizar_('Solicitacoes', id, { status: status }, u, 'faturamento', { registroNome: rotuloSol_(s) });
+    const s = porId_('Solicitacoes', id); if (!s) return;
+    const st = status || statusAntesDoBm_(s); // null = volta para a etapa anterior ao BM
+    if (s.status === st) return;
+    atualizar_('Solicitacoes', id, { status: st }, u, 'faturamento', { registroNome: rotuloSol_(s) });
   });
 }
 /** Cria ou altera um BM. reg = {id?, clienteId, bmNumero, bmData, obs, itens:[{solicitacaoId, precoClienteId, descricao, quantidade, unidadeMedida, valorUnitario, sentido}]} */
@@ -88,7 +92,7 @@ function fatSalvar_(reg, u) {
           String((porId_('Cadastros', s.clienteId) || {}).cadastroPrincipalId) !== cli.id) { erro = 'Todas as solicitações do BM precisam ser do mesmo cliente.'; return; }
       const outro = jaNoBm[s.id];
       if (outro && outro.id !== reg.id) { erro = 'A solicitação de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' já está no BM ' + (outro.bmNumero || outro.id) + '.'; return; }
-      if (!outro && s.status !== 'Realizada') { erro = 'Só entram no BM solicitações com status Realizada.'; return; }
+      if (!outro && !prontaParaBm_(s)) { erro = s.status === 'Realizada' ? 'A coleta de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' ainda aguarda a confirmação da destinação no Controle de Destinação.' : 'Só entram no BM solicitações com a destinação confirmada.'; return; }
       unidadeId = unidadeId || String(s.unidadeId || '');
     }
     it.valor = arred2_(it.quantidade * it.valorUnitario);
@@ -112,7 +116,7 @@ function fatSalvar_(reg, u) {
     inserirLote_('FaturamentoItens', itens.map(function (it) { return Object.assign({ faturamentoId: id }, it); }), u);
     if (antes !== depois) hist_(u, 'faturamento', 'Faturamentos', id, rotuloFat_(campos), 'alterou', 'Itens do BM', antes, depois, '');
     const voltam = solAntes.filter(function (x) { return solIds.indexOf(x) < 0; });
-    statusSolicitacoes_(voltam, 'Realizada', u);
+    statusSolicitacoes_(voltam, null, u);
     statusSolicitacoes_(solIds, atual.status === 'NF emitida' ? 'NF emitida' : 'BM enviado', u);
   } else {
     campos.status = 'BM enviado'; campos.origem = 'portal'; campos.ativo = true;
@@ -157,7 +161,7 @@ function fatAcao_(id, acao, x, u) {
     if (f.status === 'NF emitida' && u.modulos.faturamento !== 'admin') return semPermissao_('Só o administrador do Faturamento cancela um BM com NF emitida.');
     const m = String(x.motivo || '').trim(); if (!m) return erroDados_('Informe o motivo do cancelamento.');
     atualizar_('Faturamentos', id, { status: 'Cancelado', motivo: m }, u, 'faturamento', { registroNome: rot });
-    statusSolicitacoes_(solicitacoesDoBm_(id), 'Realizada', u);
+    statusSolicitacoes_(solicitacoesDoBm_(id), null, u);
     return { ok: true };
   }
   if (acao === 'reabrir') {

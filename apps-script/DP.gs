@@ -79,7 +79,7 @@ function avisarDp_(v, novos) {
     if (!us.ativo) return false;
     const m = onde_('UsuarioModulos', 'usuarioId', us.id).filter(function (x) { return x.modulo === 'dp'; })[0];
     return m && (m.nivel === 'editor' || m.nivel === 'admin') && !simNao_(us.adminPortal); // a analista de DP (admin do portal não recebe)
-  }).map(function (us) { return String(us.email); }).filter(String);
+  }).map(function (us) { return String(us.email); }).filter(String).filter(function (e) { return aceitaEmail_(e, 'dp'); });
   if (!dest.length) return;
   const uni = porId_('Unidades', v.unidadeId);
   const linhas = novos.map(function (a) {
