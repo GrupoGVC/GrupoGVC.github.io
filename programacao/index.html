@@ -314,6 +314,16 @@ td.atraso{color:var(--crit);font-weight:600}
 .dest-h{margin-bottom:6px;font-size:13.5px}
 .dest-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;padding:8px;background:var(--sunken);border-radius:var(--r);margin-bottom:6px}
 .dest-l .calc{font-size:13px}
+.its{display:flex;flex-direction:column;gap:6px;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+.it-l{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:6px 10px;align-items:center;font-size:13px}
+.it-l .it-j{grid-column:1/-1}
+.it-l .sub{font-size:12px}
+.mtr{border:1px solid var(--line);border-radius:var(--r);padding:8px;margin-bottom:8px;background:var(--sunken)}
+.mtr-h{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 130px auto;gap:8px;align-items:end;margin-bottom:6px}
+.mtr-l{display:grid;grid-template-columns:minmax(0,1.5fr) 130px minmax(0,1fr) 34px;gap:8px;align-items:center;margin-top:4px}
+.mtr-l .sub{font-size:12px}
+.conf{font-size:13px;padding:8px;border-radius:var(--r);background:var(--ok-bg);color:var(--ok);margin-top:8px}
+@media (max-width:720px){.it-l{grid-template-columns:1fr}.mtr-h{grid-template-columns:1fr 1fr}.mtr-h>:first-child{grid-column:1/-1}.mtr-l{grid-template-columns:1fr 1fr}.mtr-l>:first-child{grid-column:1/-1}}
 ul.avisos{margin:0 0 6px;padding-left:18px;font-size:14px}
 details.mais{margin-top:6px;font-size:13px;color:var(--ink-2)}
 details.mais .chips{margin-top:6px}
@@ -414,6 +424,48 @@ const uniNome = id => (S.d.todasUnidades.find(u => u.id === id) || {}).nome || '
 const passaUni = x => !S.uni || x.unidadeId === S.uni;
 const paradasDe = vid => S.d.paradas.filter(p => p.viagemId === vid).sort((a, b) => a.ordem - b.ordem);
 const equipeDe = vid => S.d.equipe.filter(e => e.viagemId === vid).map(e => e.colaboradorId);
+const destDe = id => (S.d.destinadores || []).find(d => d.id === id) || null;
+const destNome = id => (destDe(id) || {}).nome || '';
+const resNomeG = id => ((S.d.residuos || []).find(r => r.id === id) || {}).nome || '';
+const kgF = v => (+v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' kg';
+const itensSol = sid => (S.d.itens || []).filter(i => i.solicitacaoId === sid).sort((a, b) => a.ordem - b.ordem);
+const resumoItens = sid => itensSol(sid).map(i => resNomeG(i.residuoId) + (i.pesoEstimado !== '' ? ' ' + kgF(i.pesoEstimado) : '') + (i.destinadorId ? ' → ' + destNome(i.destinadorId) : ' → sem destinador')).join('; ');
+const precisaKmIni = v => v && v.id && v.execucao !== 'Terceirizada' && v.status === 'Programada' && v.dataSaida <= hojeISO() && (v.kmInicial === '' || v.kmInicial == null);
+function destOptsP(resId, sel) {
+  const ds = S.d.destinadores || [];
+  const com = resId ? ds.filter(d => d.precos && d.precos[resId] !== undefined) : [];
+  const o = l => l.map(d => `<option value="${esc(d.id)}" ${d.id === sel ? 'selected' : ''}>${esc(d.nome + (resId && d.precos && d.precos[resId] !== undefined && d.precos[resId] !== '' ? ' · ' + Rkg(d.precos[resId]) : ''))}</option>`).join('');
+  const sem = ds.filter(d => !com.includes(d));
+  return `<option value="">Escolha…</option>${com.length ? `<optgroup label="Com preço para o resíduo">${o(com)}</optgroup><optgroup label="Outros">${o(sem)}</optgroup>` : o(sem)}`;
+}
+/* MTRs da parada: um bloco por destinador, com as linhas dos resíduos da solicitação */
+function prepararParada(p) {
+  const lancs = (S.d.lancamentos || []).filter(l => p.id && l.paradaId === p.id);
+  p.confirmados = lancs.filter(l => l.situacao && l.situacao !== 'Pendente');
+  p.travada = p.confirmados.length > 0;
+  p.itens = p.solicitacaoId ? itensSol(p.solicitacaoId).map(i => ({ ...i, _orig: i.destinadorId, _just: '' })) : [];
+  const pend = lancs.filter(l => !l.situacao || l.situacao === 'Pendente');
+  p.mtrs = [];
+  pend.forEach(l => { let b = p.mtrs.find(x => x.destinadorId === l.destinadorId); if (!b) { b = { destinadorId: l.destinadorId, mtr: l.mtr, negocio: l.negocio, linhas: [] }; p.mtrs.push(b); }
+    b.linhas.push({ id: l.id, itemId: l.itemId, residuoId: l.residuoId, kg: l.pesoMtr !== '' && l.pesoMtr != null ? l.pesoMtr : l.kg }); });
+  return p;
+}
+const itemTravaBloco = (p, b) => b.linhas.some(l => { const it = p.itens.find(x => x.id === l.itemId); return it && it._orig; });
+function syncMtrs(p) {
+  p.mtrs = p.mtrs || [];
+  p.itens.forEach(it => {
+    const d = it.destinadorId || '';
+    const atual = p.mtrs.find(b => b.linhas.some(l => l.itemId === it.id));
+    if (atual && (atual.destinadorId === d || (!it._orig && !d))) return;
+    let linha = null;
+    if (atual) { linha = atual.linhas.find(l => l.itemId === it.id); atual.linhas = atual.linhas.filter(l => l !== linha); }
+    let alvo = p.mtrs.find(b => b.destinadorId === d);
+    if (!alvo) { alvo = { destinadorId: d, mtr: '', negocio: '', linhas: [] }; p.mtrs.push(alvo); }
+    alvo.linhas.push(linha || { id: '', itemId: it.id, residuoId: it.residuoId, kg: '' });
+  });
+  p.mtrs = p.mtrs.filter(b => b.linhas.length || b.mtr);
+  if (!p.mtrs.length && !p.itens.length) p.mtrs.push({ destinadorId: '', mtr: '', negocio: '', linhas: [{ id: '', itemId: '', residuoId: '', kg: '' }] });
+}
 function cnhCobre(daPessoa, exigida) {
   daPessoa = String(daPessoa || '').toUpperCase(); exigida = String(exigida || '').toUpperCase();
   if (!exigida) return true; if (!daPessoa) return false;
@@ -485,6 +537,7 @@ function renderFila() {
     { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
     { k: 'prev', label: 'Prevista', v: s => D(s.dataPrevista), ord: s => s.dataPrevista || '' },
     { k: 'desc', label: 'Descrição', v: s => s.descricao },
+    { k: 'dest', label: 'Destino', v: s => [...new Set(itensSol(s.id).map(i => destNome(i.destinadorId)).filter(Boolean))].join(', '), vazio: '(sem destino)' },
     { k: 'st', label: 'Status', v: stTxt },
   ], { titulo: 'A programar', arquivo: 'programacao-a-programar', unidade: 'solicitações', aoMudar: render,
     extrasExport: [{ label: 'Código UPLOG', x: s => cliDe(s.clienteId).codigoUplog || '' }, { label: 'Motivo (frustrada)', x: s => s.motivo || '' }],
@@ -500,7 +553,7 @@ function renderFila() {
         <td data-label="Cliente" class="full"><b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}</td>
         <td data-label="Unidade">${esc(uniNome(s.unidadeId))}</td>
         <td data-label="Prevista" class="mono ${s.dataPrevista && s.dataPrevista < hojeISO() ? 'atraso' : ''}">${esc(D(s.dataPrevista) || '—')}</td>
-        <td data-label="Descrição" class="wrap">${esc(s.descricao || '')}${s.status === 'Frustrada' && s.motivo ? `<div class="sub">${esc(s.motivo)}</div>` : ''}</td>
+        <td data-label="Descrição" class="wrap">${esc(s.descricao || '')}${itensSol(s.id).length ? `<div class="sub">${esc(resumoItens(s.id))}</div>` : ''}${s.status === 'Frustrada' && s.motivo ? `<div class="sub">${esc(s.motivo)}</div>` : ''}</td>
         <td data-label="Status">${stPill(s.status === 'Frustrada' ? 'Frustrada' : 'Pendente').replace('Pendente', 'Liberada')}</td></tr>`; }).join('') || `<tr><td colspan="${S.ro ? 5 : 6}" class="empty">Nada com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nada esperando programação.</div>'}
   </section>`;
@@ -522,7 +575,7 @@ function renderViagens() {
     const terc = v.execucao === 'Terceirizada';
     const vei = veiDe(v.veiculoId);
     return `<button class="vcard ${v.status === 'Cancelada' ? 'cancel' : ''}" data-v="${esc(v.id)}">
-      <div class="vc-h"><b class="mono">${esc(terc ? 'Terceirizada' : (v.placa || 'sem veículo'))}</b> ${stPill(v.status)}${v.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : ''}</div>
+      <div class="vc-h"><b class="mono">${esc(terc ? 'Terceirizada' : (v.placa || 'sem veículo'))}</b> ${stPill(v.status)}${v.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : ''}${precisaKmIni(v) ? ' <span class="pill warn">km inicial</span>' : ''}</div>
       <div class="sub">${terc ? esc(cliDe(v.transportadorId).nome || '') + (v.custoTerceiro !== '' ? ' · ' + R(v.custoTerceiro) : '') : esc([vei.tipo, apel(v.motoristaId), ...eq.map(apel)].filter(Boolean).join(' · '))}</div>
       ${v.dataRetornoPrevisto && v.dataRetornoPrevisto > v.dataSaida ? `<div class="sub">até ${esc(D2(v.dataRetorno || v.dataRetornoPrevisto))} · ${v.pernoitesRealizados !== '' ? v.pernoitesRealizados : v.pernoitesPrevistos} pernoite(s)</div>` : ''}
       <ol class="vc-p">${ps.map(p => `<li class="${p.resultado === 'Realizada' ? 'ok' : p.resultado === 'Pendente' ? '' : 'x'}">${esc(cliDe(p.clienteId).nome || '—')}</li>`).join('')}</ol></button>`;
@@ -539,7 +592,7 @@ function renderViagens() {
   $('#s-next').onclick = () => { S.semana = addDias(S.semana, 7); render(); };
   $('#s-hoje').onclick = () => { S.semana = segunda(hojeISO()); render(); };
   const n = $('#nova'); if (n) n.onclick = () => novaViagem([]);
-  $$('[data-v]').forEach(b => b.onclick = () => { abrirViagem(b.dataset.v); renderViagem(); scrollTo({ top: 0 }); });
+  $$('[data-v]').forEach(b => b.onclick = async () => { abrirViagem(b.dataset.v); renderViagem(); scrollTo({ top: 0 }); if (!S.ro && precisaKmIni(S.v)) pedirKmInicial(S.v); });
 }
 
 /* ---------- formulário da viagem ---------- */
@@ -555,14 +608,16 @@ function novaViagem(solIds) {
 }
 function abrirViagem(id) {
   const v = S.d.viagens.find(x => x.id === id); if (!v) return;
-  S.v = { ...v, equipe: equipeDe(id), noitesManual: true, sujo: false, paradas: paradasDe(id).map(p => ({ ...p, lancamentos: (S.d.lancamentos || []).filter(l => l.paradaId === p.id).map(l => ({ ...l, _dest: l.destinadorId, _res: l.residuoId })) })) };
+  S.v = { ...v, equipe: equipeDe(id), noitesManual: true, sujo: false, paradas: paradasDe(id).map(p => prepararParada({ ...p })) };
 }
 function addParadaSol(id) {
   const s = solDe(id); if (!s.id || S.v.paradas.some(p => p.solicitacaoId === id)) return;
-  S.v.paradas.push({ id: '', solicitacaoId: id, clienteId: s.clienteId, data: '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: s.descricao || '', lancamentos: [] });
+  S.v.paradas.push(prepararParada({ id: '', solicitacaoId: id, clienteId: s.clienteId, data: '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: s.descricao || '' }));
 }
 function alertasLocais(v) {
   const a = [];
+  if (v.execucao === 'Terceirizada') return a;
+  if (precisaKmIni(v)) a.push(['warn', 'Informe a km inicial do veículo antes de sair: sem ela não dá para registrar coleta realizada.']);
   if (v.execucao !== 'Própria') return a;
   const vei = veiDe(v.veiculoId), m = colDe(v.motoristaId);
   const fim = v.dataRetornoPrevisto || v.dataSaida;
@@ -585,7 +640,12 @@ function alertasLocais(v) {
   });
   return a;
 }
+const kmPrevV = v => v.paradas.reduce((t, p) => t + (p.solicitacaoId ? +solDe(p.solicitacaoId).kmPrevista || 0 : 0), 0);
 function renderViagem() {
+  if (renderViagem.ocupado) return; // o change/blur do campo que sai da tela não redesenha de novo
+  renderViagem.ocupado = true; try { renderViagem_(); } finally { renderViagem.ocupado = false; }
+}
+function renderViagem_() {
   const v = S.v; const ro = S.ro || v.status === 'Cancelada';
   const terc = v.execucao === 'Terceirizada';
   const uniV = v.unidadeId;
@@ -616,6 +676,8 @@ function renderViagem() {
         <div class="fld"><label for="v-mot">Motorista</label><select id="v-mot" ${ro ? 'disabled' : ''}>${opts(motoristas.map(c => [c.id, (c.apelido || c.nome) + (c.cnhCategoria ? ' · CNH ' + c.cnhCategoria : '') + (c.vinculo === 'Terceirizado' ? ' · terceirizado' : '')]), v.motoristaId, 'Escolha…')}</select></div>
         <div class="fld full"><label>Ajudantes</label><div class="chips">${ajudantes.filter(c => /Ajudante/.test(c.funcao) || v.equipe.includes(c.id)).map(c => `<label class="chip"><input type="checkbox" data-aj="${esc(c.id)}" ${v.equipe.includes(c.id) ? 'checked' : ''} ${ro ? 'disabled' : ''}> ${esc(c.apelido || c.nome)}${c.vinculo === 'Terceirizado' ? ' <span class="sub">(terc.)</span>' : ''}</label>`).join('') || '<span class="sub">Nenhum ajudante cadastrado nesta unidade.</span>'}
           <details class="mais"><summary>outros (motoristas como ajudante)</summary><div class="chips">${ajudantes.filter(c => !/Ajudante/.test(c.funcao) && !v.equipe.includes(c.id)).map(c => `<label class="chip"><input type="checkbox" data-aj="${esc(c.id)}" ${ro ? 'disabled' : ''}> ${esc(c.apelido || c.nome)}</label>`).join('')}</div></details></div></div>
+        <div class="fld"><label for="v-kmi">Km inicial do veículo</label><input id="v-kmi" type="number" min="0" step="1" value="${esc(v.kmInicial ?? '')}" ${ro ? 'disabled' : ''}><div class="hint">Anote no painel antes de sair.</div></div>
+        <div class="fld"><label for="v-kmf">Km na volta à base</label><input id="v-kmf" type="number" min="0" step="1" value="${esc(v.kmFinal ?? '')}" ${ro ? 'disabled' : ''}><div class="hint">${kmPrevV(v) ? 'Prevista nas solicitações: ' + kmPrevV(v).toLocaleString('pt-BR') + ' km' : 'Também pode ser informada no Controle.'}${v.kmInicial !== '' && v.kmInicial != null && v.kmFinal !== '' && v.kmFinal != null ? ' · rodou ' + (v.kmFinal - v.kmInicial).toLocaleString('pt-BR') + ' km' : ''}</div></div>
         <div class="fld"><label for="v-noites">Pernoites previstos</label><input id="v-noites" type="number" min="0" step="1" value="${esc(v.pernoitesPrevistos)}" ${ro ? 'disabled' : ''}><div class="hint">Sugestão: dias entre saída e retorno.</div></div>
         <div class="fld"><label>Adiantamento de pernoite</label><div class="calc"><b>${R(noites * proprias.length * valorNoite)}</b><div class="sub">${noites} noite(s) × ${proprias.length} pessoa(s) própria(s) × ${R(valorNoite)}</div></div></div>
         ${adisV.length ? `<div class="fld full"><label>No DP</label><div class="chips">${adisV.map(a => `<span class="chip">${esc(apel(a.colaboradorId))}: ${esc(a.status)}${a.pagoEm ? ' em ' + esc(D2(a.pagoEm)) : ''} · ${R(a.valor)}${a.acertoStatus ? ' · ' + esc(a.acertoStatus) + (a.acertoValor ? ' ' + R(Math.abs(a.acertoValor)) : '') : ''}</span>`).join('')}</div><div class="hint">Os adiantamentos são lançados no DP quando a viagem é salva; a analista recebe um e-mail.</div></div>` : ''}`}
@@ -652,29 +714,43 @@ function paradaHTML(p, i, ro, cxs) {
       ${ruim ? `<div class="fld"><label>Motivo</label><input data-f="motivo" value="${esc(p.motivo)}" ${ro ? 'disabled' : ''}></div>` : ''}
       <div class="fld"><label>Caixa entregue</label><select data-f="caixaEntregueId" ${ro ? 'disabled' : ''}>${opts(cxEnt.map(x => [x.id, cxRot(x)]), p.caixaEntregueId, '—')}</select></div>
       <div class="fld"><label>Caixa retirada</label><select data-f="caixaRetiradaId" ${ro ? 'disabled' : ''}>${opts(cxRet.map(x => [x.id, cxRot(x)]), p.caixaRetiradaId, '—')}</select></div>
-      ${(p.lancamentos || []).length ? '' : `<div class="fld"><label>Peso (kg)</label><input type="number" step="any" min="0" data-f="peso" value="${esc(p.peso)}" ${ro ? 'disabled' : ''}></div>`}
+      ${p.resultado === 'Realizada' && (p.mtrs || []).length || p.travada ? '' : `<div class="fld"><label>Peso (kg)</label><input type="number" step="any" min="0" data-f="peso" value="${esc(p.peso)}" ${ro ? 'disabled' : ''}></div>`}
       <div class="fld full"><label>Observação</label><input data-f="obs" value="${esc(p.obs)}" ${ro ? 'disabled' : ''}></div>
     </div>
-    ${p.resultado === 'Realizada' ? destinoHTML(p, i, ro) : ''}</div>`;
+    ${itensHTMLp(p, i, ro || p.travada)}
+    ${p.travada ? confirmadosHTML(p) : p.resultado === 'Realizada' && (!s || s.exigeDestinacao !== false) ? mtrsHTML(p, i, ro, s) : ''}</div>`;
 }
-function destinoHTML(p, i, ro) {
-  const ls = p.lancamentos || [];
-  const dests = S.d.destinadores || [];
-  const resNome = id => ((S.d.residuos || []).find(r => r.id === id) || {}).nome || '';
-  const tot = ls.reduce((t, l) => t + (+l.kg || 0), 0);
-  return `<div class="dest"><div class="dest-h"><b>Destinação</b> <span class="sub">vai para o Controle de Destinação com o preço do destinador no Mapa${tot ? ' · total ' + tot.toLocaleString('pt-BR') + ' kg' : ''}</span></div>
-    ${ls.map((l, j) => { const d = dests.find(x => x.id === l.destinadorId) || { precos: {} }; const resOpts = Object.keys(d.precos || {}).length ? (S.d.residuos || []).filter(r => r.id in d.precos || r.id === l.residuoId) : (S.d.residuos || []).filter(r => r.ativo || r.id === l.residuoId);
-      const preco = l.id && l._dest === l.destinadorId && l._res === l.residuoId ? l.preco : d.precos[l.residuoId];
-      return `<div class="dest-l" data-l="${j}">
-      <div class="fld"><label>Destinador</label><select data-lf="destinadorId" ${ro ? 'disabled' : ''}>${opts(dests.map(x => [x.id, x.nome]), l.destinadorId, 'Escolha…')}</select></div>
-      <div class="fld"><label>Resíduo</label><select data-lf="residuoId" ${ro ? 'disabled' : ''}>${opts(resOpts.map(r => [r.id, r.nome]), l.residuoId, 'Escolha…')}</select></div>
-      <div class="fld"><label>Peso (kg)</label><input type="number" step="any" min="0" data-lf="kg" value="${esc(l.kg)}" ${ro ? 'disabled' : ''}></div>
-      <div class="fld"><label>MTR</label><input data-lf="mtr" class="mono" value="${esc(l.mtr)}" ${ro ? 'disabled' : ''}></div>
-      <div class="fld"><label>Ticket</label><input data-lf="ticket" value="${esc(l.ticket)}" ${ro ? 'disabled' : ''}></div>
-      <div class="fld"><label>Negócio</label><select data-lf="negocio" ${ro ? 'disabled' : ''}>${opts(['RSS', 'Industrial'], l.negocio, '—')}</select></div>
-      <div class="fld"><label>Valor</label><div class="calc">${preco === '' || preco == null ? '<span class="sub">sem preço no Mapa</span>' : R((+l.kg || 0) * preco) + `<div class="sub">${Rkg(preco)}</div>`}</div></div>
-      ${ro ? '' : `<div class="fld" style="align-self:end;justify-self:start"><button type="button" class="btn sm danger" data-lrm="${j}" aria-label="Remover destinação">×</button></div>`}</div>`; }).join('')}
-    ${ro ? '' : `<button type="button" class="btn sm" data-ladd="${i}">+ Destinação</button>`}</div>`;
+function itensHTMLp(p, i, ro) {
+  if (!p.itens.length) return p.solicitacaoId ? '<div class="its"><span class="sub">A solicitação não tem resíduos com destino previsto. Informe o destinador no MTR quando a coleta for realizada.</span></div>' : '';
+  const s = solDe(p.solicitacaoId);
+  return `<div class="its"><div class="dest-h"><b>Resíduos e destino</b> <span class="sub">previstos pelo solicitante${s.kmPrevista ? ' · ' + (+s.kmPrevista).toLocaleString('pt-BR') + ' km' : ''}${s.diariasPrevistas ? ' · ' + s.diariasPrevistas + ' diária(s)' : ''}${s.pernoitesPrevistos ? ' · ' + s.pernoitesPrevistos + ' pernoite(s)' : ''}</span></div>
+    ${p.itens.map((it, j) => { const trocou = it._orig && it.destinadorId !== it._orig; const precisa = trocou && it.destinadorId !== it.destinadorPrevistoId;
+      return `<div class="it-l" data-it="${j}"><div><b>${esc(resNomeG(it.residuoId) || '—')}</b>${it.pesoEstimado !== '' ? ' <span class="sub">' + esc(kgF(it.pesoEstimado)) + ' estimado</span>' : ''}
+        ${it.destinadorPrevistoId && it.destinadorPrevistoId !== it._orig ? `<div class="sub">Previsto: ${esc(destNome(it.destinadorPrevistoId))}${it.justificativaTroca ? ' · troca: ' + esc(it.justificativaTroca) : ''}</div>` : ''}</div>
+        <select data-itd aria-label="Destinador de ${esc(resNomeG(it.residuoId))}" ${ro ? 'disabled' : ''}>${destOptsP(it.residuoId, it.destinadorId)}</select>
+        ${precisa ? `<div class="it-j fld"><label>Justificativa da troca (previsto: ${esc(destNome(it.destinadorPrevistoId || it._orig))})</label><input data-itj value="${esc(it._just)}" placeholder="Por que vai para outro destinador?"></div>` : ''}</div>`; }).join('')}</div>`;
+}
+function confirmadosHTML(p) {
+  return `<div class="conf"><b>Destinação confirmada no Controle.</b> ${p.confirmados.map(l => esc('MTR ' + (l.mtr || 's/nº') + ' · ' + destNome(l.destinadorId) + ' · ' + resNomeG(l.residuoId) + ' ' + kgF(l.kg))).join('; ')}</div>`;
+}
+function mtrsHTML(p, i, ro, s) {
+  if (!p.mtrs || !p.mtrs.length) syncMtrs(p);
+  const ds = S.d.destinadores || [];
+  return `<div class="dest"><div class="dest-h"><b>MTR da coleta</b> <span class="sub">um por destinador, emitido pelo gerador${s ? ' (obrigatório)' : ''}. O peso é o declarado no MTR; o do ticket da balança é confirmado no Controle de Destinação.</span></div>
+    ${p.mtrs.map((b, j) => { const trava = itemTravaBloco(p, b); const d = destDe(b.destinadorId);
+      return `<div class="mtr" data-m="${j}"><div class="mtr-h">
+        <div class="fld"><label>Destinador</label><select data-mf="destinadorId" ${ro || trava ? 'disabled' : ''} title="${trava ? 'Vem do resíduo; para trocar, mude o destinador do resíduo acima' : ''}">${opts(ds.map(x => [x.id, x.nome]), b.destinadorId, 'Escolha…')}</select></div>
+        <div class="fld"><label>Nº do MTR</label><input data-mf="mtr" class="mono" value="${esc(b.mtr)}" ${ro ? 'disabled' : ''}></div>
+        <div class="fld"><label>Negócio</label><select data-mf="negocio" ${ro ? 'disabled' : ''}>${opts(['RSS', 'Industrial'], b.negocio, '—')}</select></div>
+        ${ro || trava ? '<span></span>' : `<button type="button" class="btn sm danger" data-mrm="${j}" aria-label="Remover MTR">×</button>`}</div>
+        ${b.linhas.map((l, k) => { const it = p.itens.find(x => x.id === l.itemId); const pr = d && d.precos ? d.precos[l.residuoId] : undefined;
+          return `<div class="mtr-l" data-ml="${k}">
+          ${it ? `<div><b>${esc(resNomeG(l.residuoId))}</b></div>` : `<select data-lf="residuoId" aria-label="Resíduo" ${ro ? 'disabled' : ''}>${opts((S.d.residuos || []).filter(r => r.ativo || r.id === l.residuoId).map(r => [r.id, r.nome]), l.residuoId, 'Resíduo…')}</select>`}
+          <input type="number" step="any" min="0" data-lf="kg" value="${esc(l.kg)}" placeholder="${it && it.pesoEstimado !== '' ? 'est. ' + esc(it.pesoEstimado) : 'kg'}" aria-label="Peso do MTR (kg)" ${ro ? 'disabled' : ''}>
+          <span class="sub">kg no MTR${pr !== undefined && pr !== '' ? ' · ' + Rkg(pr) : ''}</span>
+          ${ro ? '<span></span>' : `<button type="button" class="btn sm" data-lrm="${k}" aria-label="Tirar do MTR" title="${it ? 'Este resíduo não foi coletado' : 'Remover'}">×</button>`}</div>`; }).join('')}
+        ${ro ? '' : `<button type="button" class="btn sm" data-ladd style="margin-top:6px">+ Resíduo neste MTR</button>`}</div>`; }).join('')}
+    ${ro ? '' : `<button type="button" class="btn sm" data-madd>+ MTR de outro destinador</button>`}</div>`;
 }
 function ligarViagem(ro) {
   const v = S.v;
@@ -691,23 +767,34 @@ function ligarViagem(ro) {
   $('#v-ret').onchange = e => { v.dataRetornoPrevisto = e.target.value; noitesAuto(); sujo(); re(); };
   const bind = (sel, k, rerender) => { const el = $(sel); if (el) el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { v[k] = el.value; sujo(); if (rerender) re(); }; };
   bind('#v-transp', 'transportadorId'); bind('#v-custo', 'custoTerceiro'); bind('#v-vei', 'veiculoId', true); bind('#v-mot', 'motoristaId', true); bind('#v-obs', 'obs');
+  ['#v-kmi', '#v-kmf'].forEach(sel => { const el = $(sel); if (el) el.oninput = () => { v[sel === '#v-kmi' ? 'kmInicial' : 'kmFinal'] = el.value === '' ? '' : +el.value; sujo(); }; });
   const vn = $('#v-noites'); if (vn) vn.onchange = () => { v.pernoitesPrevistos = vn.value; v.noitesManual = true; sujo(); re(); };
   $$('[data-aj]').forEach(c => c.onchange = () => { v.equipe = c.checked ? [...v.equipe, c.dataset.aj] : v.equipe.filter(x => x !== c.dataset.aj); sujo(); re(); });
   $$('[data-p]').forEach(card => {
     const p = v.paradas[+card.dataset.p];
     card.querySelectorAll('[data-f]').forEach(el => {
-      el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { p[el.dataset.f] = el.value; sujo(); if (el.dataset.f === 'resultado') { if (el.value === 'Realizada' && !p.data) p.data = v.dataSaida; re(); } };
+      el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { p[el.dataset.f] = el.value; sujo(); if (el.dataset.f === 'resultado') { if (el.value === 'Realizada') { if (!p.data) p.data = v.dataSaida; syncMtrs(p); } re(); } };
     });
   });
   $$('[data-p]').forEach(card => {
     const p = v.paradas[+card.dataset.p];
-    card.querySelectorAll('[data-l]').forEach(row => {
-      const l = p.lancamentos[+row.dataset.l];
-      row.querySelectorAll('[data-lf]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { l[el.dataset.lf] = el.value; sujo(); if (el.tagName === 'SELECT' || el.dataset.lf === 'kg') { if (el.dataset.lf === 'kg') { const vl = row.querySelector('.calc'); const d = (S.d.destinadores || []).find(x => x.id === l.destinadorId) || { precos: {} }; const pr = d.precos[l.residuoId]; if (vl && pr !== '' && pr != null) vl.innerHTML = R((+l.kg || 0) * pr) + `<div class="sub">${Rkg(pr)}</div>`; } else re(); } }; });
+    card.querySelectorAll('[data-it]').forEach(row => {
+      const it = p.itens[+row.dataset.it];
+      const sd = row.querySelector('[data-itd]'); if (sd) sd.onchange = () => { it.destinadorId = sd.value; sujo(); if (p.resultado === 'Realizada') syncMtrs(p); re(); const j = $(`[data-p="${card.dataset.p}"] [data-it="${row.dataset.it}"] [data-itj]`); if (j) j.focus(); };
+      const ij = row.querySelector('[data-itj]'); if (ij) ij.oninput = () => { it._just = ij.value; sujo(); };
     });
-    card.querySelectorAll('[data-lrm]').forEach(b => b.onclick = () => { p.lancamentos.splice(+b.dataset.lrm, 1); sujo(); re(); });
-    const ad = card.querySelector('[data-ladd]'); if (ad) ad.onclick = () => { const ult = p.lancamentos[p.lancamentos.length - 1] || {}; p.lancamentos = p.lancamentos || [];
-      p.lancamentos.push({ id: '', destinadorId: ult.destinadorId || '', residuoId: '', kg: '', mtr: '', ticket: '', negocio: ult.negocio || '' }); sujo(); re(); };
+    card.querySelectorAll('[data-m]').forEach(box => {
+      const b = p.mtrs[+box.dataset.m];
+      box.querySelectorAll('[data-mf]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { b[el.dataset.mf] = el.value; sujo();
+        if (el.dataset.mf === 'destinadorId') { b.linhas.forEach(l => { const it = p.itens.find(x => x.id === l.itemId); if (it && !it._orig) it.destinadorId = el.value; }); re(); } }; });
+      box.querySelectorAll('[data-ml]').forEach(row => { const l = b.linhas[+row.dataset.ml];
+        row.querySelectorAll('[data-lf]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { l[el.dataset.lf] = el.tagName === 'SELECT' ? el.value : el.value; sujo(); if (el.tagName === 'SELECT') re(); }; });
+        const rm = row.querySelector('[data-lrm]'); if (rm) rm.onclick = () => { b.linhas.splice(+row.dataset.ml, 1); if (!b.linhas.length && !b.mtr) p.mtrs.splice(+box.dataset.m, 1); sujo(); re(); };
+      });
+      const la = box.querySelector('[data-ladd]'); if (la) la.onclick = () => { b.linhas.push({ id: '', itemId: '', residuoId: '', kg: '' }); sujo(); re(); };
+      const mr = box.querySelector('[data-mrm]'); if (mr) mr.onclick = () => { p.mtrs.splice(+box.dataset.m, 1); sujo(); re(); };
+    });
+    const ma = card.querySelector('[data-madd]'); if (ma) ma.onclick = () => { p.mtrs.push({ destinadorId: '', mtr: '', negocio: (p.mtrs[0] || {}).negocio || '', linhas: [{ id: '', itemId: '', residuoId: '', kg: '' }] }); sujo(); re(); };
   });
   $$('[data-up]').forEach(b => b.onclick = () => { const i = +b.dataset.up; [v.paradas[i - 1], v.paradas[i]] = [v.paradas[i], v.paradas[i - 1]]; sujo(); re(); });
   $$('[data-down]').forEach(b => b.onclick = () => { const i = +b.dataset.down; if (i >= v.paradas.length - 1) return; [v.paradas[i + 1], v.paradas[i]] = [v.paradas[i], v.paradas[i + 1]]; sujo(); re(); });
@@ -715,7 +802,7 @@ function ligarViagem(ro) {
   const fa = $('#p-fila-add'); if (fa) fa.onclick = () => { const id = $('#p-fila').value; if (!id) return; addParadaSol(id); sujo(); re(); };
   const ca = $('#p-cli-add'); if (ca) ca.onclick = () => { const t = $('#p-cli').value.trim(); const c = S.d.clientes.find(x => cliRot(x) === t) || S.d.clientes.find(x => x.codigoUplog && x.codigoUplog === t);
     if (!c) { toast('Escolha o cliente da lista.'); return; }
-    v.paradas.push({ id: '', solicitacaoId: '', clienteId: c.id, data: '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: '', lancamentos: [] }); sujo(); re(); };
+    v.paradas.push(prepararParada({ id: '', solicitacaoId: '', clienteId: c.id, data: '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: '' })); sujo(); re(); };
   $('#v-salvar').onclick = () => salvarViagem(false);
   const cc = $('#v-concluir'); if (cc) cc.onclick = concluir;
   const cn = $('#v-cancel'); if (cn) cn.onclick = async () => { const r = await pedir('Cancelar viagem', [{ rotulo: 'Motivo', tipo: 'area', dica: 'As solicitações voltam para a fila "A programar".' }], 'Cancelar viagem'); if (!r) return;
@@ -726,9 +813,13 @@ async function salvarViagem(confirmar) {
   const v = S.v; const b = $('#v-salvar'); if (b) b.disabled = true;
   const reg = { id: v.id, unidadeId: v.unidadeId, execucao: v.execucao, dataSaida: v.dataSaida, dataRetornoPrevisto: v.dataRetornoPrevisto, veiculoId: v.veiculoId, motoristaId: v.motoristaId,
     equipe: v.equipe, transportadorId: v.transportadorId, custoTerceiro: v.custoTerceiro, pernoitesPrevistos: v.noitesManual ? v.pernoitesPrevistos : '', obs: v.obs,
-    paradas: v.paradas.map(p => ({ id: p.id, solicitacaoId: p.solicitacaoId, clienteId: p.clienteId, data: p.data, resultado: p.resultado, motivo: p.motivo, caixaEntregueId: p.caixaEntregueId,
-      caixaRetiradaId: p.caixaRetiradaId, peso: (p.lancamentos || []).length ? '' : p.peso, destinacao: p.destinacao, obs: p.obs,
-      lancamentos: p.resultado === 'Realizada' ? (p.lancamentos || []).map(l => ({ id: l.id || '', destinadorId: l.destinadorId, residuoId: l.residuoId, kg: l.kg, mtr: l.mtr, ticket: l.ticket, negocio: l.negocio })) : [] })) };
+    kmInicial: v.kmInicial ?? '', kmFinal: v.kmFinal ?? '',
+    paradas: v.paradas.map(p => { const x = { id: p.id, solicitacaoId: p.solicitacaoId, clienteId: p.clienteId, data: p.data, resultado: p.resultado, motivo: p.motivo, caixaEntregueId: p.caixaEntregueId,
+      caixaRetiradaId: p.caixaRetiradaId, peso: p.resultado === 'Realizada' && (p.mtrs || []).length ? '' : p.peso, destinacao: p.destinacao, obs: p.obs,
+      itens: (p.itens || []).filter(it => it._orig && it.destinadorId && it.destinadorId !== it._orig).map(it => ({ id: it.id, destinadorId: it.destinadorId, justificativa: it._just })) };
+      if (!p.travada) x.mtrs = p.resultado === 'Realizada' ? (p.mtrs || []).filter(b => b.destinadorId || b.mtr || b.linhas.some(l => l.residuoId || l.kg)).map(b => ({ destinadorId: b.destinadorId, mtr: b.mtr, negocio: b.negocio,
+        linhas: b.linhas.filter(l => l.residuoId || l.kg).map(l => ({ id: l.id || '', itemId: l.itemId || '', residuoId: l.residuoId, kg: l.kg })) })) : [];
+      return x; }) };
   try {
     const r = await Portal.api('prog.salvarViagem', { registro: reg, confirmar });
     toast(v.id ? 'Viagem salva' : 'Viagem programada'); v.sujo = false;
@@ -741,6 +832,11 @@ async function salvarViagem(confirmar) {
     } else falha(e);
   }
 }
+async function pedirKmInicial(v) {
+  const r = await pedir('Km inicial do veículo', [{ rotulo: 'Km no painel de ' + (v.placa || 'veículo') + ' antes de sair', tipo: 'number', dica: 'Obrigatória para registrar as coletas desta viagem como realizadas.' }], 'Registrar');
+  if (!r || r[0] === '') return;
+  try { await Portal.api('prog.viagemAcao', { id: v.id, tipo: 'kmInicial', dados: { kmInicial: r[0] } }); toast('Km inicial registrada'); await carregar(true); abrirViagem(v.id); renderViagem(); } catch (e) { falha(e); }
+}
 async function concluir() {
   const v = S.v;
   if (v.sujo) { toast('Salve a viagem antes de concluir.'); return; }
@@ -749,11 +845,15 @@ async function concluir() {
   const ret = v.dataRetornoPrevisto && v.dataRetornoPrevisto >= v.dataSaida ? v.dataRetornoPrevisto : v.dataSaida;
   const campos = [{ rotulo: 'Retorno à base', tipo: 'date', valor: ret }];
   if (terc) campos.push({ rotulo: 'Custo final do terceiro (R$)', tipo: 'number', valor: v.custoTerceiro });
-  else campos.push({ rotulo: 'Pernoites realizados', tipo: 'number', valor: diasEntre(v.dataSaida, ret), dica: 'Previstos: ' + (v.pernoitesPrevistos || 0) + '. A diferença vira acerto no DP.' });
+  else {
+    campos.push({ rotulo: 'Pernoites realizados', tipo: 'number', valor: diasEntre(v.dataSaida, ret), dica: 'Previstos: ' + (v.pernoitesPrevistos || 0) + '. A diferença vira acerto no DP.' });
+    campos.push({ rotulo: 'Km na volta à base', tipo: 'number', valor: v.kmFinal ?? '', dica: v.kmInicial !== '' && v.kmInicial != null ? 'Saiu com ' + (+v.kmInicial).toLocaleString('pt-BR') + ' km.' + (kmPrevV(v) ? ' Prevista: ' + kmPrevV(v).toLocaleString('pt-BR') + ' km.' : '') : 'Opcional: a viagem não tem km inicial.' });
+  }
   const r = await pedir('Concluir viagem', campos, 'Concluir'); if (!r) return;
+  if (!terc && v.kmInicial !== '' && v.kmInicial != null && r[2] === '') { toast('Informe a km do veículo na volta à base.'); return; }
   // se mudou o retorno e deixou as noites como estavam, o servidor recalcula pelas datas
   const noitesR = !terc && +r[1] === diasEntre(v.dataSaida, ret) && r[0] !== ret ? '' : r[1];
-  try { await Portal.api('prog.viagemAcao', { id: v.id, tipo: 'concluir', dados: terc ? { dataRetorno: r[0], custoTerceiro: r[1] } : { dataRetorno: r[0], pernoitesRealizados: noitesR } });
+  try { await Portal.api('prog.viagemAcao', { id: v.id, tipo: 'concluir', dados: terc ? { dataRetorno: r[0], custoTerceiro: r[1] } : { dataRetorno: r[0], pernoitesRealizados: noitesR, kmFinal: r[2] } });
     toast('Viagem concluída'); await carregar(true); abrirViagem(v.id); renderViagem(); } catch (e) { falha(e); }
 }
 function imprimirOS(v) {
@@ -763,9 +863,9 @@ function imprimirOS(v) {
     <table class="os-t"><tr><th>Veículo</th><td>${esc(v.execucao === 'Terceirizada' ? 'Terceirizada: ' + (cliDe(v.transportadorId).nome || '') : (v.placa || '') + ' · ' + (vei.tipo || ''))}</td></tr>
       ${v.execucao === 'Terceirizada' ? '' : `<tr><th>Motorista</th><td>${esc(colDe(v.motoristaId).nome || '')}</td></tr><tr><th>Ajudantes</th><td>${esc(v.equipe.map(id => colDe(id).nome).join(', ') || '—')}</td></tr>
       <tr><th>Pernoites previstos</th><td>${esc(v.pernoitesPrevistos || 0)}</td></tr>`}${v.obs ? `<tr><th>Observações</th><td>${esc(v.obs)}</td></tr>` : ''}</table>
-    <h2>Paradas</h2><table class="os-t"><thead><tr><th>#</th><th>Cliente</th><th>Caixas</th><th>Observação</th><th>Peso (kg)</th><th>Visto do cliente</th></tr></thead><tbody>
+    <h2>Paradas</h2><table class="os-t"><thead><tr><th>#</th><th>Cliente</th><th>Caixas</th><th>Resíduos → destino</th><th>Observação</th><th>MTR / peso (kg)</th><th>Visto do cliente</th></tr></thead><tbody>
     ${v.paradas.map((p, i) => { const c = cliDe(p.clienteId); return `<tr><td>${i + 1}</td><td><b>${esc(c.nome || '')}</b>${c.codigoUplog ? '<br>Cód. ' + esc(c.codigoUplog) : ''}</td>
-      <td>${p.caixaEntregueId ? 'Entregar ' + esc(cxRot(cxDe(p.caixaEntregueId))) + '<br>' : ''}${p.caixaRetiradaId ? 'Retirar ' + esc(cxRot(cxDe(p.caixaRetiradaId))) : ''}</td><td>${esc(p.obs || '')}</td><td></td><td></td></tr>`; }).join('')}
+      <td>${p.caixaEntregueId ? 'Entregar ' + esc(cxRot(cxDe(p.caixaEntregueId))) + '<br>' : ''}${p.caixaRetiradaId ? 'Retirar ' + esc(cxRot(cxDe(p.caixaRetiradaId))) : ''}</td><td>${esc((p.itens || []).map(it => resNomeG(it.residuoId) + ' → ' + (destNome(it.destinadorId) || '?')).join('; '))}</td><td>${esc(p.obs || '')}</td><td></td><td></td></tr>`; }).join('')}
     </tbody></table><div class="os-ass"><div>Programação</div><div>Motorista</div></div>`;
   window.print();
 }
