@@ -263,6 +263,9 @@ h3.sec{font:600 14px var(--f-body);margin:18px 0 8px;color:var(--ink)}
 .pill.st.fat{background:#efe6fb;color:#6a3fb0}
 .pill.st.nf{background:var(--ok-bg);color:var(--ok)}
 .pill.st.ok{background:#dff3f0;color:#0e7466}
+.pill.st.dest{background:#fbecd9;color:#93520f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.dest{background:#3a2a16;color:#f0b877}}
+:root[data-theme="dark"] .pill.st.dest{background:#3a2a16;color:#f0b877}
 .pill.st.crit{background:var(--crit-bg);color:var(--crit)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root:not([data-theme="light"]) .pill.st.fat{background:#2c2240;color:#c3a6f0}:root:not([data-theme="light"]) .pill.st.ok{background:#14302b;color:#6fd3c2}}
 :root[data-theme="dark"] .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root[data-theme="dark"] .pill.st.fat{background:#2c2240;color:#c3a6f0}:root[data-theme="dark"] .pill.st.ok{background:#14302b;color:#6fd3c2}
@@ -311,14 +314,14 @@ const $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const R = v => v === '' || v == null ? '—' : (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const D = iso => iso ? iso.split('-').reverse().join('/') : '';
-const PASSOS = ['Recebida', 'Liberada para programar', 'Programada', 'Realizada', 'BM enviado', 'NF emitida'];
-const ABERTAS = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada', 'Frustrada', 'Realizada', 'BM enviado'];
+const PASSOS = ['Recebida', 'Liberada para programar', 'Programada', 'Realizada', 'Destinação', 'BM enviado', 'NF emitida'];
+const ABERTAS = ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Programada', 'Frustrada', 'Realizada', 'Destinação', 'BM enviado'];
 const S = { d: null, filtro: 'abertas', busca: '' };
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 3600); }
 function setSync(ok, txt) { const s = $('#sync'); s.classList.toggle('on', ok); s.querySelector('span').textContent = txt; }
 const cliDe = id => (S.d.clientes.find(c => c.id === id) || {});
 const uniNome = id => ((S.d.unidades || []).find(u => u.id === id) || {}).nome || '';
-const stPill = st => `<span class="pill st ${{ 'Documentação pendente': 'warn', 'Liberada para programar': 'lib', 'Programada': 'lib', 'Realizada': 'ok', 'BM enviado': 'fat', 'NF emitida': 'nf', 'Cancelada': 'crit', 'Frustrada': 'crit' }[st] || ''}">${esc(st)}</span>`;
+const stPill = st => `<span class="pill st ${{ 'Documentação pendente': 'warn', 'Liberada para programar': 'lib', 'Programada': 'lib', 'Realizada': 'ok', 'Destinação': 'dest', 'BM enviado': 'fat', 'NF emitida': 'nf', 'Cancelada': 'crit', 'Frustrada': 'crit' }[st] || ''}">${esc(st)}</span>`;
 async function carregar() {
   setSync(false, 'Carregando…');
   try { S.d = await Portal.api('minhas.dados', {}); setSync(true, 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })); render(); }
