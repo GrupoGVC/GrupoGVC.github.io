@@ -382,6 +382,11 @@ function setTab(t) {
 $$('nav.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 // o servidor só manda as realizadas que já podem ir para o BM (destinação confirmada ou serviço sem destinação)
 const prontaBm = s => s.status === 'Destinação' || s.status === 'Realizada';
+// cliente que paga o transporte por km rodado: o solicitante escolhe o km (real ou previsto) antes do BM
+const kmPend = s => !!(s && s.km && s.km.pendente);
+const porKm = m => /^Km rodado/.test(m || '');
+const valoriza = m => /valoriza/i.test(m || '');
+const kmTxt = k => 'km ' + (k.escolha === 'Real' ? 'real' : 'previsto') + (k.definidoPor ? ', definido por ' + k.definidoPor + (k.definidoEm ? ' em ' + D(k.definidoEm) : '') : '');
 function render() {
   if (!S.d) return;
   const afat = S.d.solicitacoes.filter(s => prontaBm(s) && passaUni(s));
@@ -426,6 +431,7 @@ function renderAFaturar() {
   $('#main').innerHTML = `<section class="panel">
     <div class="panel-h"><div><h2>Destinadas — falta BM</h2><p class="sub">Coletas com a destinação confirmada no Controle (ou de serviço sem destinação) que ainda não entraram num BM. Marque as do mesmo cliente que vão no mesmo BM e clique em "Montar BM".</p></div></div>
     ${S.d.aguardandoDestinacao ? `<div class="al"><span class="pill warn">${S.d.aguardandoDestinacao} coleta(s)</span><b>Realizadas aguardando a confirmação da destinação no Controle de Destinação (aba A destinar). Entram aqui depois do ticket da balança.</b></div>` : ''}
+    ${S.d.aguardandoKm ? `<div class="al"><span class="pill warn">${S.d.aguardandoKm} coleta(s)</span><b>Aguardando o solicitante definir o km da cobrança (km rodado) em Solicitações. O BM delas fica liberado depois da escolha.</b></div>` : ''}
     <div class="toolbar"><input type="search" id="busca" placeholder="Buscar cliente ou código…" value="${esc(S.busca)}" aria-label="Buscar"><span class="sub" style="margin:0 0 0 auto">${sols.length} coleta(s) de ${ids.length} cliente(s)</span>${T.botao()}</div>
     ${T.info(sols.length, solsTela.length)}
     ${ids.length ? ids.map(cid => { const c = cliDe(cid); let l = grupos[cid].sort((a, b) => String(a.dataColeta).localeCompare(String(b.dataColeta)));
@@ -434,16 +440,18 @@ function renderAFaturar() {
       return `<div class="cli-card"><div class="cli-h"><div><b>${esc(c.nome)}</b> ${c.codigoUplog ? `<span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}</div>
         ${S.ro ? '' : `<button class="btn sm pri" data-montar="${esc(cid)}">Montar BM</button>`}</div>
         <div class="tbl-wrap"><table><thead>${T.cab('', S.ro ? '' : '<th></th>')}</thead><tbody>
-        ${l.map(s => `<tr>${S.ro ? '' : `<td><input type="checkbox" data-sel="${esc(s.id)}" data-cli="${esc(cid)}" ${S.sel[s.id] ? 'checked' : ''} aria-label="Incluir no BM" style="width:auto"></td>`}
-          <td class="mono">${esc(D(s.dataColeta))}</td><td>${esc(uniNome(s.unidadeId))}</td><td>${esc(conNome(s.consultorId) || '—')}</td><td class="wrap">${esc(s.descricao || '')}</td><td class="num">${R(s.valorPrevisto)}</td></tr>`).join('')}
+        ${l.map(s => `<tr>${S.ro ? '' : `<td><input type="checkbox" data-sel="${esc(s.id)}" data-cli="${esc(cid)}" ${S.sel[s.id] && !kmPend(s) ? 'checked' : ''} ${kmPend(s) ? 'disabled title="Aguardando o solicitante definir o km"' : ''} aria-label="Incluir no BM" style="width:auto"></td>`}
+          <td class="mono">${esc(D(s.dataColeta))}</td><td>${esc(uniNome(s.unidadeId))}</td><td>${esc(conNome(s.consultorId) || '—')}</td><td class="wrap">${esc(s.descricao || '')}${kmPend(s) ? ' <span class="pill warn" title="O solicitante escolhe o km real ou o previsto em Solicitações">aguardando km</span>' : s.km && s.km.escolha ? ` <span class="sub">· ${esc(s.km.kmCobrado)} km (${esc(s.km.escolha.toLowerCase())})</span>` : ''}</td><td class="num">${R(s.valorPrevisto)}</td></tr>`).join('')}
         </tbody></table></div></div>`; }).join('') : `<div class="empty">${solsTela.length ? 'Nenhuma coleta com os filtros das colunas.' : 'Nenhuma coleta realizada esperando BM.'}</div>`}
   </section>`;
   ligarBusca(); T.ligar();
   $$('[data-sel]').forEach(c => c.onchange = () => { S.sel[c.dataset.sel] = c.checked; });
   $$('[data-montar]').forEach(b => b.onclick = () => {
     const cid = b.dataset.montar;
-    let ids2 = grupos[cid].filter(s => S.sel[s.id]).map(s => s.id);
-    if (!ids2.length) ids2 = grupos[cid].map(s => s.id);
+    const livres = grupos[cid].filter(s => !kmPend(s));
+    let ids2 = livres.filter(s => S.sel[s.id]).map(s => s.id);
+    if (!ids2.length) ids2 = livres.map(s => s.id);
+    if (!ids2.length) { toast('As coletas deste cliente aguardam o solicitante definir o km da cobrança.'); return; }
     novoBM(cid, ids2);
   });
 }
@@ -463,9 +471,14 @@ function editarBM(f) {
 /* ---------- formulário do BM ---------- */
 function precoRot(p) {
   const partes = [p.modalidade, p.residuoId ? resNome(p.residuoId) : 'transporte'];
-  if (p.valorTransporte !== '') partes.push('transporte ' + R(p.valorTransporte));
+  if (p.valorTransporte !== '') partes.push('transporte ' + R(p.valorTransporte) + (porKm(p.modalidade) ? '/km' : ''));
   if (p.precoKg !== '') partes.push(R(p.precoKg) + '/kg');
   return partes.join(' · ');
+}
+function kmAviso(it) {
+  if (it.unidadeMedida !== 'km' || !it.solicitacaoId) return '';
+  const k = (solDe(it.solicitacaoId) || {}).km; if (!k || !k.escolha || +it.quantidade === +k.kmCobrado) return '';
+  return `<div class="km-av" style="font-size:11px;color:var(--warn);white-space:normal;max-width:140px;text-align:right">≠ ${esc(k.kmCobrado)} km definidos (${esc(k.escolha.toLowerCase())}); fica no histórico</div>`;
 }
 function renderBM() {
   const b = S.bm; const c = cliDe(b.clienteId);
@@ -473,7 +486,7 @@ function renderBM() {
   const precos = S.d.precos.filter(p => p.cadastroId === b.clienteId || (c.principalId && p.cadastroId === c.principalId))
     .filter(p => (!p.vigenciaInicio || p.vigenciaInicio <= hoje) && (!p.vigenciaFim || p.vigenciaFim >= hoje));
   // solicitações que podem entrar: realizadas do mesmo cliente + as que já estão no BM
-  const disponiveis = S.d.solicitacoes.filter(s => s.clienteId === b.clienteId && (prontaBm(s) || b.solIds.includes(s.id)));
+  const disponiveis = S.d.solicitacoes.filter(s => s.clienteId === b.clienteId && ((prontaBm(s) && !kmPend(s)) || b.solIds.includes(s.id)));
   const total = totalItens(b.itens);
   const um = S.d.listas.unidadeMedida;
   $('#main').innerHTML = `<section class="panel form-panel" id="form-panel">
@@ -491,7 +504,7 @@ function renderBM() {
     ${b.itens.map((it, i) => `<tr data-it="${i}">
       <td><select data-f="solicitacaoId" aria-label="Coleta">${opts(b.solIds.map(id => [id, D(solDe(id).dataColeta) || id]), it.solicitacaoId, '—')}</select></td>
       <td><input data-f="descricao" value="${esc(it.descricao)}" aria-label="Descrição" style="min-width:180px"></td>
-      <td class="num"><input data-f="quantidade" type="number" step="any" min="0" value="${esc(it.quantidade)}" aria-label="Quantidade" style="width:90px;text-align:right"></td>
+      <td class="num"><input data-f="quantidade" type="number" step="any" min="0" value="${esc(it.quantidade)}" aria-label="Quantidade" style="width:90px;text-align:right">${kmAviso(it)}</td>
       <td><select data-f="unidadeMedida" aria-label="Unidade de medida">${opts(um.concat(it.unidadeMedida && !um.includes(it.unidadeMedida) ? [it.unidadeMedida] : []), it.unidadeMedida, '—')}</select></td>
       <td class="num"><input data-f="valorUnitario" type="number" step="any" min="0" value="${esc(it.valorUnitario)}" aria-label="Valor unitário" style="width:110px;text-align:right"></td>
       <td><select data-f="sentido" aria-label="Sentido">${opts(S.d.listas.sentido, it.sentido)}</select></td>
@@ -526,6 +539,7 @@ function renderBM() {
         const v = arred((+it.quantidade || 0) * (+it.valorUnitario || 0));
         const cel = tr.querySelector('[data-v]'); cel.textContent = (it.sentido === 'Desconto' ? '− ' : '') + R(v); cel.classList.toggle('neg', it.sentido === 'Desconto');
         $('#bm-total').innerHTML = '<b>' + R(totalItens(b.itens)) + '</b>';
+        const qc = tr.querySelector('[data-f="quantidade"]').parentNode; const av = qc.querySelector('.km-av'); if (av) av.remove(); qc.insertAdjacentHTML('beforeend', kmAviso(it));
       };
     });
   });
@@ -536,11 +550,15 @@ function renderBM() {
     const novos = [];
     b.solIds.forEach(sid => {
       const d = dest[sid] || { viagens: 0, kg: {} }; const dc = D(solDe(sid).dataColeta);
+      const sk = solDe(sid).km;
       precos.forEach(p => {
-        const valoriza = /Valorização/.test(p.modalidade);
-        if (p.valorTransporte !== '') novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : '') + (dc ? ' (' + dc + ')' : ''), quantidade: d.viagens || 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
+        const valoriza2 = valoriza(p.modalidade);
+        if (porKm(p.modalidade)) {
+          if (p.valorTransporte !== '' && sk && sk.escolha && (!sk.precoId || sk.precoId === p.id || !precos.some(q => q.id === sk.precoId)) && !novos.some(n => n.solicitacaoId === sid && n.unidadeMedida === 'km'))
+            novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte — ' + kmTxt(sk) + (dc ? ' (' + dc + ')' : ''), quantidade: +sk.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
+        } else if (p.valorTransporte !== '') novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : '') + (dc ? ' (' + dc + ')' : ''), quantidade: d.viagens || 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
         const kg = p.residuoId ? +(d.kg[p.residuoId] || 0) : 0;
-        if (p.precoKg !== '' && kg > 0) novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: (valoriza ? 'Valorização — ' : '') + resNome(p.residuoId) + (dc ? ' (' + dc + ')' : ''), quantidade: Math.round(kg * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza ? 'Desconto' : 'Cobrança' });
+        if (p.precoKg !== '' && kg > 0) novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: (valoriza2 ? 'Valorização — ' : '') + resNome(p.residuoId) + (dc ? ' (' + dc + ')' : ''), quantidade: Math.round(kg * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza2 ? 'Desconto' : 'Cobrança' });
       });
     });
     if (!novos.length) { toast('Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
@@ -550,10 +568,12 @@ function renderBM() {
   const pa = $('#it-preco-add'); if (pa) pa.onclick = () => {
     const p = S.d.precos.find(x => x.id === $('#it-preco').value); if (!p) return;
     const sol = b.solIds[0] || '';
-    const valoriza = /Valorização/.test(p.modalidade);
-    if (p.valorTransporte !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : ''), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
+    const valoriza2 = valoriza(p.modalidade);
+    if (porKm(p.modalidade) && p.valorTransporte !== '') {
+      b.solIds.forEach(sid => { const k = solDe(sid).km || {}; b.itens.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte — ' + (k.escolha ? kmTxt(k) : 'km rodado') + (solDe(sid).dataColeta ? ' (' + D(solDe(sid).dataColeta) + ')' : ''), quantidade: +k.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: p.valorTransporte, sentido: 'Cobrança' }); });
+    } else if (p.valorTransporte !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : ''), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
     const kgLanc = p.residuoId ? b.solIds.reduce((t, sid) => t + +(((S.d.destinacao || {})[sid] || { kg: {} }).kg[p.residuoId] || 0), 0) : 0;
-    if (p.precoKg !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: (valoriza ? 'Valorização — ' : '') + (resNome(p.residuoId) || 'Resíduo'), quantidade: Math.round(kgLanc * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza ? 'Desconto' : 'Cobrança' });
+    if (p.precoKg !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: (valoriza2 ? 'Valorização — ' : '') + (resNome(p.residuoId) || 'Resíduo'), quantidade: Math.round(kgLanc * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza2 ? 'Desconto' : 'Cobrança' });
     marcar(); renderBM(); toast(p.precoKg !== '' ? 'Item incluído: informe a quantidade em kg.' : 'Item incluído.');
   };
   $('#bm-fechar').onclick = () => { if (b.sujo && !confirm('Fechar sem salvar o BM?')) return; S.bm = null; render(); };
