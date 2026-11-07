@@ -319,7 +319,7 @@ const hojeISO = () => { const d = new Date(); return d.getFullYear() + '-' + Str
 const arred = v => Math.round((+v || 0) * 100) / 100;
 const NIVEL_LBL = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 const TABS = ['afaturar', 'abertos', 'emitidas'];
-const S = { tab: 'afaturar', d: null, ro: true, uni: '', busca: '', mes: null, cancelados: false, sel: {}, bm: null };
+const S = { tab: 'afaturar', d: null, ro: true, uni: '', busca: '', mes: null, cancelados: false, sel: {}, selc: {}, bm: null };
 
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 3600); }
 function setSync(ok, txt) { const s = $('#sync'); s.classList.toggle('on', ok); s.querySelector('span').textContent = txt; }
@@ -384,12 +384,17 @@ $$('nav.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 const prontaBm = s => s.status === 'Destinação' || s.status === 'Realizada';
 // cliente que paga o transporte por km rodado: o solicitante escolhe o km (real ou previsto) antes do BM
 const kmPend = s => !!(s && s.km && s.km.pendente);
+// viagens frustradas (culpa do cliente) que o solicitante decidiu cobrar
+const cobDe = id => (S.d.cobrancas || []).find(c => c.id === id) || {};
+const cobLivres = () => (S.d.cobrancas || []).filter(c => c.decisao === 'Cobrar' && !c.noBm && passaUni(c));
+const cobTxt = c => 'Viagem ' + (c.tipo === 'Frustrada' ? 'frustrada' : 'cancelada no dia') + ' em ' + D(c.data) + ' — ' + c.motivo;
+const itemCob = c => ({ solicitacaoId: '', cobrancaId: c.id, precoClienteId: '', descricao: cobTxt(c), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: +c.valor || 0, sentido: 'Cobrança' });
 const porKm = m => /^Km rodado/.test(m || '');
 const valoriza = m => /valoriza/i.test(m || '');
 const kmTxt = k => 'km ' + (k.escolha === 'Real' ? 'real' : 'previsto') + (k.definidoPor ? ', definido por ' + k.definidoPor + (k.definidoEm ? ' em ' + D(k.definidoEm) : '') : '');
 function render() {
   if (!S.d) return;
-  const afat = S.d.solicitacoes.filter(s => prontaBm(s) && passaUni(s));
+  const afat = S.d.solicitacoes.filter(s => prontaBm(s) && passaUni(s)).concat(cobLivres());
   const abertos = S.d.faturamentos.filter(f => (f.status === 'BM enviado' || f.status === 'Aprovado') && passaUni(f));
   $('#ct-af').textContent = afat.length; $('#ct-ab').textContent = abertos.length;
   if (S.bm) return renderBM();
@@ -425,8 +430,9 @@ function renderAFaturar() {
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"'].filter(Boolean),
     totais: l => ({ 'Valor previsto': l.reduce((t, s) => t + (+s.valorPrevisto || 0), 0) }) });
   const sols = T.aplicar(solsTela);
-  const grupos = {};
+  const grupos = {}, cobs = {};
   sols.forEach(s => { (grupos[s.clienteId] = grupos[s.clienteId] || []).push(s); });
+  cobLivres().filter(c => passaBusca([cliNome(c.clienteId), cliDe(c.clienteId).codigoUplog].join(' '))).forEach(c => { (cobs[c.clienteId] = cobs[c.clienteId] || []).push(c); grupos[c.clienteId] = grupos[c.clienteId] || []; });
   const ids = Object.keys(grupos).sort((a, b) => cliNome(a).localeCompare(cliNome(b), 'pt-BR'));
   $('#main').innerHTML = `<section class="panel">
     <div class="panel-h"><div><h2>Destinadas — falta BM</h2><p class="sub">Coletas com a destinação confirmada no Controle (ou de serviço sem destinação) que ainda não entraram num BM. Marque as do mesmo cliente que vão no mesmo BM e clique em "Montar BM".</p></div></div>
@@ -439,31 +445,35 @@ function renderAFaturar() {
       T.base = solsTela;
       return `<div class="cli-card"><div class="cli-h"><div><b>${esc(c.nome)}</b> ${c.codigoUplog ? `<span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}</div>
         ${S.ro ? '' : `<button class="btn sm pri" data-montar="${esc(cid)}">Montar BM</button>`}</div>
-        <div class="tbl-wrap"><table><thead>${T.cab('', S.ro ? '' : '<th></th>')}</thead><tbody>
+        ${l.length ? `<div class="tbl-wrap"><table><thead>${T.cab('', S.ro ? '' : '<th></th>')}</thead><tbody>
         ${l.map(s => `<tr>${S.ro ? '' : `<td><input type="checkbox" data-sel="${esc(s.id)}" data-cli="${esc(cid)}" ${S.sel[s.id] && !kmPend(s) ? 'checked' : ''} ${kmPend(s) ? 'disabled title="Aguardando o solicitante definir o km"' : ''} aria-label="Incluir no BM" style="width:auto"></td>`}
           <td class="mono">${esc(D(s.dataColeta))}</td><td>${esc(uniNome(s.unidadeId))}</td><td>${esc(conNome(s.consultorId) || '—')}</td><td class="wrap">${esc(s.descricao || '')}${kmPend(s) ? ' <span class="pill warn" title="O solicitante escolhe o km real ou o previsto em Solicitações">aguardando km</span>' : s.km && s.km.escolha ? ` <span class="sub">· ${esc(s.km.kmCobrado)} km (${esc(s.km.escolha.toLowerCase())})</span>` : ''}</td><td class="num">${R(s.valorPrevisto)}</td></tr>`).join('')}
-        </tbody></table></div></div>`; }).join('') : `<div class="empty">${solsTela.length ? 'Nenhuma coleta com os filtros das colunas.' : 'Nenhuma coleta realizada esperando BM.'}</div>`}
+        </tbody></table></div>` : ''}
+        ${(cobs[cid] || []).length ? `<h3 class="sec">Frustradas a cobrar</h3><div class="chips">${cobs[cid].map(c => `<label class="chip">${S.ro ? '' : `<input type="checkbox" data-selc="${esc(c.id)}" ${S.selc[c.id] ? 'checked' : ''}>`} ${esc(cobTxt(c))} · <b>${R(c.valor)}</b></label>`).join('')}</div>` : ''}</div>`; }).join('') : `<div class="empty">${solsTela.length ? 'Nenhuma coleta com os filtros das colunas.' : 'Nenhuma coleta realizada esperando BM.'}</div>`}
   </section>`;
   ligarBusca(); T.ligar();
   $$('[data-sel]').forEach(c => c.onchange = () => { S.sel[c.dataset.sel] = c.checked; });
+  $$('[data-selc]').forEach(c => c.onchange = () => { S.selc[c.dataset.selc] = c.checked; });
   $$('[data-montar]').forEach(b => b.onclick = () => {
     const cid = b.dataset.montar;
-    const livres = grupos[cid].filter(s => !kmPend(s));
-    let ids2 = livres.filter(s => S.sel[s.id]).map(s => s.id);
-    if (!ids2.length) ids2 = livres.map(s => s.id);
-    if (!ids2.length) { toast('As coletas deste cliente aguardam o solicitante definir o km da cobrança.'); return; }
-    novoBM(cid, ids2);
+    const livres = grupos[cid].filter(s => !kmPend(s)), cl = cobs[cid] || [];
+    let ids2 = livres.filter(s => S.sel[s.id]).map(s => s.id), cIds = cl.filter(c => S.selc[c.id]).map(c => c.id);
+    if (!ids2.length && !cIds.length) { ids2 = livres.map(s => s.id); cIds = cl.map(c => c.id); }
+    if (!ids2.length && !cIds.length) { toast('As coletas deste cliente aguardam o solicitante definir o km da cobrança.'); return; }
+    novoBM(cid, ids2, cIds);
   });
 }
-function novoBM(clienteId, solIds) {
-  S.bm = { clienteId, bmNumero: '', bmData: hojeISO(), obs: '', solIds: solIds.slice(), sujo: true,
-    itens: solIds.map(id => { const s = solDe(id); return { solicitacaoId: id, precoClienteId: '', descricao: 'Coleta' + (s.dataColeta ? ' de ' + D(s.dataColeta) : ''), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: +s.valorPrevisto || 0, sentido: 'Cobrança' }; }) };
+function novoBM(clienteId, solIds, cobIds) {
+  cobIds = cobIds || [];
+  S.bm = { clienteId, bmNumero: '', bmData: hojeISO(), obs: '', solIds: solIds.slice(), cobIds: cobIds.slice(), sujo: true,
+    itens: solIds.map(id => { const s = solDe(id); return { solicitacaoId: id, precoClienteId: '', descricao: 'Coleta' + (s.dataColeta ? ' de ' + D(s.dataColeta) : ''), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: +s.valorPrevisto || 0, sentido: 'Cobrança' }; })
+      .concat(cobIds.map(id => itemCob(cobDe(id)))) };
   render(); scrollTo({ top: 0 });
 }
 function editarBM(f) {
-  const solIds = [...new Set(f.itens.map(i => i.solicitacaoId).filter(Boolean))];
-  S.bm = { id: f.id, status: f.status, clienteId: f.clienteId, bmNumero: f.bmNumero, bmData: f.bmData, obs: f.obs, solIds, sujo: false,
-    itens: f.itens.map(i => ({ solicitacaoId: i.solicitacaoId, precoClienteId: i.precoClienteId, descricao: i.descricao, quantidade: i.quantidade, unidadeMedida: i.unidadeMedida, valorUnitario: i.valorUnitario, sentido: i.sentido })),
+  const solIds = [...new Set(f.itens.map(i => i.solicitacaoId).filter(Boolean))], cobIds = [...new Set(f.itens.map(i => i.cobrancaId).filter(Boolean))];
+  S.bm = { id: f.id, status: f.status, clienteId: f.clienteId, bmNumero: f.bmNumero, bmData: f.bmData, obs: f.obs, solIds, cobIds, sujo: false,
+    itens: f.itens.map(i => ({ solicitacaoId: i.solicitacaoId, cobrancaId: i.cobrancaId || '', precoClienteId: i.precoClienteId, descricao: i.descricao, quantidade: i.quantidade, unidadeMedida: i.unidadeMedida, valorUnitario: i.valorUnitario, sentido: i.sentido })),
     criadoEm: f.criadoEm, criadoPor: f.criadoPor, atualizadoEm: f.atualizadoEm, atualizadoPor: f.atualizadoPor };
   render(); scrollTo({ top: 0 });
 }
@@ -487,6 +497,8 @@ function renderBM() {
     .filter(p => (!p.vigenciaInicio || p.vigenciaInicio <= hoje) && (!p.vigenciaFim || p.vigenciaFim >= hoje));
   // solicitações que podem entrar: realizadas do mesmo cliente + as que já estão no BM
   const disponiveis = S.d.solicitacoes.filter(s => s.clienteId === b.clienteId && ((prontaBm(s) && !kmPend(s)) || b.solIds.includes(s.id)));
+  b.cobIds = b.cobIds || [];
+  const cobsDisp = (S.d.cobrancas || []).filter(c => (c.clienteId === b.clienteId || cliDe(c.clienteId).principalId === b.clienteId) && ((c.decisao === 'Cobrar' && (!c.noBm || (b.id && c.noBm.id === b.id))) || b.cobIds.includes(c.id)));
   const total = totalItens(b.itens);
   const um = S.d.listas.unidadeMedida;
   $('#main').innerHTML = `<section class="panel form-panel" id="form-panel">
@@ -499,10 +511,11 @@ function renderBM() {
     </div>
     <h3 class="sec">Coletas neste BM</h3>
     <div class="chips">${disponiveis.map(s => `<label class="chip"><input type="checkbox" data-bsol="${esc(s.id)}" ${b.solIds.includes(s.id) ? 'checked' : ''}> ${esc(D(s.dataColeta) || D(s.dataSolicitacao))} · ${esc(uniNome(s.unidadeId))}${s.valorPrevisto !== '' ? ' · ' + R(s.valorPrevisto) : ''}</label>`).join('')}</div>
+    ${cobsDisp.length ? `<h3 class="sec">Viagens frustradas a cobrar</h3><div class="chips">${cobsDisp.map(c => `<label class="chip"><input type="checkbox" data-bcob="${esc(c.id)}" ${b.cobIds.includes(c.id) ? 'checked' : ''}> ${esc(cobTxt(c))} · ${R(c.valor)}</label>`).join('')}</div>` : ''}
     <h3 class="sec">Itens</h3>
     <div class="tbl-wrap"><table class="itens"><thead><tr><th>Coleta</th><th>Descrição</th><th class="num">Qtd</th><th>Un.</th><th class="num">Valor unit. (R$)</th><th>Sentido</th><th class="num">Valor</th><th></th></tr></thead><tbody>
     ${b.itens.map((it, i) => `<tr data-it="${i}">
-      <td><select data-f="solicitacaoId" aria-label="Coleta">${opts(b.solIds.map(id => [id, D(solDe(id).dataColeta) || id]), it.solicitacaoId, '—')}</select></td>
+      <td>${it.cobrancaId ? `<span class="pill warn" title="Viagem frustrada">frustrada ${esc(D(cobDe(it.cobrancaId).data))}</span>` : `<select data-f="solicitacaoId" aria-label="Coleta">${opts(b.solIds.map(id => [id, D(solDe(id).dataColeta) || id]), it.solicitacaoId, '—')}</select>`}</td>
       <td><input data-f="descricao" value="${esc(it.descricao)}" aria-label="Descrição" style="min-width:180px"></td>
       <td class="num"><input data-f="quantidade" type="number" step="any" min="0" value="${esc(it.quantidade)}" aria-label="Quantidade" style="width:90px;text-align:right">${kmAviso(it)}</td>
       <td><select data-f="unidadeMedida" aria-label="Unidade de medida">${opts(um.concat(it.unidadeMedida && !um.includes(it.unidadeMedida) ? [it.unidadeMedida] : []), it.unidadeMedida, '—')}</select></td>
@@ -528,6 +541,12 @@ function renderBM() {
     const id = x.dataset.bsol;
     if (x.checked) { b.solIds.push(id); const s = solDe(id); b.itens.push({ solicitacaoId: id, precoClienteId: '', descricao: 'Coleta' + (s.dataColeta ? ' de ' + D(s.dataColeta) : ''), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: +s.valorPrevisto || 0, sentido: 'Cobrança' }); }
     else { b.solIds = b.solIds.filter(y => y !== id); b.itens = b.itens.filter(it => it.solicitacaoId !== id); }
+    marcar(); renderBM();
+  });
+  $$('[data-bcob]').forEach(x => x.onchange = () => {
+    const id = x.dataset.bcob;
+    if (x.checked) { b.cobIds.push(id); b.itens.push(itemCob(cobDe(id))); }
+    else { b.cobIds = b.cobIds.filter(y => y !== id); b.itens = b.itens.filter(it => it.cobrancaId !== id); }
     marcar(); renderBM();
   });
   $$('[data-it]').forEach(tr => {
@@ -562,8 +581,9 @@ function renderBM() {
       });
     });
     if (!novos.length) { toast('Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
-    if (b.itens.length && !confirm('Trocar os ' + b.itens.length + ' item(ns) atuais pelos ' + novos.length + ' sugeridos?')) return;
-    b.itens = novos; marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s). Confira e salve.');
+    const deCob = b.itens.filter(it => it.cobrancaId), outros = b.itens.filter(it => !it.cobrancaId);
+    if (outros.length && !confirm('Trocar os ' + outros.length + ' item(ns) atuais pelos ' + novos.length + ' sugeridos? (as viagens frustradas ficam)')) return;
+    b.itens = novos.concat(deCob); marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s). Confira e salve.');
   };
   const pa = $('#it-preco-add'); if (pa) pa.onclick = () => {
     const p = S.d.precos.find(x => x.id === $('#it-preco').value); if (!p) return;
@@ -582,7 +602,7 @@ function renderBM() {
     const zero = b.itens.find(it => !(+it.quantidade > 0)); if (zero) { toast('Informe a quantidade de todos os itens (' + (zero.descricao || 'item sem descrição') + ').'); return; }
     ev.target.disabled = true;
     try { await Portal.api('fat.salvar', { registro: { id: b.id || '', clienteId: b.clienteId, bmNumero: b.bmNumero, bmData: b.bmData, obs: b.obs, itens: b.itens } });
-      toast(b.id ? 'BM atualizado' : 'BM registrado'); b.solIds.forEach(id => delete S.sel[id]); S.bm = null; S.tab = 'abertos'; setTab('abertos'); await carregar(true); }
+      toast(b.id ? 'BM atualizado' : 'BM registrado'); b.solIds.forEach(id => delete S.sel[id]); (b.cobIds || []).forEach(id => delete S.selc[id]); S.bm = null; S.tab = 'abertos'; setTab('abertos'); await carregar(true); }
     catch (e) { ev.target.disabled = false; falha(e); }
   };
 }
