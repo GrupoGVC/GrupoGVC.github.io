@@ -285,6 +285,7 @@ tr.inativo td{opacity:.55}
     ].concat(mods.map(([k, m]) => ({ k: 'm-' + k, label: m.nome, v: u => NIV[(u.modulos || {})[k]] || 'Sem acesso' }))).concat([
       { k: 'uni', label: 'Unidades', v: u => (u.unidades || []).length ? u.unidades.map(nomeUni).join(', ') : 'Todas' },
       { k: 'adm', label: 'Admin do portal', v: u => u.adminPortal ? 'Sim' : 'Não' },
+      { k: 'cob', label: 'Decide cobrança de frustrada', v: u => u.decideCobranca || u.adminPortal ? 'Sim' : 'Não' },
       { k: 'at', label: 'Ativo', v: u => u.ativo ? 'Sim' : 'Não' },
       { k: 'sen', label: 'Senha', v: u => u.temSenha ? 'criada' : 'aguardando 1º acesso' },
       { k: 'ult', label: 'Último acesso', v: u => u.ultimoAcesso, ord: u => parseAcesso(u.ultimoAcesso) },
@@ -292,7 +293,7 @@ tr.inativo td{opacity:.55}
     const us = TU.aplicar(usTela);
     $('#main').innerHTML = `<section class="panel">
       <h2>Usuários e acessos</h2>
-      <p class="sub">Novos acessos são gerados na ficha da pessoa, no módulo <b>Pessoas</b> (botão "Gerar acesso"); nome e e-mail vêm de lá. Aqui você ajusta os níveis e as unidades. Para cada pessoa, escolha o nível em cada módulo: <b>Leitor</b> só vê, <b>Editor</b> lança e altera, <b>Administrador</b> também mexe nas configurações do módulo. <b>Admin do portal</b> cadastra usuários e vê o histórico geral. Em <b>Unidades</b>, marque a unidade da pessoa (programadora, frota e equipe são por unidade); sem nenhuma marcada, ela vê todas. Mudanças valem na hora, inclusive para quem já está conectado.</p>
+      <p class="sub">Novos acessos são gerados na ficha da pessoa, no módulo <b>Pessoas</b> (botão "Gerar acesso"); nome e e-mail vêm de lá. Aqui você ajusta os níveis e as unidades. Para cada pessoa, escolha o nível em cada módulo: <b>Leitor</b> só vê, <b>Editor</b> lança e altera, <b>Administrador</b> também mexe nas configurações do módulo. <b>Admin do portal</b> cadastra usuários e vê o histórico geral. <b>Decide cobrança de frustrada</b>: pode decidir se a viagem frustrada por culpa do cliente será cobrada (e quanto) ou não; recebe o aviso por e-mail. Em <b>Unidades</b>, marque a unidade da pessoa (programadora, frota e equipe são por unidade); sem nenhuma marcada, ela vê todas. Mudanças valem na hora, inclusive para quem já está conectado.</p>
       <div class="row" style="margin-top:10px"><a class="btn pri" href="pessoas/">Ir para Pessoas (cadastrar e gerar acesso)</a></div>
       <div class="row" style="justify-content:flex-end;margin:14px 0 8px">${TU.botao()}</div>
       ${TU.info(us.length, usTela.length)}
@@ -305,6 +306,7 @@ tr.inativo td{opacity:.55}
           ${mods.map(([k, m]) => `<td><select data-mod="${k}" aria-label="${esc(m.nome)}">${optNivel((u.modulos || {})[k])}</select></td>`).join('')}
           <td><div data-unis style="display:flex;flex-direction:column;gap:2px;min-width:120px">${chkUnidades('u-' + esc(u.email), u.unidades)}</div></td>
           <td><select data-k="admin" aria-label="Admin do portal"><option value="1" ${u.adminPortal ? 'selected' : ''}>Sim</option><option value="0" ${u.adminPortal ? '' : 'selected'}>Não</option></select></td>
+          <td><select data-k="cob" aria-label="Decide cobrança de viagem frustrada" title="Pode decidir se a viagem frustrada por culpa do cliente será cobrada (o admin do portal sempre pode)"><option value="1" ${u.decideCobranca ? 'selected' : ''}>Sim</option><option value="0" ${u.decideCobranca ? '' : 'selected'}>Não</option></select></td>
           <td><select data-k="ativo" aria-label="Ativo"><option value="1" ${u.ativo ? 'selected' : ''}>Sim</option><option value="0" ${u.ativo ? '' : 'selected'}>Não</option></select></td>
           <td>${u.temSenha ? '<span class="pill ok">criada</span>' : '<span class="pill warn">aguardando 1º acesso</span>'}</td>
           <td>${esc(u.ultimoAcesso || '—')}</td>
@@ -323,7 +325,7 @@ tr.inativo td{opacity:.55}
         const modulos = {}; tr.querySelectorAll('[data-mod]').forEach(s => modulos[s.dataset.mod] = s.value);
         try {
           await Portal.api('salvarUsuario', { usuario: { email, modulos,
-            adminPortal: tr.querySelector('[data-k="admin"]').value === '1', ativo: tr.querySelector('[data-k="ativo"]').value === '1', unidades: lerUnidades(tr) } });
+            adminPortal: tr.querySelector('[data-k="admin"]').value === '1', decideCobranca: tr.querySelector('[data-k="cob"]').value === '1', ativo: tr.querySelector('[data-k="ativo"]').value === '1', unidades: lerUnidades(tr) } });
           toast('Usuário atualizado'); usuarios = null;
           if (email === usuario.email) { const j = await Portal.api('eu', {}); usuario = j.usuario; const s = Portal.sessao(); s.usuario = usuario; Portal.gravarSessao(s); }
           renderUsuarios();
