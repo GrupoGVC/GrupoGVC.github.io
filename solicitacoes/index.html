@@ -320,7 +320,7 @@ table.itens td input,table.itens td select{min-width:70px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261106"></script>
-<script src="../tabela.js?v=20261102"></script>
+<script src="../tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -780,35 +780,47 @@ const FMT_R = '"R$" #,##0.00';
 const valorSol = s => s.faturamento ? +(s.faturamento.nfValor !== '' ? s.faturamento.nfValor : s.faturamento.bmValor) || 0 : (s.valorPrevisto === '' || s.valorPrevisto == null ? '' : +s.valorPrevisto);
 const bmnfTxt = s => s.faturamento ? (s.faturamento.nfNumero ? 'NF ' + s.faturamento.nfNumero : s.faturamento.bmNumero ? 'BM ' + s.faturamento.bmNumero : s.faturamento.status) + (s.faturamento.nfData ? ' · ' + D(s.faturamento.nfData) : '') : '';
 function colsSol(comFat) {
-  return [
-    { k: 'cli', label: 'Cliente', v: s => cliNome(s.clienteId) },
+  const cliH = s => { const c = cliDe(s.clienteId); return `<b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}${s.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : s.origem === 'rotina' ? ' <span class="tag-imp">recorrente</span>' : ''}`; };
+  const stH = s => { const pend = pendentes(s.id); return `${statusPill(s.status)}${kmPendente(s) ? ' <span class="pill warn" title="Escolher o km real ou o previsto">Definir km</span>' : ''}${cobPendente(s) ? ' <span class="pill warn" title="Viagem frustrada por culpa do cliente">Decidir cobrança</span>' : ''}${pend ? ` <span class="pill warn" title="Documentos pendentes">${pend} doc</span>` : ''}`; };
+  const prevH = s => s.dataPrevista ? esc(D(s.dataPrevista)) : s.dataDesejada ? '<span class="sub">desejada</span> ' + esc(D(s.dataDesejada)) : '';
+  const base = [
+    { k: 'cli', label: 'Cliente', v: s => cliNome(s.clienteId), h: cliH, tdc: () => 'full' },
     { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
-    { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) },
-    { k: 'sol', label: 'Solicitada', v: s => D(s.dataSolicitacao), ord: s => s.dataSolicitacao || '' },
-    comFat ? { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '' }
-           : { k: 'prev', label: 'Saída / desejada', v: s => s.dataPrevista ? D(s.dataPrevista) : s.dataDesejada ? 'desejada ' + D(s.dataDesejada) : '', ord: s => s.dataPrevista || s.dataDesejada || '' },
-    { k: 'st', label: 'Status', v: s => s.status },
+    { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId), h: s => esc(conNome(s.consultorId) || '—') },
+    { k: 'sol', label: 'Solicitada', v: s => D(s.dataSolicitacao), ord: s => s.dataSolicitacao || '', tdc: () => 'mono' },
+    comFat ? { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '', tdc: () => 'mono' }
+           : { k: 'prev', label: 'Saída / desejada', v: s => s.dataPrevista ? D(s.dataPrevista) : s.dataDesejada ? 'desejada ' + D(s.dataDesejada) : '', ord: s => s.dataPrevista || s.dataDesejada || '', h: prevH, tdc: () => 'mono' },
+    { k: 'st', label: 'Status', v: s => s.status, h: stH },
   ].concat(comFat ? [
     { k: 'val', label: 'Valor', v: s => R(valorSol(s)), ord: s => +valorSol(s) || 0, num: true, x: s => valorSol(s), fmt: FMT_R },
-    { k: 'bmnf', label: 'BM / NF', v: s => bmnfTxt(s) },
+    { k: 'bmnf', label: 'BM / NF', v: s => bmnfTxt(s), tdc: () => 'mono' },
   ] : []);
+  // colunas extras (aparecem em ⚙ Colunas)
+  const extra = [
+    { k: 'upl', label: 'Código UPLOG', v: s => cliDe(s.clienteId).codigoUplog || '', tdc: () => 'mono' },
+    { k: 'serv', label: 'Serviço', v: s => s.servico || '' },
+    { k: 'dem', label: 'Demanda', v: s => s.demanda || '' },
+    { k: 'perf', label: 'Perfil', v: s => s.perfil || '' },
+    { k: 'exe', label: 'Execução', v: s => s.execucao || '' },
+    { k: 'desc', label: 'Descrição', v: s => s.descricao || '', tdc: () => 'wrap' },
+    { k: 'dsc', label: 'Pedido do consultor', v: s => D(s.dataSolicitacaoConsultor), ord: s => s.dataSolicitacaoConsultor || '', tdc: () => 'mono' },
+    { k: 'des', label: 'Desejada pelo cliente', v: s => D(s.dataDesejada), ord: s => s.dataDesejada || '', tdc: () => 'mono' },
+    comFat ? { k: 'prev', label: 'Saída da viagem', v: s => D(s.dataPrevista), ord: s => s.dataPrevista || '', tdc: () => 'mono' }
+           : { k: 'col', label: 'Data da coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '', tdc: () => 'mono' },
+    { k: 'placa', label: 'Placa', v: s => (s.programacao && s.programacao.placa) || '', tdc: () => 'mono' },
+    { k: 'vprev', label: 'Valor previsto', v: s => s.valorPrevisto === '' ? '' : R(s.valorPrevisto), ord: s => +s.valorPrevisto || 0, num: true, x: s => s.valorPrevisto === '' ? '' : +s.valorPrevisto, fmt: FMT_R },
+    { k: 'km', label: 'Km prevista', v: s => s.kmPrevista === '' || s.kmPrevista == null ? '' : String(s.kmPrevista), ord: s => +s.kmPrevista || 0, num: true, x: s => s.kmPrevista === '' ? '' : +s.kmPrevista },
+    { k: 'kmc', label: 'Km cobrado', v: s => s.km && s.km.escolha ? s.km.kmCobrado + ' km (' + s.km.escolha.toLowerCase() + ')' : '' },
+    { k: 'mot', label: 'Motivo', v: s => s.motivo || '', tdc: () => 'wrap' },
+    { k: 'orig', label: 'Origem', v: s => s.origem || '' },
+    { k: 'por', label: 'Registrada por', v: s => String(s.criadoPor || '').split('@')[0] },
+  ].map(c => Object.assign(c, { oculta: true }));
+  return base.concat(extra.filter(c => !base.some(b => b.k === c.k)));
 }
-const EXTRAS_SOL = [{ label: 'Código UPLOG', x: s => cliDe(s.clienteId).codigoUplog || '' }, { label: 'Serviço', x: s => s.servico || '' },
-  { label: 'Descrição', x: s => s.descricao || '' }, { label: 'Origem', x: s => s.origem || '' }, { label: 'Motivo', x: s => s.motivo || '' }];
+const EXTRAS_SOL = [];
 const filtrosTopo = (...xs) => xs.filter(Boolean);
 
-function linhaSol(s, comFat) {
-  const c = cliDe(s.clienteId); const pend = pendentes(s.id);
-  return `<tr class="click" data-sol="${esc(s.id)}" tabindex="0">
-    <td data-label="Cliente" class="full"><b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}${s.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : s.origem === 'rotina' ? ' <span class="tag-imp">recorrente</span>' : ''}</td>
-    <td data-label="Unidade">${esc(uniNome(s.unidadeId))}</td>
-    <td data-label="Consultor">${esc(conNome(s.consultorId) || '—')}</td>
-    <td data-label="Solicitada" class="mono">${esc(D(s.dataSolicitacao))}</td>
-    <td data-label="${comFat ? 'Coleta' : 'Saída / desejada'}" class="mono">${comFat ? esc(D(s.dataColeta)) : s.dataPrevista ? esc(D(s.dataPrevista)) : s.dataDesejada ? '<span class="sub">desejada</span> ' + esc(D(s.dataDesejada)) : ''}</td>
-    <td data-label="Status">${statusPill(s.status)}${kmPendente(s) ? ' <span class="pill warn" title="Escolher o km real ou o previsto">Definir km</span>' : ''}${cobPendente(s) ? ' <span class="pill warn" title="Viagem frustrada por culpa do cliente">Decidir cobrança</span>' : ''}${pend ? ` <span class="pill warn" title="Documentos pendentes">${pend} doc</span>` : ''}</td>
-    ${comFat ? `<td data-label="Valor" class="num">${R(s.faturamento ? (s.faturamento.nfValor !== '' ? s.faturamento.nfValor : s.faturamento.bmValor) : s.valorPrevisto)}</td><td data-label="BM/NF" class="mono">${s.faturamento ? esc((s.faturamento.nfNumero ? 'NF ' + s.faturamento.nfNumero : s.faturamento.bmNumero ? 'BM ' + s.faturamento.bmNumero : s.faturamento.status) + (s.faturamento.nfData ? ' · ' + D(s.faturamento.nfData) : '')) : ''}</td>` : ''}
-  </tr>`;
-}
+function linhaSol(s, T) { return `<tr class="click" data-sol="${esc(s.id)}" tabindex="0">${T.celulas(s)}</tr>`; }
 function ligarLinhas() { $$('[data-sol]').forEach(tr => { tr.onclick = () => abrir(tr.dataset.sol); tr.onkeydown = ev => { if (ev.key === 'Enter') abrir(tr.dataset.sol); }; }); }
 function renderFila() {
   const base = S.d.solicitacoes.filter(s => (ABERTAS.includes(s.status) || kmPendente(s) || cobPendente(s)) && passaUni(s));
@@ -832,7 +844,7 @@ function renderFila() {
       <input type="search" id="busca" placeholder="Buscar cliente, código, consultor…" value="${esc(S.busca)}" aria-label="Buscar">
       <span style="margin-left:auto">${T.botao()}</span>${S.ro ? '' : '<button class="btn pri" id="novo">+ Solicitação</button>'}</div>
     ${T.info(listaF.length, listaTela.length)}
-    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${listaF.map(s => linhaSol(s, false)).join('') || '<tr><td colspan="6" class="empty">Nenhuma solicitação com os filtros das colunas.</td></tr>'}</tbody></table></div>` : '<div class="empty">Nenhuma solicitação aberta com estes filtros.</div>'}
+    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${listaF.map(s => linhaSol(s, T)).join('') || `<tr><td colspan="${T.nVis()}" class="empty">Nenhuma solicitação com os filtros das colunas.</td></tr>`}</tbody></table></div>` : '<div class="empty">Nenhuma solicitação aberta com estes filtros.</div>'}
   </section>`;
   ligarComum(); T.ligar();
   $$('[data-fst]').forEach(b => b.onclick = () => { S.st = b.dataset.fst; render(); });
@@ -856,7 +868,7 @@ function renderTodas() {
       <span class="sub" style="margin:0 0 0 auto">${lista.length} solicitação(ões) · faturado ${R(total)}</span>
       ${T.botao()}${S.ro ? '' : '<button class="btn pri" id="novo">+ Solicitação</button>'}</div>
     ${T.info(lista.length, listaTela.length)}
-    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${lista.slice(0, MAX).map(s => linhaSol(s, true)).join('') || '<tr><td colspan="8" class="empty">Nenhuma solicitação com os filtros das colunas.</td></tr>'}</tbody></table></div>
+    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${lista.slice(0, MAX).map(s => linhaSol(s, T)).join('') || `<tr><td colspan="${T.nVis()}" class="empty">Nenhuma solicitação com os filtros das colunas.</td></tr>`}</tbody></table></div>
       ${lista.length > MAX ? `<p class="hint">Mostrando as ${MAX} primeiras. Use o mês, a busca ou os filtros das colunas para achar as outras (a exportação leva todas as ${lista.length}).</p>` : ''}` : '<div class="empty">Nenhuma solicitação com estes filtros.</div>'}
   </section>`;
   ligarComum(); T.ligar();
@@ -878,12 +890,17 @@ function renderRecorrentes() {
   const futuras = id => S.d.solicitacoes.filter(x => x.rotinaId === id && dRef(x) >= hoje).sort((a, b) => dRef(a).localeCompare(dRef(b)));
   const proxTxt = r => { const f = futuras(r.id); return r.ativo ? (f.length ? f.length + ' · próxima ' + D(dRef(f[0])) : '') : 'Pausada'; };
   const TR = Portal.tabela('sol-rot', [
-    { k: 'cli', label: 'Cliente', v: r => cliNome(r.clienteId) },
+    { k: 'cli', label: 'Cliente', v: r => cliNome(r.clienteId), cls: 'full', h: r => `<b>${esc(cliNome(r.clienteId))}</b>${r.descricao ? `<div class="sub">${esc(r.descricao)}</div>` : ''}` },
     { k: 'qd', label: 'Quando', v: r => r.frequencia + ' · ' + rotQuando(r) },
     { k: 'uni', label: 'Unidade', v: r => uniNome(r.unidadeId) },
-    { k: 'con', label: 'Consultor', v: r => conNome(r.consultorId) },
-    { k: 'per', label: 'Período', v: r => D(r.dataInicio) + (r.dataFim ? ' a ' + D(r.dataFim) : ''), ord: r => r.dataInicio || '' },
-    { k: 'prox', label: 'Próximas', v: proxTxt, ord: r => { const f = futuras(r.id); return r.ativo && f.length ? dRef(f[0]) : 'z'; } },
+    { k: 'con', label: 'Consultor', v: r => conNome(r.consultorId) || '—' },
+    { k: 'per', label: 'Período', v: r => D(r.dataInicio) + (r.dataFim ? ' a ' + D(r.dataFim) : ''), ord: r => r.dataInicio || '', cls: 'mono' },
+    { k: 'prox', label: 'Próximas', v: proxTxt, ord: r => { const f = futuras(r.id); return r.ativo && f.length ? dRef(f[0]) : 'z'; }, h: r => r.ativo ? esc(proxTxt(r) || '—') : '<span class="pill">Pausada</span>' },
+    { k: 'serv', label: 'Serviço', v: r => r.servico || '', oculta: true },
+    { k: 'val', label: 'Valor previsto', v: r => r.valorPrevisto === '' || r.valorPrevisto == null ? '' : R(r.valorPrevisto), x: r => r.valorPrevisto === '' ? '' : +r.valorPrevisto, fmt: FMT_R, num: true, oculta: true },
+    { k: 'res', label: 'Resíduos', v: r => (r.residuoIds || []).map(id => (S.d.residuos.find(x => x.id === id) || {}).nome).filter(Boolean).join(', '), oculta: true },
+    { k: 'sit', label: 'Situação', v: r => r.ativo ? 'Ativa' : 'Pausada', oculta: true },
+    { k: 'desc', label: 'Descrição', v: r => r.descricao || '', oculta: true },
   ], { titulo: 'Coletas recorrentes', arquivo: 'coletas-recorrentes', unidade: 'coletas', aoMudar: render,
     extrasExport: [{ label: 'Situação', x: r => r.ativo ? 'Ativa' : 'Pausada' }, { label: 'Valor previsto', x: r => r.valorPrevisto === '' ? '' : +r.valorPrevisto }, { label: 'Descrição', x: r => r.descricao || '' }],
     filtrosExtras: () => filtrosTopo(S.inativos && 'Mostrando as pausadas') });
@@ -911,11 +928,8 @@ function renderRecorrentes() {
       <span style="margin-left:auto">${TR.botao()}</span>${S.ro ? '' : '<button class="btn" id="r-gerar">Gerar agora</button><button class="btn pri" id="novo">+ Coleta recorrente</button>'}</div>
     ${TR.info(listaRot.length, lista.length)}
     ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TR.cab('<th></th>')}</thead><tbody>
-      ${listaRot.map(r => { const f = futuras(r.id); return `<tr class="${r.ativo ? '' : 'inativo'}"><td data-label="Cliente" class="full"><b>${esc(cliNome(r.clienteId))}</b>${r.descricao ? `<div class="sub">${esc(r.descricao)}</div>` : ''}</td>
-        <td data-label="Quando">${esc(r.frequencia)} · ${esc(rotQuando(r))}</td><td data-label="Unidade">${esc(uniNome(r.unidadeId))}</td><td data-label="Consultor">${esc(conNome(r.consultorId) || '—')}</td>
-        <td data-label="Período" class="mono">${esc(D(r.dataInicio))}${r.dataFim ? ' a ' + esc(D(r.dataFim)) : ''}</td>
-        <td data-label="Próximas">${r.ativo ? (f.length ? f.length + ' · próxima ' + esc(D(dRef(f[0]))) : '—') : '<span class="pill">Pausada</span>'}</td>
-        <td data-label=""><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-red="${r.id}">Editar</button>`}<button class="btn sm" data-rhist="${r.id}">Histórico</button>${S.ro ? '' : r.ativo ? `<button class="btn sm danger" data-rpausa="${r.id}">Pausar</button>` : `<button class="btn sm" data-rreat="${r.id}">Retomar</button>`}</div></td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Nenhuma coleta com os filtros das colunas.</td></tr>'}
+      ${listaRot.map(r => `<tr class="${r.ativo ? '' : 'inativo'}">${TR.celulas(r)}
+        <td data-label=""><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-red="${r.id}">Editar</button>`}<button class="btn sm" data-rhist="${r.id}">Histórico</button>${S.ro ? '' : r.ativo ? `<button class="btn sm danger" data-rpausa="${r.id}">Pausar</button>` : `<button class="btn sm" data-rreat="${r.id}">Retomar</button>`}</div></td></tr>`).join('') || `<tr><td colspan="${TR.nVis() + 1}" class="empty">Nenhuma coleta com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhuma coleta recorrente.</div>'}</section>`;
   const achar = id => S.d.rotinas.find(r => r.id === id);
   TR.ligar();
@@ -988,12 +1002,14 @@ function renderConsultores() {
     ${card('top', 'Destaque do mês', top ? (top.nome.split(' ').length > 1 ? top.nome.split(' ')[0] + ' ' + top.nome.split(' ').slice(-1)[0] : top.nome) : '—', top ? m(top.id).mes + ' solicitação(ões) · ' + R(m(top.id).valor) : 'nenhuma solicitação no mês', !top)}
   </div>`;
   const TC = Portal.tabela('sol-con', [
-    { k: 'nome', label: 'Nome', v: c => c.nome }, { k: 'email', label: 'E-mail', v: c => c.email }, { k: 'tel', label: 'Telefone', v: c => c.telefone },
+    { k: 'nome', label: 'Nome', v: c => c.nome, h: c => `<b>${esc(c.nome)}</b>${top && top.id === c.id ? ' <span class="pill ok">destaque</span>' : ''}` },
+    { k: 'email', label: 'E-mail', v: c => c.email || '—' }, { k: 'tel', label: 'Telefone', v: c => c.telefone || '—' },
     { k: 'mes', label: 'No mês', v: c => String(m(c.id).mes), ord: c => m(c.id).mes, x: c => m(c.id).mes, num: true },
     { k: 'and', label: 'Em andamento', v: c => String(m(c.id).and), ord: c => m(c.id).and, x: c => m(c.id).and, num: true },
     { k: 'real', label: 'Realizadas', v: c => String(m(c.id).real), ord: c => m(c.id).real, x: c => m(c.id).real, num: true },
     { k: 'valor', label: 'Valor previsto (R$)', v: c => R(m(c.id).valor), ord: c => m(c.id).valor, x: c => m(c.id).valor, fmt: '#,##0.00', num: true },
     { k: 'qtd', label: 'Total', v: c => String(m(c.id).total), ord: c => m(c.id).total, x: c => m(c.id).total, num: true },
+    { k: 'sit', label: 'Situação', v: c => c.ativo ? 'Ativo' : 'Inativo', oculta: true },
   ], { titulo: 'Consultores', arquivo: 'consultores', unidade: 'consultores', aoMudar: render, totais: l => ({ 'No mês': l.reduce((t, c) => t + m(c.id).mes, 0), 'Valor previsto (R$)': l.reduce((t, c) => t + m(c.id).valor, 0) }),
     subtitulo: () => ['Mês: ' + mesLbl, S.uni ? 'Unidade: ' + uniNome(S.uni) : ''].filter(Boolean).join(' · '),
     extrasExport: [{ label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }],
@@ -1008,8 +1024,7 @@ function renderConsultores() {
       <span style="margin-left:auto">${TC.botao()}</span></div>
     ${TC.info(listaC.length, lista.length)}
     ${lista.length ? `<div class="tbl-wrap"><table><thead>${TC.cab()}</thead><tbody>
-    ${listaC.map(c => `<tr class="${c.ativo ? '' : 'inativo'}"><td><b>${esc(c.nome)}</b>${top && top.id === c.id ? ' <span class="pill ok">destaque</span>' : ''}</td><td>${esc(c.email || '—')}</td><td>${esc(c.telefone || '—')}</td>
-      <td class="num">${m(c.id).mes}</td><td class="num">${m(c.id).and}</td><td class="num">${m(c.id).real}</td><td class="num">${R(m(c.id).valor)}</td><td class="num">${m(c.id).total}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nenhum consultor com esses filtros.</td></tr>'}
+    ${listaC.map(c => `<tr class="${c.ativo ? '' : 'inativo'}">${TC.celulas(c)}</tr>`).join('') || `<tr><td colspan="${TC.nVis()}" class="empty">Nenhum consultor com esses filtros.</td></tr>`}
     </tbody></table></div>` : `<div class="empty">${S.indCon ? 'Nenhum consultor neste indicador.' : 'Nenhum consultor cadastrado. O cadastro é feito no módulo Pessoas, com a função Consultor.'}</div>`}</section>`;
   TC.ligar();
   const mudaMes = d => { const [y, mm] = S.mesCon.split('-').map(Number); const t = new Date(y, mm - 1 + d, 1); S.mesCon = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0'); render(); };
@@ -1024,7 +1039,7 @@ function renderDocumentos() {
   const tipos = S.d.tiposDocumento.slice().sort((a, b) => (b.ativo - a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const usoDoc = id => S.d.documentosPadrao.filter(d => d.tipoDocumentoId === id).length;
   const TD = Portal.tabela('sol-tdoc', [
-    { k: 'nome', label: 'Documento', v: t => t.nome }, { k: 'sit', label: 'Situação', v: t => t.ativo ? 'Ativo' : 'Inativo' },
+    { k: 'nome', label: 'Documento', v: t => t.nome }, { k: 'sit', label: 'Situação', v: t => t.ativo ? 'Ativo' : 'Inativo', h: t => t.ativo ? 'Ativo' : '<span class="pill">Inativo</span>' },
     { k: 'cli', label: 'Clientes com este documento', v: t => String(usoDoc(t.id)), ord: t => usoDoc(t.id), num: true },
   ], { titulo: 'Tipos de documento', arquivo: 'tipos-de-documento', unidade: 'tipos', aoMudar: render });
   const tiposF = TD.aplicar(tipos);
@@ -1042,7 +1057,7 @@ function renderDocumentos() {
   <section class="panel"><div class="panel-h"><div><h2>Tipos de documento</h2><p class="sub">Catálogo usado nos checklists.</p></div></div>
     <div class="toolbar">${S.ro ? '' : '<input id="td-novo" placeholder="Novo tipo de documento" style="max-width:320px"><button class="btn" id="td-add">Adicionar</button>'}<span style="margin-left:auto">${TD.botao()}</span></div>
     ${TD.info(tiposF.length, tipos.length)}
-    <div class="tbl-wrap"><table><thead>${TD.cab('<th></th>')}</thead><tbody>${tiposF.map(t => `<tr class="${t.ativo ? '' : 'inativo'}"><td>${esc(t.nome)}</td><td>${t.ativo ? 'Ativo' : '<span class="pill">Inativo</span>'}</td><td class="num">${usoDoc(t.id)}</td><td><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-tren="${t.id}">Renomear</button>`}<button class="btn sm" data-thist="${t.id}">Histórico</button>${S.ro ? '' : t.ativo ? `<button class="btn sm danger" data-tdel="${t.id}">Excluir</button>` : `<button class="btn sm" data-treat="${t.id}">Reativar</button>`}</div></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Nenhum tipo com os filtros das colunas.</td></tr>'}</tbody></table></div>
+    <div class="tbl-wrap"><table><thead>${TD.cab('<th></th>')}</thead><tbody>${tiposF.map(t => `<tr class="${t.ativo ? '' : 'inativo'}">${TD.celulas(t)}<td><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-tren="${t.id}">Renomear</button>`}<button class="btn sm" data-thist="${t.id}">Histórico</button>${S.ro ? '' : t.ativo ? `<button class="btn sm danger" data-tdel="${t.id}">Excluir</button>` : `<button class="btn sm" data-treat="${t.id}">Reativar</button>`}</div></td></tr>`).join('') || `<tr><td colspan="${TD.nVis() + 1}" class="empty">Nenhum tipo com os filtros das colunas.</td></tr>`}</tbody></table></div>
   </section>
   <section class="panel"><div class="panel-h"><div><h2>Serviços</h2><p class="sub">Lista do campo "Serviço" da solicitação. Um por linha, na ordem em que devem aparecer.</p></div></div>
     <textarea id="serv" rows="5" ${S.ro ? 'disabled' : ''} style="max-width:420px">${esc(S.d.listas.servico.join('\n'))}</textarea>
@@ -1182,18 +1197,19 @@ function renderPrevisto() {
     cols.push({ k: 'tr', label: 'Trocas de destinador', v: g => String(g.trocas), ord: g => g.trocas, num: true });
     if (P.dim === 'coleta') cols.push({ k: 'kc', label: 'Km cobrado', v: g => { const l = por[g.chave][0]; return l.kmCobranca ? l.kmCobrado + ' km (' + l.kmCobranca.toLowerCase() + ')' : ''; }, ord: g => +por[g.chave][0].kmCobrado || 0 });
   }
+  cols.forEach(c => {
+    if (c.k === 'g') { c.cls = 'full'; c.h = g => '<b>' + esc(c.v(g)) + '</b>'; }
+    else if (/^d(kg|v|_)/.test(c.k)) c.h = g => { const pk = c.k === 'dkg' ? g.pKgC : c.k === 'dv' ? g.pVC : g['p_' + c.k.slice(2)], rk = c.k === 'dkg' ? g.rKg : c.k === 'dv' ? g.rV : g['r_' + c.k.slice(2)]; return prDeltaCel(prDelta(pk, rk), lim); };
+  });
   const T = Portal.tabela('sol-pr-' + (P.dim === 'destinador' ? 'dest' : 'grp'), cols, { titulo: 'Previsto × real por ' + PR_DIM.find(d => d[0] === P.dim)[1].toLowerCase(), arquivo: 'previsto-real-' + P.dim, unidade: 'linhas', aoMudar: render,
     subtitulo: () => ['Coletas de ' + mesTxt(P.de) + ' a ' + mesTxt(P.ate), S.uni ? 'Unidade: ' + uniNome(S.uni) : '', P.soPrev ? 'Só coletas com previsto' : ''].filter(Boolean).join(' · ') });
   const lista = T.aplicar(grupos.sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR')));
-  const celula = (c, g) => { const val = c.v(g);
-    if (c.k.startsWith('d')) { const pk = c.k === 'dkg' ? g.pKgC : c.k === 'dv' ? g.pVC : g['p_' + c.k.slice(2)], rk = c.k === 'dkg' ? g.rKg : c.k === 'dv' ? g.rV : g['r_' + c.k.slice(2)]; return `<td data-label="${esc(c.label)}" class="num">${prDeltaCel(prDelta(pk, rk), lim)}</td>`; }
-    return `<td data-label="${esc(c.label)}" class="${c.num ? 'num' : c.k === 'g' ? 'full' : ''}">${c.k === 'g' ? '<b>' + esc(val) + '</b>' : esc(val)}</td>`; };
   $('#main').innerHTML = `<section class="panel">${cab}${topo.replace('<span id="pr-exp" style="margin-left:auto"></span>', '<span id="pr-exp" style="margin-left:auto">' + T.botao() + '</span>')}
     <div class="inds">${kpis}</div>
     <p class="hint" style="margin:-4px 0 10px">${linhas.length} coleta(s) realizada(s) no período · ${destinadas} com destinação confirmada · ${trocas} com troca de destinador.
       <label class="chip" style="margin-left:8px"><input type="checkbox" id="pr-so" ${P.soPrev ? 'checked' : ''}> Só coletas com previsto</label></p>
     ${T.info(lista.length, grupos.length)}
-    ${grupos.length ? `<div class="tbl-wrap rtw"><table class="rt pr-t"><thead>${T.cab()}</thead><tbody>${lista.map(g => `<tr>${cols.map(c => celula(c, g)).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="empty">Nada com os filtros das colunas.</td></tr>`}</tbody></table></div>`
+    ${grupos.length ? `<div class="tbl-wrap rtw"><table class="rt pr-t"><thead>${T.cab()}</thead><tbody>${lista.map(g => `<tr>${T.celulas(g)}</tr>`).join('') || `<tr><td colspan="${T.nVis()}" class="empty">Nada com os filtros das colunas.</td></tr>`}</tbody></table></div>`
       : '<div class="empty">Nenhuma coleta realizada no período.</div>'}
     <p class="hint" style="margin-top:10px">Peso real = ticket da balança (só coletas com a destinação confirmada). Km real = km na volta − km inicial; diárias = dias da viagem concluída; pernoites = realizados. Viagem com mais de uma coleta: km, diárias e pernoites divididos pela km prevista de cada uma. As somas e o Δ usam só as coletas que têm o previsto e o real. Valor previsto pelo destinador escolhido pelo solicitante.</p>
   </section>`;
