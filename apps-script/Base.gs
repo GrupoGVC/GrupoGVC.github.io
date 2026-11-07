@@ -94,6 +94,8 @@ const TABELAS = {
                                                       'dataInicio', 'dataFim', 'valorPrevisto', 'geradaAte', 'obs', 'ativo'],
                           texto: ['residuoIds'], numero: ['diaSemana', 'diaMes', 'valorPrevisto'], data: ['dataInicio', 'dataFim', 'geradaAte'] },
   // Motivos padrão de frustração e de cancelamento (responsável: Cliente / Interno / Externo / Na hora)
+  // Preferências de cada usuário nas telas (ex.: colunas e ordenação das tabelas). valor = JSON
+  Preferencias:         { prefixo: 'PRF', colunas: ['id', 'usuarioId', 'chave', 'valor'], texto: ['chave', 'valor'] },
   Motivos:              { prefixo: 'MOT', colunas: ['id', 'tipo', 'nome', 'responsavel', 'ordem', 'ativo'], numero: ['ordem'] },
   // Cobrança de viagem frustrada (ou cancelada no dia com a equipe na rua) por culpa do cliente
   CobrancasFrustracao:  { prefixo: 'CFR', colunas: ['id', 'solicitacaoId', 'paradaId', 'viagemId', 'clienteId', 'unidadeId', 'data', 'tipo', 'motivoId', 'motivo',

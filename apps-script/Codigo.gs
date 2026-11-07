@@ -47,7 +47,7 @@ const ACOES_MINHAS = ['minhas.dados', 'minhas.linhaTempo'];
 const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
 const ACOES_PROG_ESCRITA = ['prog.salvarViagem', 'prog.viagemAcao', 'prog.ciente'];
 // a permissão é conferida dentro da própria ação (motivos: admin de Solicitações ou Programação; cobrança: autorização no usuário)
-const ACOES_PROPRIAS = ['mot.salvar', 'mot.excluir', 'sol.cobranca'];
+const ACOES_PROPRIAS = ['mot.salvar', 'mot.excluir', 'sol.cobranca', 'pref.salvar'];
 const ACOES_PES_LEITURA = ['pes.dados', 'pes.verFoto'];
 const ACOES_PES_ESCRITA = ['pes.salvar', 'pes.ativo', 'pes.excluir', 'pes.foto', 'pes.salvarFuncoes'];
 const ACOES_AMB_LEITURA = ['amb.dados'];
@@ -99,6 +99,7 @@ function rotear_(body) {
   const u = sessao_(body.token);
   if (!u) return { ok: false, erro: 'nao_autenticado' };
   if (acao === 'eu') return { ok: true, usuario: usuarioPublico_(u) };
+  if (acao === 'pref.dados') return prefDados_(u);
 
   // leituras (sem trava)
   if (acao === 'dados') {
@@ -228,6 +229,7 @@ function rotear_(body) {
       case 'mot.salvar': return motSalvar_(body.registro, u);
       case 'mot.excluir': return motExcluir_(String(body.id), u);
       case 'sol.cobranca': return solCobranca_(body.cobranca, u);
+      case 'pref.salvar': return prefSalvar_(String(body.chave || ''), body.valor, u);
       case 'prog.importarEquipe': return progImportarEquipe_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'prog.importarProgramacao': return progImportarProgramacao_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'dp.acao': return dpAcao_(String(body.tipo), body.dados, u);
