@@ -286,7 +286,7 @@ nav.tabs .ic,nav.tabs .t-short{display:none}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
-<script src="../tabela.js?v=20261102"></script>
+<script src="../tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -497,9 +497,8 @@ function renderPainel(){
   const resRows=Object.entries(a.byRes).map(([n,d])=>({n,v:d.kg,val:d.v})).sort((x,y)=>y.v-x.v);
   const resR=Object.entries(a.byResR).map(([n,d])=>({n,v:d.kg,val:d.v})).sort((x,y)=>y.v-x.v);
   const vsTela=(S.loc&&S.loc.veiculos)||[];
-  const TU=Portal.tabela('ctl-uso',colsLocacao(a).map(c=>c.k==='val'?Object.assign({},c,{label:'Aluguel'}):c).filter(c=>c.k!=='tipo'||true),{titulo:'Uso da frota alugada · '+mesLbl(S.mes),aba:'Uso da frota',arquivo:'uso-frota-'+S.mes,unidade:'veículos',aoMudar:render,
-    subtitulo:()=>'Mês: '+mesLbl(S.mes),extrasExport:[{label:'Alerta',x:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p&&p.mtr.size?'':'Sem viagem lançada'}}],
-    totais:l=>({'Aluguel':l.reduce((t,v)=>t+(+v.valor||0),0)})});
+  const TU=Portal.tabela('ctl-uso',colsLocacao(a).map(c=>c.k==='val'?Object.assign({},c,{label:'Aluguel'}):c).concat([{k:'alerta',label:'Alerta',v:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p&&p.mtr.size?'':'Sem viagem lançada'},tdc:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p&&p.mtr.size?'hide-m':'full'},h:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p&&p.mtr.size?'':'<span class="pill warn">sem viagem lançada</span>'}}]),{titulo:'Uso da frota alugada · '+mesLbl(S.mes),aba:'Uso da frota',arquivo:'uso-frota-'+S.mes,unidade:'veículos',aoMudar:render,
+    subtitulo:()=>'Mês: '+mesLbl(S.mes),    totais:l=>({'Aluguel':l.reduce((t,v)=>t+(+v.valor||0),0)})});
   const vs=TU.aplicar(vsTela);
   const proprio=gerRows.find(r=>r.n==='RETEC');
   const nAd=(S.aDest||[]).length;
@@ -548,26 +547,33 @@ function renderPainel(){
   <section class="panel">
     <div class="panel-h"><div><h2>Uso da frota alugada</h2><p class="sub">Viagens de descarte lançadas por placa alugada. Custo por viagem = aluguel ÷ viagens.</p></div><div class="row" style="gap:6px">${vsTela.length?TU.botao():''}<button class="btn sm" data-go="frota">Editar frota do mês</button></div></div>
     ${TU.info(vs.length,vsTela.length)}
-    ${vsTela.length?`<div class="tbl-wrap rtw"><table class="rt"><thead>${TU.cab('<th></th>')}</thead><tbody>
-    ${vs.map(v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];const n=p?p.mtr.size:0;return `<tr><td>${esc(v.tipo)}</td><td class="mono">${esc(v.placa)}</td><td>${esc(v.fornecedor)}</td><td class="num">${R(v.valor)}</td><td class="num">${n}</td><td class="num">${p?N(p.kg):'—'}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td><td class="${n?'hide-m':'full'}">${n?'':'<span class="pill warn">sem viagem lançada</span>'}</td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Nada com os filtros das colunas.</td></tr>'}
-    </tbody><tfoot><tr><td colspan="3">${vs.length} itens</td><td class="num">${R(vs.reduce((t,v)=>t+(+v.valor||0),0))}</td><td class="num"></td><td></td><td></td><td></td></tr></tfoot></table></div>`:`<div class="empty">Nenhum veículo cadastrado para ${esc(mesLbl(S.mes))}. <button class="btn sm" data-go="frota">Cadastrar frota</button></div>`}
+    ${vsTela.length?`<div class="tbl-wrap rtw"><table class="rt"><thead>${TU.cab()}</thead><tbody>
+    ${vs.map(v=>`<tr>${TU.celulas(v)}</tr>`).join('')||`<tr><td colspan="${TU.nVis()}" class="empty">Nada com os filtros das colunas.</td></tr>`}
+    </tbody>${rodapeLoc(TU,vs)}</table></div>`:`<div class="empty">Nenhum veículo cadastrado para ${esc(mesLbl(S.mes))}. <button class="btn sm" data-go="frota">Cadastrar frota</button></div>`}
   </section>`;
   TU.ligar();
 }
 
 const COLS_LANC=[
   {k:'data',label:'Data',v:l=>fmtData(l.data),ord:l=>l.data||'',x:l=>fmtDataLonga(l.data)},
-  {k:'mtr',label:'MTR',v:l=>l.mtr},
-  {k:'dest',label:'Destinador',v:l=>nomeDe(l.destinador)},
-  {k:'neg',label:'Negócio',v:l=>l.negocio||'Sem tipo'},
+  {k:'mtr',label:'MTR',v:l=>l.mtr,cls:'mono',h:l=>esc(l.mtr||'—')+(l.motivoDivergencia?` <span class="pill warn" data-tip="${esc(l.motivoDivergencia)}">divergência</span>`:'')},
+  {k:'dest',label:'Destinador',v:l=>nomeDe(l.destinador),tdc:()=>'full',h:l=>`<span class="pill ${tipoDe(l.destinador)}">${esc(nomeDe(l.destinador))}</span>`},
+  {k:'neg',label:'Negócio',v:l=>l.negocio||'Sem tipo',h:l=>negPill(l.negocio)},
   {k:'ger',label:'Gerador',v:l=>l.gerador},
-  {k:'fonte',label:'Descarte',v:l=>l.fonte==='Coleta de cliente'?'Coleta':'Interno',cls:'hide-m',x:l=>l.fonte||''},
+  {k:'fonte',label:'Descarte',v:l=>l.fonte==='Coleta de cliente'?'Coleta':'Interno',cls:'hide-m',x:l=>l.fonte||'',h:l=>l.fonte==='Coleta de cliente'?'<span class="pill">Coleta</span>':'<span class="pill fonte-int">Interno</span>'},
   {k:'orig',label:'Origem',v:l=>l.origem,cls:'hide-m'},
   {k:'res',label:'Resíduo',v:l=>l.residuo},
-  {k:'placa',label:'Placa',v:l=>l.placa},
-  {k:'kg',label:'kg',v:l=>l.kg!=null&&l.kg!==''?N(l.kg):'',ord:l=>+l.kg||0,num:true,x:l=>l.kg===''||l.kg==null?'':+l.kg,fmt:'#,##0.##'},
+  {k:'placa',label:'Placa',v:l=>l.placa,cls:'mono'},
+  {k:'kg',label:'kg',v:l=>l.kg!=null&&l.kg!==''?N(l.kg):'',ord:l=>+l.kg||0,num:true,x:l=>l.kg===''||l.kg==null?'':+l.kg,fmt:'#,##0.##',h:l=>l.kg!=null&&l.kg!==''?N(l.kg):'—'},
   {k:'preco',label:'R$/kg',v:l=>l.valorFixo?'fechado':N(l.preco,3),ord:l=>l.valorFixo?-1:+l.preco||0,num:true,cls:'hide-m',x:l=>l.valorFixo?'':+l.preco||0,fmt:'0.000'},
-  {k:'valor',label:'Valor',v:l=>(tipoDe(l.destinador)==='receita'?'+ ':'')+R(l.valor),ord:l=>+l.valor||0,num:true,x:l=>+l.valor||0,fmt:FMT_R}];
+  {k:'valor',label:'Valor',v:l=>(tipoDe(l.destinador)==='receita'?'+ ':'')+R(l.valor),ord:l=>+l.valor||0,num:true,x:l=>+l.valor||0,fmt:FMT_R,tdc:()=>'strong-m'},
+  {k:'tick',label:'Ticket',v:l=>l.ticket||'',cls:'mono',oculta:true},
+  {k:'pmtr',label:'Peso do MTR (kg)',v:l=>l.pesoMtr===''||l.pesoMtr==null?'':N(l.pesoMtr),ord:l=>+l.pesoMtr||0,x:l=>l.pesoMtr===''||l.pesoMtr==null?'':+l.pesoMtr,num:true,oculta:true},
+  {k:'div',label:'Divergência',v:l=>l.motivoDivergencia||'',oculta:true},
+  {k:'tipo',label:'Tipo',v:l=>tipoDe(l.destinador)==='receita'?'Receita':'Custo',oculta:true},
+  {k:'transp',label:'Transportadora',v:l=>l.transportadora||'',oculta:true},
+  {k:'vfix',label:'Valor fechado',v:l=>l.valorFixo?R(l.valorFixo):'',ord:l=>+l.valorFixo||0,x:l=>l.valorFixo?+l.valorFixo:'',fmt:FMT_R,num:true,oculta:true},
+  {k:'obs',label:'Observação',v:l=>l.obs||'',oculta:true}];
 /** Lançamentos do mês com a busca (sem os filtros das colunas). */
 function lancBase(){
   const q=S.f.q.trim().toUpperCase();
@@ -623,7 +629,7 @@ function renderLanc(){
     ${tbLanc().info(lst.length,base.length)}
     ${!S.readOnly&&lst.length&&temFiltroLanc()?`<div class="bulk" id="bulk"><span>Definir o tipo de negócio dos <b>${lst.length}</b> lançamento(s) filtrados:</span><button type="button" class="btn sm" data-lote="RSS">RSS</button><button type="button" class="btn sm" data-lote="Industrial">Industrial</button></div>`:''}
     ${base.length?`<div class="tbl-wrap rtw" style="max-height:620px"><table class="rt"><thead>${tbLanc().cab()}</thead><tbody>
-    ${lst.map(l=>{const t=tipoDe(l.destinador);return `<tr class="click" data-id="${esc(l._id)}"><td>${fmtData(l.data)}</td><td class="mono">${esc(l.mtr||'—')}${l.motivoDivergencia?` <span class="pill warn" data-tip="${esc(l.motivoDivergencia)}">divergência</span>`:''}</td><td class="full"><span class="pill ${t}">${esc(nomeDe(l.destinador))}</span></td><td>${negPill(l.negocio)}</td><td>${esc(l.gerador)}</td><td class="hide-m">${l.fonte==='Coleta de cliente'?'<span class="pill">Coleta</span>':'<span class="pill fonte-int">Interno</span>'}</td><td class="hide-m">${esc(l.origem)}</td><td>${esc(l.residuo)}</td><td class="mono">${esc(l.placa)}</td><td class="num">${l.kg!=null&&l.kg!==''?N(l.kg):'—'}</td><td class="num hide-m">${l.valorFixo?'fechado':N(l.preco,3)}</td><td class="num strong-m">${t==='receita'?'+ ':''}${R(l.valor)}</td></tr>`}).join('')||'<tr><td colspan="12" class="empty">Nenhum lançamento com os filtros das colunas.</td></tr>'}
+    ${lst.map(l=>`<tr class="click" data-id="${esc(l._id)}">${tbLanc().celulas(l)}</tr>`).join('')||`<tr><td colspan="${tbLanc().nVis()}" class="empty">Nenhum lançamento com os filtros das colunas.</td></tr>`}
     </tbody></table></div>`:`<div class="empty">${S.lanc.length?'Nenhum lançamento com esses filtros.':'Nenhum lançamento em '+esc(mesLbl(S.mes))+'. Use o formulário acima para lançar a primeira viagem.'}</div>`}
   </section>`;
   bindLancForm();
@@ -703,12 +709,13 @@ function fmtDataLonga(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d)?d.slice(8,10)+'/
 
 /* ---------- frota ---------- */
 // Só para consulta: a locação é lançada no módulo Frota do portal.
-function colsLocacao(a){const vg=v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p?p.mtr.size:0};return[
-  {k:'tipo',label:'Tipo',v:v=>v.tipo},{k:'placa',label:'Placa / ativo',v:v=>v.placa},{k:'forn',label:'Fornecedor',v:v=>v.fornecedor},
+function colsLocacao(a){const pl=v=>a.byPlaca[String(v.placa).toUpperCase()];const vg=v=>{const p=pl(v);return p?p.mtr.size:0};return[
+  {k:'tipo',label:'Tipo',v:v=>v.tipo},{k:'placa',label:'Placa / ativo',v:v=>v.placa,cls:'mono'},{k:'forn',label:'Fornecedor',v:v=>v.fornecedor},
   {k:'val',label:'Valor no mês (R$)',v:v=>R(v.valor),ord:v=>+v.valor||0,num:true,x:v=>+v.valor||0,fmt:FMT_R},
   {k:'vg',label:'Viagens',v:v=>String(vg(v)),ord:vg,num:true},
-  {k:'kg',label:'kg levados',v:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p?N(p.kg):''},ord:v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];return p?p.kg:0},num:true},
-  {k:'rv',label:'R$/viagem',v:v=>vg(v)?R((+v.valor||0)/vg(v)):'',ord:v=>vg(v)?(+v.valor||0)/vg(v):0,num:true,fmt:FMT_R}]}
+  {k:'kg',label:'kg levados',v:v=>{const p=pl(v);return p?N(p.kg):''},ord:v=>{const p=pl(v);return p?p.kg:0},num:true,h:v=>{const p=pl(v);return p?N(p.kg):'—'}},
+  {k:'rv',label:'R$/viagem',v:v=>vg(v)?R((+v.valor||0)/vg(v)):'',ord:v=>vg(v)?(+v.valor||0)/vg(v):0,num:true,fmt:FMT_R,h:v=>vg(v)?R((+v.valor||0)/vg(v)):'—'}]}
+function rodapeLoc(T,lista,extra){return T.rodape({val:R(lista.reduce((t,v)=>t+(+v.valor||0),0))},lista.length+' itens',extra)}
 function renderFrota(){
   const dTela=(S.loc&&S.loc.veiculos)||[];
   const a=agg(S.lanc,{veiculos:dTela});
@@ -721,10 +728,8 @@ function renderFrota(){
       ${temFrota?`<a class="btn pri" href="../frota/#locacao" style="text-decoration:none">Abrir a Frota ↗</a>`:''}</div>
     <div class="notice" style="margin-bottom:12px">Esta tela é só para consulta. Para incluir, tirar ou mudar o valor de um veículo ou caixa no mês, use o módulo Frota${temFrota?'':' (peça acesso ao administrador do portal)'}.</div>
     ${dTela.length?`<div class="row" style="justify-content:flex-end;margin-bottom:8px">${TL.botao()}</div>${TL.info(d.length,dTela.length)}<div class="tbl-wrap rtw"><table class="rt"><thead>${TL.cab()}</thead><tbody>
-    ${d.map(v=>{const p=a.byPlaca[String(v.placa).toUpperCase()];const n=p?p.mtr.size:0;return `<tr>
-      <td>${esc(v.tipo)}</td><td class="mono">${esc(v.placa)}</td><td>${esc(v.fornecedor)}</td>
-      <td class="num">${R(v.valor)}</td><td class="num">${n}</td><td class="num">${p?N(p.kg):'—'}</td><td class="num">${n?R((+v.valor||0)/n):'—'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">Nada com os filtros das colunas.</td></tr>'}
-    </tbody><tfoot><tr><td colspan="3">${d.length} itens</td><td class="num">${R(totF)}</td><td></td><td></td><td></td></tr></tfoot></table></div>`:
+    ${d.map(v=>`<tr>${TL.celulas(v)}</tr>`).join('')||`<tr><td colspan="${TL.nVis()}" class="empty">Nada com os filtros das colunas.</td></tr>`}
+    </tbody>${rodapeLoc(TL,d)}</table></div>`:
     `<div class="empty">Nenhum veículo lançado na Frota para este mês.</div>`}
   </section>`;
   TL.ligar();
@@ -747,7 +752,7 @@ function renderDest(){
     {k:'res',label:'Resíduo',v:x=>x.r},{k:'preco',label:'Preço por kg (R$)',v:x=>x.p===''?'':RP(x.p),ord:x=>+x.p||0,num:true,x:x=>x.p===''?'':+x.p,fmt:'0.000'},
     {k:'nat',label:'Natureza',v:x=>{const n=(x.d.naturezas||{})[x.r]||x.d.tipo;return x.r?(n==='receita'?'Receita':'Custo'):''}},
     {k:'mes',label:'Lançado no mês (R$)',v:x=>{const m=a.byDest[x.id];return m?R(m.v):''},ord:x=>(a.byDest[x.id]||{}).v||0,num:true,x:x=>(a.byDest[x.id]||{}).v||'',fmt:FMT_R}],
-    {titulo:'Destinadores e tabela de preços',aba:'Preços',arquivo:'destinadores-precos',unidade:'linhas',subtitulo:()=>'Lançado no mês: '+mesLbl(S.mes)});
+    {titulo:'Destinadores e tabela de preços',aba:'Preços',arquivo:'destinadores-precos',unidade:'linhas',colunas:false,subtitulo:()=>'Lançado no mês: '+mesLbl(S.mes)});
   TP.aplicar(precos);
   $('#main').innerHTML=`<section class="panel"><div class="panel-h"><div><h2>Destinadores e tabela de preços</h2><p class="sub">Vem dos cadastros de destinador e reciclador do Mapa Operacional. O preço daqui preenche o lançamento automaticamente. Destinador de custo: a Retec paga. De receita: o comprador paga pelo reciclável.</p></div>
     <div class="row" style="gap:6px">${TP.botao('↓ Exportar tabela de preços')}${temMapa?`<a class="btn pri" href="../mapa/">Abrir o Mapa Operacional ↗</a>`:''}</div></div>
