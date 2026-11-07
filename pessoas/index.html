@@ -353,7 +353,7 @@ details.mais .chips{margin-top:6px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261106"></script>
-<script src="../tabela.js?v=20261102"></script>
+<script src="../tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -478,21 +478,26 @@ function renderPessoas() {
   const dups = (S.d.duplicados || []).map(g => g.map(pesDe).filter(Boolean)).filter(g => g.length > 1);
   const cnhTxt = p => { const st = cnhStatus(p); return [p.cnhCategoria, st && st.txt].filter(Boolean).join(' · '); };
   const TP = Portal.tabela('pes-lista', [
-    { k: 'nome', label: 'Nome', v: p => p.nome },
-    { k: 'fun', label: 'Funções', v: p => p.funcoes.join(', '), vazio: '(Sem função)' },
+    { k: 'nome', label: 'Nome', v: p => p.nome, cls: 'full', h: p => `<b>${esc(p.nome)}</b>${p.apelido && p.apelido !== p.nome ? ` <span class="sub">“${esc(p.apelido)}”</span>` : ''}` },
+    { k: 'fun', label: 'Funções', v: p => p.funcoes.join(', '), vazio: '(Sem função)', h: p => p.funcoes.length ? p.funcoes.map(f => `<span class="pill acc">${esc(f)}</span>`).join(' ') : '<span class="pill warn">sem função</span>' },
     { k: 'uni', label: 'Unidade', v: p => uniNome(p.unidadeId) },
-    { k: 'vin', label: 'Vínculo', v: p => p.vinculo, vazio: '(Sem vínculo)' },
-    { k: 'cnh', label: 'CNH', v: cnhTxt, ord: p => p.cnhValidade || 'z' },
-  ].concat(S.d.vePessoal ? [{ k: 'cpf', label: 'CPF', v: p => p.cpf }] : []).concat([
-    { k: 'acc', label: 'Acesso ao portal', v: acessoTxt },
-    { k: 'cont', label: 'Contato', v: p => [p.email, p.telefone].filter(Boolean).join(' · ') },
+    { k: 'vin', label: 'Vínculo', v: p => p.vinculo, vazio: '(Sem vínculo)', h: p => esc(p.vinculo || '—') },
+    { k: 'cnh', label: 'CNH', v: cnhTxt, ord: p => p.cnhValidade || 'z', h: p => { const s = cnhStatus(p); return (p.cnhCategoria ? `<span class="cnh">${esc(p.cnhCategoria)}</span> ` : '') + (s ? `<span class="pill ${s.cls}">${esc(s.txt)}</span>` : (p.cnhCategoria ? '' : '—')); } },
+  ].concat(S.d.vePessoal ? [{ k: 'cpf', label: 'CPF', v: p => p.cpf, cls: 'mono', h: p => esc(p.cpf || '—') + (p.cpf && !p.cpfValido ? ' <span class="pill crit">confira</span>' : '') }] : []).concat([
+    { k: 'acc', label: 'Acesso ao portal', v: acessoTxt, h: acessoPill },
+    { k: 'cont', label: 'Contato', v: p => [p.email, p.telefone].filter(Boolean).join(' · ') || '—' },
+    { k: 'ape', label: 'Apelido', v: p => p.apelido || '', oculta: true },
+    { k: 'email', label: 'E-mail', v: p => p.email || '', oculta: true },
+    { k: 'tel', label: 'Telefone', v: p => p.telefone || '', oculta: true },
+    { k: 'cnhc', label: 'Categoria da CNH', v: p => p.cnhCategoria || '', oculta: true },
+    { k: 'cnhv', label: 'Validade da CNH', v: p => D(p.cnhValidade), ord: p => p.cnhValidade || '', cls: 'mono', oculta: true },
+    { k: 'sit', label: 'Situação', v: p => p.ativo ? 'Ativa' : 'Inativa', oculta: true },
   ]), { titulo: 'Pessoas', arquivo: 'pessoas', unidade: 'pessoas', aoMudar: render,
     extrasExport: [{ label: 'Apelido', x: p => p.apelido || '' }, { label: 'E-mail', x: p => p.email || '' }, { label: 'Telefone', x: p => p.telefone || '' },
       { label: 'Categoria da CNH', x: p => p.cnhCategoria || '' }, { label: 'Validade da CNH', x: p => D(p.cnhValidade) }, { label: 'Situação', x: p => p.ativo ? 'Ativa' : 'Inativa' }],
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '',
     filtrosExtras: () => [S.fun && 'Função: ' + S.fun, S.busca && 'Busca: "' + S.busca + '"', S.inativos && 'Inclui inativas'].filter(Boolean) });
   const listaP = TP.aplicar(lista);
-  const nCols = 8 + (S.d.vePessoal ? 1 : 0);
   $('#main').innerHTML = (e ? fichaHTML(e) : '') + `<section class="panel">
     <div class="panel-h"><div><h2>Pessoas</h2><p class="sub">Cadastro único: motoristas e ajudantes (Programação e DP), consultores (Solicitações) e a equipe do escritório. O acesso ao portal é opcional e é gerado na ficha da pessoa.${S.d.restrito ? ' Você cadastra e altera pessoas da sua unidade.' : ''}</p></div></div>
     ${alertas.length ? `<div class="alerts" style="margin-bottom:12px">${alertas.map(([p, s]) => `<div class="al ${s.cls === 'crit' ? 'crit' : 'warn'}"><span class="pill ${s.cls}">CNH</span><b>${esc(p.nome)}: ${esc(s.txt)}</b></div>`).join('')}</div>` : ''}
@@ -503,16 +508,9 @@ function renderPessoas() {
       <span style="margin-left:auto">${TP.botao()}</span>${S.d.podeCriar ? '<button class="btn pri" id="novo">+ Pessoa</button>' : ''}</div>
     ${TP.info(listaP.length, lista.length)}
     ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TP.cab('<th></th>', '<th></th>')}</thead><tbody>
-    ${listaP.map(p => { const s = cnhStatus(p); return `<tr class="${p.ativo ? '' : 'inativo'}" data-pes="${esc(p.id)}"><td data-label="" data-av="${esc(p.id)}">${avatar(p)}</td>
-      <td data-label="Nome" class="full"><b>${esc(p.nome)}</b>${p.apelido && p.apelido !== p.nome ? ` <span class="sub">“${esc(p.apelido)}”</span>` : ''}</td>
-      <td data-label="Funções">${p.funcoes.length ? p.funcoes.map(f => `<span class="pill acc">${esc(f)}</span>`).join(' ') : '<span class="pill warn">sem função</span>'}</td>
-      <td data-label="Unidade">${esc(uniNome(p.unidadeId))}</td>
-      <td data-label="Vínculo">${esc(p.vinculo || '—')}</td>
-      <td data-label="CNH">${p.cnhCategoria ? `<span class="cnh">${esc(p.cnhCategoria)}</span> ` : ''}${s ? `<span class="pill ${s.cls}">${esc(s.txt)}</span>` : (p.cnhCategoria ? '' : '—')}</td>
-      ${S.d.vePessoal ? `<td data-label="CPF" class="mono">${esc(p.cpf || '—')}${p.cpf && !p.cpfValido ? ' <span class="pill crit">confira</span>' : ''}</td>` : ''}
-      <td data-label="Acesso">${acessoPill(p)}</td>
-      <td data-label="Contato">${esc([p.email, p.telefone].filter(Boolean).join(' · ') || '—')}</td>
-      <td data-label=""><div class="acoes"><button class="btn sm" data-abrir="${esc(p.id)}">${p.podeEditar ? 'Abrir' : 'Ver'}</button></div></td></tr>`; }).join('') || `<tr><td colspan="${nCols + 1}" class="empty">Ninguém com os filtros das colunas.</td></tr>`}
+    ${listaP.map(p => { return `<tr class="${p.ativo ? '' : 'inativo'}" data-pes="${esc(p.id)}"><td data-label="" data-av="${esc(p.id)}">${avatar(p)}</td>
+      ${TP.celulas(p)}
+      <td data-label=""><div class="acoes"><button class="btn sm" data-abrir="${esc(p.id)}">${p.podeEditar ? 'Abrir' : 'Ver'}</button></div></td></tr>`; }).join('') || `<tr><td colspan="${TP.nVis() + 2}" class="empty">Ninguém com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Ninguém cadastrado com esses filtros.</div>'}</section>`;
   carregarFotos(listaP); TP.ligar();
   const b = $('#busca'); b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
