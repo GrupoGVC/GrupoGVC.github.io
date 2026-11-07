@@ -579,7 +579,7 @@ function acessoHTML(e) {
   return `<div class="box"><h3>Acesso ao portal</h3>
     <dl class="kv"><dt>Situação</dt><dd>${acessoPill(e)}</dd><dt>Login</dt><dd class="mono">${esc(a.email)}</dd>
     <dt>Último acesso</dt><dd>${esc(a.ultimoAcesso || '—')}</dd>
-    ${adm ? `<dt>Módulos</dt><dd>${mods || '—'}${a.adminPortal ? '<br><b>Admin do portal</b>' : ''}</dd><dt>Unidades</dt><dd>${esc(unis)}</dd>` : ''}</dl>
+    ${adm ? `<dt>Módulos</dt><dd>${mods || '—'}${a.adminPortal ? '<br><b>Admin do portal</b>' : ''}${a.decideCobranca ? '<br>Decide cobrança de viagem frustrada' : ''}</dd><dt>Unidades</dt><dd>${esc(unis)}</dd>` : ''}</dl>
     ${adm ? `<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
       ${a.ativo ? `<button class="btn sm" data-acc="convite">Reenviar convite</button>${a.temSenha ? '<button class="btn sm" data-acc="apagarSenha">Apagar senha</button>' : ''}<button class="btn sm danger" data-acc="suspender">Suspender acesso</button>` : `<button class="btn sm pri" data-acc="reativar">Reativar acesso</button>`}
       <a class="btn sm" href="../" id="a-niveis">Ajustar níveis em Usuários</a></div>` : ''}</div>`;
@@ -598,6 +598,7 @@ function gerarHTML(e) {
     <div class="niv">${Object.entries(S.d.modulos).map(([k, n]) => `<div class="fld"><label for="a-m-${k}">${esc(n)}</label><select id="a-m-${k}" data-mod="${k}">${opts([['', 'Sem acesso'], ['leitor', 'Leitor'], ['editor', 'Editor'], ['admin', 'Administrador']], sug[k] || '')}</select></div>`).join('')}</div>
     <div class="fld"><label>Unidades que vê</label><div class="chips">${S.d.todasUnidades.map(u => `<label class="chip"><input type="checkbox" data-auni="${esc(u.id)}" ${unisSel.includes(u.id) ? 'checked' : ''}> ${esc(u.nome)}</label>`).join('')}</div><div class="hint">Nenhuma marcada = vê todas.</div></div>
     <label class="chk"><input type="checkbox" id="a-admin"> Admin do portal</label><br>
+    <label class="chk"><input type="checkbox" id="a-cob"> Decide cobrança de viagem frustrada</label><br>
     <label class="chk"><input type="checkbox" id="a-conv" checked> Enviar e-mail com o convite (link do portal e como criar a senha)</label>
     <div class="row" style="justify-content:flex-end;margin-top:10px;gap:8px"><button class="btn" id="a-cancel">Cancelar</button><button class="btn pri" id="a-ok">Gerar acesso</button></div></div>`;
 }
@@ -644,7 +645,7 @@ function ligarFicha() {
   const ok = $('#a-ok'); if (ok) ok.onclick = async () => {
     const modulos = {}; $$('#a-box [data-mod]').forEach(s => modulos[s.dataset.mod] = s.value);
     const acesso = { id: e.id, email: $('#a-email').value.trim(), modulos, unidades: $$('[data-auni]').filter(c => c.checked).map(c => c.dataset.auni),
-      adminPortal: $('#a-admin').checked, convite: $('#a-conv').checked };
+      adminPortal: $('#a-admin').checked, decideCobranca: $('#a-cob').checked, convite: $('#a-conv').checked };
     ok.disabled = true;
     try { const r = await Portal.api('pes.gerarAcesso', { acesso }); S.gerar = false; toast(r.convite ? 'Acesso gerado. Convite enviado para ' + acesso.email + '.' : 'Acesso gerado.'); await carregar(true); }
     catch (er) { ok.disabled = false; falha(er); }
