@@ -279,7 +279,7 @@ td.wrap{white-space:normal;min-width:160px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
-<script src="../tabela.js?v=20261102"></script>
+<script src="../tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -379,8 +379,7 @@ const EXTRAS = {
   veiculos: { extrasExport: [{ label: 'Modelo', x: v => v.modelo || '' }, { label: 'Ano', x: v => v.ano || '' }, { label: 'Observações', x: v => v.obs || '' }] },
   caixas: { extrasExport: [{ label: 'Locadora', x: c => cadNome(c.locadoraId) }, { label: 'Observações', x: c => c.obs || '' }] },
   tipos: {},
-  locacao: { extrasExport: [{ label: 'Valor no mês (R$)', x: valorLoc, fmt: '"R$" #,##0.00' }],
-             totais: l => ({ 'Valor no mês (R$)': l.reduce((t, x) => t + (+valorLoc(x) || 0), 0) }) },
+  locacao: { totais: l => ({ 'Valor no mês (R$)': l.reduce((t, x) => t + (+valorLoc(x) || 0), 0) }) },
 };
 function tb(aba, extra) {
   return Portal.tabela('frota-' + aba, COLS[aba], Object.assign({ titulo: TITULOS[aba], arquivo: 'frota-' + aba, unidade: UNID[aba], aoMudar: render,
@@ -394,32 +393,39 @@ const ligarFiltros = (aba) => tb(aba).ligar();
 const fecharFiltro = () => { if (Portal.fecharFiltroTabela) Portal.fecharFiltroTabela(); };
 const COLS = {
   veiculos: [
-    { k: 'placa', label: 'Placa', v: v => v.placa },
-    { k: 'tipo', label: 'Tipo', v: v => tipoDe(v.tipoVeiculoId).nome },
-    { k: 'cnh', label: 'CNH', v: v => tipoDe(v.tipoVeiculoId).categoriaCnh },
+    { k: 'placa', label: 'Placa', v: v => v.placa, cls: 'mono', h: v => `<b>${esc(v.placa)}</b>${v.modelo ? `<div class="sub" style="margin:0">${esc(v.modelo)}${v.ano ? ' · ' + esc(v.ano) : ''}</div>` : ''}` },
+    { k: 'tipo', label: 'Tipo', v: v => tipoDe(v.tipoVeiculoId).nome || '—' },
+    { k: 'cnh', label: 'CNH', v: v => tipoDe(v.tipoVeiculoId).categoriaCnh, h: v => { const c = tipoDe(v.tipoVeiculoId).categoriaCnh; return c ? `<span class="cnh">${esc(c)}</span>` : '—'; } },
     { k: 'prop', label: 'Propriedade', v: v => v.propriedade },
-    { k: 'loc', label: 'Locadora', v: v => cadNome(v.locadoraId) },
-    { k: 'uni', label: 'Unidade', v: v => uniNome(v.unidadeId), vazio: 'Sem unidade' },
-    { k: 'sit', label: 'Situação', v: v => v.ativo ? v.situacao : 'Inativo' }],
+    { k: 'loc', label: 'Locadora', v: v => cadNome(v.locadoraId) || '—' },
+    { k: 'uni', label: 'Unidade', v: v => uniNome(v.unidadeId), vazio: 'Sem unidade', h: v => uniCell(v.unidadeId) },
+    { k: 'sit', label: 'Situação', v: v => v.ativo ? v.situacao : 'Inativo', h: v => v.ativo ? situPill(v.situacao) : '<span class="pill">Inativo</span>' },
+    { k: 'mod', label: 'Modelo', v: v => v.modelo || '', oculta: true },
+    { k: 'ano', label: 'Ano', v: v => v.ano || '', oculta: true },
+    { k: 'obs', label: 'Observações', v: v => v.obs || '', cls: 'wrap', oculta: true }],
   caixas: [
-    { k: 'num', label: 'Número', v: c => c.numero },
+    { k: 'num', label: 'Número', v: c => c.numero, cls: 'mono', h: c => `<b>${esc(c.numero)}</b>` },
     { k: 'cap', label: 'm³', v: c => c.capacidade, num: true },
-    { k: 'prop', label: 'Propriedade', v: c => c.propriedade },
-    { k: 'uni', label: 'Unidade', v: c => uniNome(c.unidadeId), vazio: 'Sem unidade' },
-    { k: 'sit', label: 'Situação', v: c => c.ativo ? c.situacao : 'Inativa' },
-    { k: 'onde', label: 'Onde está', v: c => cadNome(c.cadastroAtualId) }],
+    { k: 'prop', label: 'Propriedade', v: c => c.propriedade, h: c => esc(c.propriedade) + (c.locadoraId ? `<div class="sub" style="margin:0">${esc(cadNome(c.locadoraId))}</div>` : '') },
+    { k: 'uni', label: 'Unidade', v: c => uniNome(c.unidadeId), vazio: 'Sem unidade', h: c => uniCell(c.unidadeId) },
+    { k: 'sit', label: 'Situação', v: c => c.ativo ? c.situacao : 'Inativa', h: c => c.ativo ? situPill(c.situacao) : '<span class="pill">Inativa</span>' },
+    { k: 'onde', label: 'Onde está', v: c => cadNome(c.cadastroAtualId) || '—', cls: 'wrap' },
+    { k: 'loc', label: 'Locadora', v: c => cadNome(c.locadoraId), oculta: true },
+    { k: 'obs', label: 'Observações', v: c => c.obs || '', cls: 'wrap', oculta: true }],
   tipos: [
-    { k: 'nome', label: 'Tipo', v: t => t.nome },
-    { k: 'cnh', label: 'CNH exigida', v: t => t.categoriaCnh, vazio: 'Não definida' },
-    { k: 'cx', label: 'Caixas (m³)', v: t => t.capacidadesCaixa },
+    { k: 'nome', label: 'Tipo', v: t => t.nome, h: t => `<b>${esc(t.nome)}</b>` },
+    { k: 'cnh', label: 'CNH exigida', v: t => t.categoriaCnh, vazio: 'Não definida', h: t => t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '<span class="sem-uni">não definida</span>' },
+    { k: 'cx', label: 'Caixas (m³)', v: t => t.capacidadesCaixa || '—' },
     { k: 'n', label: 'Veículos', v: t => t.veiculos, num: true }],
   locacao: [
-    { k: 'uso', label: 'Em uso', v: l => l.uso ? 'Sim' : 'Não' },
-    { k: 'nome', label: 'Placa / caixa', v: l => l.nome },
+    { k: 'uso', label: 'Em uso', v: l => l.uso ? 'Sim' : 'Não', h: l => `<input type="checkbox" data-uso="${l.k}" ${l.uso ? 'checked' : ''} ${S.ro ? 'disabled' : ''} aria-label="Em uso no mês: ${esc(l.nome)}" style="width:auto">` },
+    { k: 'nome', label: 'Placa / caixa', v: l => l.nome, cls: 'mono', h: l => `<b>${esc(l.nome)}</b>` },
     { k: 'tipo', label: 'Tipo', v: l => l.tipo },
     { k: 'prop', label: 'Propriedade', v: l => l.prop },
-    { k: 'loc', label: 'Locadora', v: l => l.loc },
-    { k: 'uni', label: 'Unidade', v: l => uniNome(l.uni), vazio: 'Sem unidade' }],
+    { k: 'loc', label: 'Locadora', v: l => l.loc || '—' },
+    { k: 'uni', label: 'Unidade', v: l => uniNome(l.uni), vazio: 'Sem unidade', h: l => uniCell(l.uni) },
+    { k: 'val', label: 'Valor no mês (R$)', v: l => valorLoc(l) === '' ? '' : R(valorLoc(l)), ord: l => +valorLoc(l) || 0, x: valorLoc, fmt: '"R$" #,##0.00', num: true, filtro: false,
+      h: l => { const x = (S.locDraft && S.locDraft.m[l.k]) || { uso: false, valor: 0 }; return l.prop === 'Locada' ? `<input type="number" step="any" min="0" data-val="${l.k}" value="${x.uso ? esc(x.valor) : ''}" ${S.ro || !x.uso ? 'disabled' : ''} style="width:130px;text-align:right" aria-label="Valor de ${esc(l.nome)}">` : '<span class="sub">própria</span>'; } }],
 };
 
 /* ---------- excluir / inativar / histórico (iguais em todas as abas) ---------- */
@@ -489,11 +495,7 @@ function renderVeiculos() {
     <div class="panel-h"><div><h2>Veículos</h2><p class="sub">Próprios e locados, por unidade. Veículo devolvido ou parado não aparece para a Programação.</p></div></div>
     ${toolbar('+ Veículo', 'veiculos')}${infoFiltros('veiculos', lista.length, base.length)}
     ${base.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('veiculos', COLS.veiculos, '<th></th>')}</thead><tbody>
-    ${lista.map(v => { const t = tipoDe(v.tipoVeiculoId); return `<tr class="${v.ativo ? '' : 'inativo'}">
-      <td class="mono"><b>${esc(v.placa)}</b>${v.modelo ? `<div class="sub" style="margin:0">${esc(v.modelo)}${v.ano ? ' · ' + esc(v.ano) : ''}</div>` : ''}</td>
-      <td>${esc(t.nome || '—')}</td><td>${t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '—'}</td>
-      <td>${esc(v.propriedade)}</td><td>${esc(cadNome(v.locadoraId) || '—')}</td><td>${uniCell(v.unidadeId)}</td>
-      <td>${v.ativo ? situPill(v.situacao) : '<span class="pill">Inativo</span>'}</td><td>${botoes(v)}</td></tr>`; }).join('') || '<tr><td colspan="8" class="empty">Nenhum veículo com os filtros das colunas.</td></tr>'}
+    ${lista.map(v => `<tr class="${v.ativo ? '' : 'inativo'}">${tb('veiculos').celulas(v)}<td>${botoes(v)}</td></tr>`).join('') || `<tr><td colspan="${tb('veiculos').nVis() + 1}" class="empty">Nenhum veículo com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhum veículo com esses filtros.</div>'}</section>`;
   ligarFiltros('veiculos', COLS.veiculos, base);
   ligarToolbar(() => ({ placa: '', tipoVeiculoId: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Em operação', modelo: '', ano: '', obs: '' }));
@@ -537,11 +539,7 @@ function renderCaixas() {
     <div class="panel-h"><div><h2>Caixas estacionárias</h2><p class="sub">Onde cada caixa está. Na Programação, a entrega, a retirada e a troca de caixa vão atualizar isso sozinhas.</p></div></div>
     ${toolbar('+ Caixa', 'caixas')}${infoFiltros('caixas', lista.length, base.length)}
     ${base.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('caixas', COLS.caixas, '<th></th>')}</thead><tbody>
-    ${lista.map(c => `<tr class="${c.ativo ? '' : 'inativo'}">
-      <td class="mono"><b>${esc(c.numero)}</b></td><td class="num">${esc(c.capacidade)}</td>
-      <td>${esc(c.propriedade)}${c.locadoraId ? `<div class="sub" style="margin:0">${esc(cadNome(c.locadoraId))}</div>` : ''}</td>
-      <td>${uniCell(c.unidadeId)}</td><td>${c.ativo ? situPill(c.situacao) : '<span class="pill">Inativa</span>'}</td>
-      <td class="wrap">${esc(cadNome(c.cadastroAtualId) || '—')}</td><td>${botoes(c)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhuma caixa com os filtros das colunas.</td></tr>'}
+    ${lista.map(c => `<tr class="${c.ativo ? '' : 'inativo'}">${tb('caixas').celulas(c)}<td>${botoes(c)}</td></tr>`).join('') || `<tr><td colspan="${tb('caixas').nVis() + 1}" class="empty">Nenhuma caixa com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhuma caixa com esses filtros. Cadastre as caixas em "+ Caixa".</div>'}</section>`;
   ligarFiltros('caixas', COLS.caixas, base);
   ligarToolbar(() => ({ numero: '', capacidade: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Na base', cadastroAtualId: '', obs: '' }));
@@ -573,8 +571,7 @@ function renderTipos() {
     <div class="panel-h"><div><h2>Tipos de veículo</h2><p class="sub">Lista usada no cadastro de veículos. Tipo que já tem veículo não pode ser excluído, só inativado.</p></div></div>
     ${toolbar('+ Tipo', 'tipos')}${infoFiltros('tipos', lista.length, base.length)}
     <div class="tbl-wrap"><table><thead>${cabFiltro('tipos', COLS.tipos, '<th></th>')}</thead><tbody>
-    ${lista.map(t => `<tr class="${t.ativo ? '' : 'inativo'}"><td><b>${esc(t.nome)}</b></td><td>${t.categoriaCnh ? `<span class="cnh">${esc(t.categoriaCnh)}</span>` : '<span class="sem-uni">não definida</span>'}</td>
-      <td>${esc(t.capacidadesCaixa || '—')}</td><td class="num">${t.veiculos}</td><td>${botoes(t)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nenhum tipo com os filtros das colunas.</td></tr>'}
+    ${lista.map(t => `<tr class="${t.ativo ? '' : 'inativo'}">${tb('tipos').celulas(t)}<td>${botoes(t)}</td></tr>`).join('') || `<tr><td colspan="${tb('tipos').nVis() + 1}" class="empty">Nenhum tipo com os filtros das colunas.</td></tr>`}
     </tbody></table></div></section>`;
   ligarFiltros('tipos', COLS.tipos, base);
   ligarToolbar(() => ({ nome: '', categoriaCnh: '', capacidadesCaixa: '' }));
@@ -618,11 +615,8 @@ function renderLocacao() {
       ${S.ro ? '' : `<button class="btn pri" id="salvar" ${d.sujo ? '' : 'disabled'}>Salvar ${esc(mesLbl(S.mes))}</button>`}
     </div>
     ${infoFiltros('locacao', vis.length, linhas.length)}
-    ${linhas.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('locacao', COLS.locacao, '<th class="num">Valor no mês (R$)</th>')}</thead><tbody>
-    ${vis.map(l => { const x = d.m[l.k] || { uso: false, valor: 0 }; return `<tr>
-      <td><input type="checkbox" data-uso="${l.k}" ${x.uso ? 'checked' : ''} ${S.ro ? 'disabled' : ''} aria-label="Em uso no mês: ${esc(l.nome)}" style="width:auto"></td>
-      <td class="mono"><b>${esc(l.nome)}</b></td><td>${esc(l.tipo)}</td><td>${esc(l.prop)}</td><td>${esc(l.loc || '—')}</td><td>${uniCell(l.uni)}</td>
-      <td class="num">${l.prop === 'Locada' ? `<input type="number" step="any" min="0" data-val="${l.k}" value="${x.uso ? esc(x.valor) : ''}" ${S.ro || !x.uso ? 'disabled' : ''} style="width:130px;text-align:right" aria-label="Valor de ${esc(l.nome)}">` : '<span class="sub">própria</span>'}</td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Nenhum item com os filtros das colunas.</td></tr>'}
+    ${linhas.length ? `<div class="tbl-wrap"><table><thead>${cabFiltro('locacao', COLS.locacao)}</thead><tbody>
+    ${vis.map(l => `<tr>${tb('locacao').celulas(l)}</tr>`).join('') || `<tr><td colspan="${tb('locacao').nVis()}" class="empty">Nenhum item com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhum veículo ou caixa locada nesta unidade. Cadastre em Veículos e Caixas.</div>'}
     ${d.sujo ? '<p class="hint warn" id="aviso-sujo" style="margin-top:8px">Alterações ainda não salvas.</p>' : ''}
   </section>`;
