@@ -351,7 +351,7 @@ details.mais .chips{margin-top:6px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261106"></script>
-<script src="../tabela.js?v=20261102"></script>
+<script src="../tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -547,12 +547,18 @@ function renderFila() {
   const abertas = S.d.viagens.filter(v => v.status === 'Programada' && passaUni(v)).sort((a, b) => a.dataSaida.localeCompare(b.dataSaida));
   const stTxt = s => s.status === 'Frustrada' ? 'Frustrada' : 'Liberada';
   const T = Portal.tabela('prog-fila', [
-    { k: 'cli', label: 'Cliente', v: s => cliDe(s.clienteId).nome },
+    { k: 'cli', label: 'Cliente', v: s => cliDe(s.clienteId).nome, cls: 'full', h: s => { const c = cliDe(s.clienteId); return `<b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}`; } },
     { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
-    { k: 'prev', label: 'Desejada pelo cliente', v: s => D(s.dataDesejada), ord: s => s.dataDesejada || '' },
-    { k: 'desc', label: 'Descrição', v: s => s.descricao },
+    { k: 'prev', label: 'Desejada pelo cliente', v: s => D(s.dataDesejada), ord: s => s.dataDesejada || '', cls: 'mono', tdc: s => s.dataDesejada && s.dataDesejada < hojeISO() ? 'atraso' : '', h: s => esc(D(s.dataDesejada) || '—') },
+    { k: 'desc', label: 'Descrição', v: s => s.descricao, cls: 'wrap', h: s => esc(s.descricao || '') + (itensSol(s.id).length ? `<div class="sub">${esc(resumoItens(s.id))}</div>` : '') + (s.status === 'Frustrada' && s.motivo ? `<div class="sub">${esc(s.motivo)}</div>` : '') },
     { k: 'dest', label: 'Destino', v: s => [...new Set(itensSol(s.id).map(i => destNome(i.destinadorId)).filter(Boolean))].join(', '), vazio: '(sem destino)' },
-    { k: 'st', label: 'Status', v: stTxt },
+    { k: 'st', label: 'Status', v: stTxt, h: s => stPill(s.status === 'Frustrada' ? 'Frustrada' : 'Pendente').replace('Pendente', 'Liberada') },
+    { k: 'upl', label: 'Código UPLOG', v: s => cliDe(s.clienteId).codigoUplog || '', cls: 'mono', oculta: true },
+    { k: 'serv', label: 'Serviço', v: s => s.servico || '', oculta: true },
+    { k: 'dsol', label: 'Data da solicitação', v: s => D(s.dataSolicitacao), ord: s => s.dataSolicitacao || '', cls: 'mono', oculta: true },
+    { k: 'res', label: 'Resíduos', v: s => itensSol(s.id).length ? resumoItens(s.id) : '', cls: 'wrap', oculta: true },
+    { k: 'kmp', label: 'Km prevista', v: s => s.kmPrevista === '' || s.kmPrevista == null ? '' : String(s.kmPrevista), ord: s => +s.kmPrevista || 0, num: true, oculta: true },
+    { k: 'mot', label: 'Motivo (frustrada)', v: s => s.motivo || '', oculta: true },
   ], { titulo: 'A programar', arquivo: 'programacao-a-programar', unidade: 'solicitações', aoMudar: render,
     extrasExport: [{ label: 'Código UPLOG', x: s => cliDe(s.clienteId).codigoUplog || '' }, { label: 'Motivo (frustrada)', x: s => s.motivo || '' }],
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '' });
@@ -563,12 +569,8 @@ function renderFila() {
       ${abertas.length ? `<select id="viag-sel" style="width:auto;max-width:100%">${opts(abertas.map(v => [v.id, D(v.dataSaida) + ' · ' + (v.execucao === 'Terceirizada' ? cliDe(v.transportadorId).nome || 'terceirizada' : (v.placa || 'sem veículo') + ' · ' + apel(v.motoristaId))]), '', 'Incluir numa viagem programada…')}</select><button class="btn" id="incluir-sel">Incluir</button>` : ''}`}<span style="margin-left:auto">${T.botao()}</span></div>
     ${T.info(listaF.length, listaTela.length)}
     ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('', S.ro ? '' : '<th></th>')}</thead><tbody>
-      ${listaF.map(s => { const c = cliDe(s.clienteId); return `<tr>${S.ro ? '' : `<td data-label=""><input type="checkbox" data-sel="${esc(s.id)}" ${S.sel[s.id] ? 'checked' : ''} aria-label="Marcar" style="width:auto"></td>`}
-        <td data-label="Cliente" class="full"><b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}</td>
-        <td data-label="Unidade">${esc(uniNome(s.unidadeId))}</td>
-        <td data-label="Desejada" class="mono ${s.dataDesejada && s.dataDesejada < hojeISO() ? 'atraso' : ''}">${esc(D(s.dataDesejada) || '—')}</td>
-        <td data-label="Descrição" class="wrap">${esc(s.descricao || '')}${itensSol(s.id).length ? `<div class="sub">${esc(resumoItens(s.id))}</div>` : ''}${s.status === 'Frustrada' && s.motivo ? `<div class="sub">${esc(s.motivo)}</div>` : ''}</td>
-        <td data-label="Status">${stPill(s.status === 'Frustrada' ? 'Frustrada' : 'Pendente').replace('Pendente', 'Liberada')}</td></tr>`; }).join('') || `<tr><td colspan="${S.ro ? 5 : 6}" class="empty">Nada com os filtros das colunas.</td></tr>`}
+      ${listaF.map(s => `<tr>${S.ro ? '' : `<td data-label=""><input type="checkbox" data-sel="${esc(s.id)}" ${S.sel[s.id] ? 'checked' : ''} aria-label="Marcar" style="width:auto"></td>`}
+        ${T.celulas(s)}</tr>`).join('') || `<tr><td colspan="${T.nVis() + (S.ro ? 0 : 1)}" class="empty">Nada com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nada esperando programação.</div>'}
   </section>`;
   T.ligar();
@@ -972,20 +974,23 @@ function renderEquipe() {
   const cnhTxt = c => { const s2 = cnhStatus(c); return [c.cnhCategoria, s2 && s2.txt].filter(Boolean).join(' · '); };
   // CPF: só aparece (e só sai na exportação) para quem já pode vê-lo na tela
   const TE = Portal.tabela('prog-equipe', [
-    { k: 'nome', label: 'Nome', v: c => c.nome },
+    { k: 'nome', label: 'Nome', v: c => c.nome, cls: 'full', h: c => `<b>${esc(c.nome)}</b>${c.apelido && c.apelido !== c.nome ? ` <span class="sub">“${esc(c.apelido)}”</span>` : ''}${hoje[c.id] ? ' <span class="pill st lib">em viagem</span>' : ''}` },
     { k: 'fun', label: 'Função', v: c => c.funcao },
     { k: 'vin', label: 'Vínculo', v: c => c.vinculo },
-    { k: 'cnh', label: 'CNH', v: cnhTxt, ord: c => c.cnhValidade || 'z' },
-  ].concat(S.d.vePessoal ? [{ k: 'cpf', label: 'CPF', v: c => c.cpf }] : []).concat([
+    { k: 'cnh', label: 'CNH', v: cnhTxt, ord: c => c.cnhValidade || 'z', h: c => { const s2 = cnhStatus(c); return (c.cnhCategoria ? `<span class="cnh">${esc(c.cnhCategoria)}</span> ` : '') + (s2 ? `<span class="pill ${s2.cls}">${esc(s2.txt)}</span>` : '—'); } },
+  ].concat(S.d.vePessoal ? [{ k: 'cpf', label: 'CPF', v: c => c.cpf, cls: 'mono', h: c => esc(c.cpf || '—') + (c.cpf && !c.cpfValido ? ' <span class="pill crit">confira</span>' : '') }] : []).concat([
     { k: 'uni', label: 'Unidade', v: c => uniNome(c.unidadeId) },
     { k: 'vm', label: 'Viagens (mês)', v: c => String(nViag[c.id] || 0), ord: c => nViag[c.id] || 0, x: c => nViag[c.id] || 0, num: true },
     { k: 'pm', label: 'Pernoites (mês)', v: c => String(nPern[c.id] || 0), ord: c => nPern[c.id] || 0, x: c => nPern[c.id] || 0, num: true },
+    { k: 'ape', label: 'Apelido', v: c => c.apelido || '', oculta: true },
+    { k: 'cnhc', label: 'Categoria da CNH', v: c => c.cnhCategoria || '', oculta: true },
+    { k: 'cnhv', label: 'Validade da CNH', v: c => D(c.cnhValidade), ord: c => c.cnhValidade || '', cls: 'mono', oculta: true },
+    { k: 'sit', label: 'Situação', v: c => c.ativo ? 'Ativo' : 'Inativo', oculta: true },
   ]), { titulo: 'Equipe', arquivo: 'programacao-equipe', unidade: 'pessoas', aoMudar: render, totais: l => ({ 'Pernoites (mês)': l.reduce((t, c) => t + (nPern[c.id] || 0), 0) }),
     extrasExport: [{ label: 'Apelido', x: c => c.apelido || '' }, { label: 'Categoria da CNH', x: c => c.cnhCategoria || '' }, { label: 'Validade da CNH', x: c => D(c.cnhValidade) }, { label: 'Situação', x: c => c.ativo ? 'Ativo' : 'Inativo' }],
     subtitulo: () => [S.uni ? 'Unidade: ' + uniNome(S.uni) : '', 'Viagens e pernoites de ' + mesLbl].filter(Boolean).join(' · '),
     filtrosExtras: () => [S.indEq && 'Indicador: ' + IND[S.indEq].k, S.busca && 'Busca: "' + S.busca + '"', S.inativos && 'Inclui inativos'].filter(Boolean) });
   const listaE = TE.aplicar(lista);
-  const nCols = S.d.vePessoal ? 9 : 8;
   $('#main').innerHTML = `<section class="panel">
     <div class="panel-h"><div><h2>Equipe</h2><p class="sub">Motoristas e ajudantes da unidade, só para consulta (o cadastro fica no módulo Pessoas). Clique num indicador para filtrar a lista.${S.d.vePessoal ? '' : ' CPF e foto só aparecem para quem edita a Programação.'}</p></div></div>
     ${inds}
@@ -994,13 +999,7 @@ function renderEquipe() {
       <span style="margin-left:auto">${TE.botao()}</span></div>
     ${TE.info(listaE.length, lista.length)}
     ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TE.cab('', '<th></th>')}</thead><tbody>
-    ${listaE.map(c => { const s2 = cnhStatus(c); return `<tr class="${c.ativo ? '' : 'inativo'}"><td data-label="" data-av="${esc(c.id)}">${avatar(c)}</td>
-      <td data-label="Nome" class="full"><b>${esc(c.nome)}</b>${c.apelido && c.apelido !== c.nome ? ` <span class="sub">“${esc(c.apelido)}”</span>` : ''}${hoje[c.id] ? ' <span class="pill st lib">em viagem</span>' : ''}</td>
-      <td data-label="Função">${esc(c.funcao)}</td><td data-label="Vínculo">${esc(c.vinculo)}</td>
-      <td data-label="CNH">${c.cnhCategoria ? `<span class="cnh">${esc(c.cnhCategoria)}</span> ` : ''}${s2 ? `<span class="pill ${s2.cls}">${esc(s2.txt)}</span>` : '—'}</td>
-      ${S.d.vePessoal ? `<td data-label="CPF" class="mono">${esc(c.cpf || '—')}${c.cpf && !c.cpfValido ? ' <span class="pill crit">confira</span>' : ''}</td>` : ''}
-      <td data-label="Unidade">${esc(uniNome(c.unidadeId))}</td>
-      <td data-label="Viagens (mês)" class="num">${nViag[c.id] || 0}</td><td data-label="Pernoites (mês)" class="num">${nPern[c.id] || 0}</td></tr>`; }).join('') || `<tr><td colspan="${nCols}" class="empty">Ninguém com esses filtros.</td></tr>`}
+    ${listaE.map(c => `<tr class="${c.ativo ? '' : 'inativo'}"><td data-label="" data-av="${esc(c.id)}">${avatar(c)}</td>${TE.celulas(c)}</tr>`).join('') || `<tr><td colspan="${TE.nVis() + 1}" class="empty">Ninguém com esses filtros.</td></tr>`}
     </tbody></table></div>` : `<div class="empty">${S.indEq ? 'Ninguém neste indicador.' : 'Ninguém cadastrado. O cadastro de motoristas e ajudantes é feito no módulo Pessoas.'}</div>`}</section>`;
   carregarFotos(listaE); TE.ligar();
   const b = $('#busca'); b.oninput = () => { S.busca = b.value; const pos = b.selectionStart; render(); const nb = $('#busca'); nb.focus(); nb.setSelectionRange(pos, pos); };
