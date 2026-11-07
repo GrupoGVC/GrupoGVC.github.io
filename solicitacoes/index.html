@@ -282,6 +282,7 @@ h3.sec{font:600 14px var(--f-body);margin:18px 0 8px;color:var(--ink)}
 .km-op .km-t{display:flex;gap:6px;align-items:center;font-weight:600}
 .km-op .km-t input{width:auto;margin:0}
 .km-op .km-v{font-variant-numeric:tabular-nums}
+.ro-v{padding:8px 0;font-size:14px;min-height:36px}
 .lib-falta{font-size:12.5px;color:var(--warn);background:var(--warn-bg);border-radius:var(--r);padding:7px 10px;margin:0 0 10px}
 @media (max-width:720px){.it-row{grid-template-columns:1fr 1fr}.it-row .it-r,.it-row .it-d{grid-column:1/-1}.it-row .it-v{grid-column:1/2}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root:not([data-theme="light"]) .pill.st.fat{background:#2c2240;color:#c3a6f0}:root:not([data-theme="light"]) .pill.st.ok{background:#14302b;color:#6fd3c2}}
@@ -335,7 +336,7 @@ table.itens td input,table.itens td select{min-width:70px}
       <button role="tab" data-tab="recorrentes" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4"/></svg><span class="t-long">Recorrentes</span><span class="t-short">Recorr.</span></button>
       <button role="tab" data-tab="consultores" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5"/><path d="M16 4.5a3 3 0 0 1 0 6M18 15c1.6.6 2.6 2.2 3 5"/></svg><span class="t-long">Consultores</span><span class="t-short">Consult.</span></button>
       <button role="tab" data-tab="previsto" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/><path d="M3 7l6-3 6 5 6-4" stroke-dasharray="2 2"/></svg><span class="t-long">Previsto × real</span><span class="t-short">Prev×real</span></button>
-      <button role="tab" data-tab="documentos" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg><span class="t-long">Documentos</span><span class="t-short">Docs</span></button>
+      <button role="tab" data-tab="documentos" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg><span class="t-long">Configurações</span><span class="t-short">Config.</span></button>
       <button role="tab" data-tab="importar" aria-selected="false" id="tab-importar" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg><span class="t-long">Importar planilha</span><span class="t-short">Importar</span></button>
     </nav>
   </div>
@@ -360,6 +361,44 @@ function kmEstimadoTxt(clienteId, km, data) {
   return +km > 0 ? `Transporte estimado (km rodado): ${esc(km)} km × ${R(p.valorKm)} = <b>${R(+km * p.valorKm)}</b>` : `O cliente paga o transporte por km rodado (${R(p.valorKm)}/km): informe a km prevista.`;
 }
 const kmPendente = s => !!(s.km && s.km.pendente);
+/* ---------- clientes, motivos e cobrança de viagem frustrada ---------- */
+const ehClienteSol = c => (c.tipos || []).includes('cliente') || (c.tipos || []).includes('empresa');
+const motivosDe = tipo => (S.d.motivos || []).filter(m => m.tipo === tipo && m.ativo);
+const cobrancasDe = id => (S.d.cobrancas || []).filter(c => c.solicitacaoId === id);
+const cobPendente = s => cobrancasDe(s.id).some(c => c.decisao === 'A decidir');
+function cobrancasHTML(e) {
+  const l = cobrancasDe(e.id); if (!l.length) return '';
+  const pode = !!S.d.podeDecidirCobranca;
+  return l.map(c => {
+    const aberta = c.decisao === 'A decidir' || e._cobEdit === c.id;
+    const cab = `<h3>🚫 Viagem ${c.tipo === 'Frustrada' ? 'frustrada' : 'cancelada no dia (equipe na rua)'} em ${esc(D(c.data))} ${c.decisao === 'A decidir' ? '<span class="pill warn">Decidir cobrança</span>' : c.decisao === 'Cobrar' ? '<span class="pill ok">Cobrar ' + R(c.valor) + '</span>' : '<span class="pill">Não cobrar</span>'}</h3>
+      <p style="margin:0 0 4px"><b>${esc(c.motivo)}</b> — ${esc(c.obsProgramacao)}</p><p class="hint" style="margin:0 0 6px">${esc(c.viagem || '')}</p>`;
+    let corpo = '';
+    if (c.noBm) corpo = `<p class="hint">${c.decisao === 'Cobrar' ? 'Cobrada no BM ' + esc(c.noBm.bmNumero || 's/nº') + '.' : ''} Decidido por ${esc(c.decididoPor)} em ${esc(D(c.decididoEm))}.</p>`;
+    else if (aberta && pode) corpo = `${c.sugestao ? `<p class="hint">Sugestão: <b>${c.sugestao.valor !== '' ? R(c.sugestao.valor) : '—'}</b> · ${esc(c.sugestao.base || '')}</p>` : ''}
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <label class="chip"><input type="radio" name="cob-${c.id}" value="Cobrar" ${c.decisao === 'Cobrar' ? 'checked' : ''}> Cobrar</label>
+        <label class="chip"><input type="radio" name="cob-${c.id}" value="Não cobrar" ${c.decisao === 'Não cobrar' ? 'checked' : ''}> Não cobrar</label>
+        <div class="fld" style="margin:0;width:140px"><label for="cobv-${c.id}">Valor (R$)</label><input id="cobv-${c.id}" type="number" step="any" min="0" value="${esc(c.valor !== '' ? c.valor : (c.sugestao && c.sugestao.valor !== '' ? c.sugestao.valor : ''))}"></div>
+        <div class="fld" style="margin:0;flex:1;min-width:200px"><label for="cobo-${c.id}">Observação / justificativa</label><input id="cobo-${c.id}" value="${esc(c.justificativa || '')}" placeholder="Obrigatória se não for cobrar"></div>
+        ${c.decisao !== 'A decidir' ? `<button class="btn sm" type="button" data-cobcanc="${c.id}">Cancelar</button>` : ''}<button class="btn sm pri" type="button" data-cobok="${c.id}">Confirmar</button></div>`;
+    else if (aberta) corpo = '<p class="hint">Aguardando a decisão de quem está autorizado a decidir a cobrança de viagem frustrada.</p>';
+    else corpo = `<p class="hint" style="margin:0">${c.decisao === 'Cobrar' ? 'Cobrar ' + R(c.valor) + (c.justificativa ? ' · ' + esc(c.justificativa) : '') : 'Não cobrar: ' + esc(c.justificativa)} — ${esc(c.decididoPor)} em ${esc(D(c.decididoEm))}.</p>
+      ${pode ? `<button class="btn sm" type="button" data-cobalt="${c.id}" style="margin-top:6px">Rever decisão</button>` : ''}`;
+    return `<div class="km-box ${c.decisao === 'A decidir' ? 'pend' : ''}" data-cob="${c.id}">${cab}${corpo}</div>`;
+  }).join('');
+}
+function ligarCobrancas(e) {
+  $$('[data-cobalt]').forEach(b => b.onclick = () => { e._cobEdit = b.dataset.cobalt; render(); });
+  $$('[data-cobcanc]').forEach(b => b.onclick = () => { e._cobEdit = null; render(); });
+  $$('[data-cobok]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.cobok; const d = (document.querySelector(`input[name="cob-${id}"]:checked`) || {}).value;
+    if (!d) { toast('Escolha cobrar ou não cobrar.'); return; }
+    b.disabled = true;
+    try { await Portal.api('sol.cobranca', { cobranca: { id, decisao: d, valor: $('#cobv-' + id).value, obs: $('#cobo-' + id).value } }); toast(d === 'Cobrar' ? 'Cobrança registrada: segue para o Faturamento' : 'Registrado: não será cobrada'); e._cobEdit = null; S.edit = { id: e.id }; await carregar(true); }
+    catch (er) { b.disabled = false; falha(er); }
+  });
+}
 function kmHTML(e) {
   const k = e.km; if (!k) return '';
   const pronta = e.status === 'Destinação' || (e.status === 'Realizada' && e.exigeDestinacao === false);
@@ -420,15 +459,20 @@ function pedir(titulo, campos, okTxt) {
   return new Promise(res => {
     const ov = document.createElement('div'); ov.className = 'dlg-ov';
     ov.innerHTML = `<div class="dlg" role="dialog" aria-modal="true" aria-label="${esc(titulo)}"><h3>${esc(titulo)}</h3>
-      ${campos.map((c, i) => `<div class="fld"><label for="dlg-${i}">${esc(c.rotulo)}</label>${c.tipo === 'area' ? `<textarea id="dlg-${i}" rows="3">${esc(c.valor || '')}</textarea>` : `<input id="dlg-${i}" type="${c.tipo || 'text'}" value="${esc(c.valor || '')}" ${c.tipo === 'number' ? 'step="any"' : ''}>`}</div>`).join('')}
+      ${campos.map((c, i) => `<div class="fld"><label for="dlg-${i}">${esc(c.rotulo)}</label>${c.tipo === 'area' ? `<textarea id="dlg-${i}" rows="3">${esc(c.valor || '')}</textarea>` : c.tipo === 'select' ? `<select id="dlg-${i}">${opts(c.opcoes, c.valor || '', 'Escolha…')}</select>` : `<input id="dlg-${i}" type="${c.tipo || 'text'}" value="${esc(c.valor || '')}" ${c.tipo === 'number' ? 'step="any"' : ''}>`}${c.dica ? `<div class="hint">${c.dica}</div>` : ''}</div>`).join('')}
       <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" data-x>Cancelar</button><button class="btn pri" data-ok>${esc(okTxt || 'Confirmar')}</button></div></div>`;
     document.body.appendChild(ov);
     const fim = v => { ov.remove(); res(v); };
     ov.querySelector('[data-x]').onclick = () => fim(null);
     ov.onclick = e => { if (e.target === ov) fim(null); };
     ov.addEventListener('keydown', e => { if (e.key === 'Escape') fim(null); });
-    ov.querySelector('[data-ok]').onclick = () => fim(campos.map((c, i) => ov.querySelector('#dlg-' + i).value.trim()));
-    setTimeout(() => { const f = ov.querySelector('input,textarea'); if (f) f.focus(); }, 30);
+    ov.querySelector('[data-ok]').onclick = () => {
+      const v = campos.map((c, i) => ov.querySelector('#dlg-' + i).value.trim());
+      const falta = campos.findIndex((c, i) => c.obrig && !v[i]);
+      if (falta >= 0) { toast('Preencha: ' + campos[falta].rotulo); ov.querySelector('#dlg-' + falta).focus(); return; }
+      fim(v);
+    };
+    setTimeout(() => { const f = ov.querySelector('input,textarea,select'); if (f) f.focus(); }, 30);
   });
 }
 
@@ -490,7 +534,7 @@ function setTab(t) {
 $$('nav.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function render() {
   if (!S.d) return;
-  const abertas = S.d.solicitacoes.filter(s => (ABERTAS.includes(s.status) || kmPendente(s)) && passaUni(s));
+  const abertas = S.d.solicitacoes.filter(s => (ABERTAS.includes(s.status) || kmPendente(s) || cobPendente(s)) && passaUni(s));
   $('#ct-fila').textContent = abertas.length;
   ({ fila: renderFila, todas: renderTodas, recorrentes: renderRecorrentes, consultores: renderConsultores, previsto: renderPrevisto, documentos: renderDocumentos, importar: renderImportar })[S.tab]();
 }
@@ -502,7 +546,7 @@ function formSol() {
   const cli = cliDe(e.clienteId);
   const fat = e.faturamento;
   const travado = S.ro;
-  const clientesAtivos = S.d.clientes.filter(c => c.ativo || c.id === e.clienteId);
+  const clientesAtivos = S.d.clientes.filter(c => (c.ativo && ehClienteSol(c)) || c.id === e.clienteId);
   const docs = e.id ? docsDe(e.id) : [];
   const resAtivos = S.d.residuos.filter(r => r.ativo || (e.residuoIds || []).includes(r.id));
   return `<section class="panel form-panel" id="form-panel">
@@ -511,6 +555,7 @@ function formSol() {
       <button class="btn sm" id="f-cancel" type="button">Fechar</button></div>
     ${e.id ? funil(e) : ''}
     ${e.id ? kmHTML(e) : ''}
+    ${e.id ? cobrancasHTML(e) : ''}
     ${e.id && ['Recebida', 'Documentação pendente', 'Frustrada', 'Cancelada'].includes(e.status) && !S.ro && faltaLiberar(e) ? `<p class="lib-falta">${esc(faltaLiberar(e))}</p>` : ''}
     <form id="f" class="form" autocomplete="off">
       <div class="fld full"><label for="f-cli">Cliente</label>
@@ -525,14 +570,15 @@ function formSol() {
       <div class="fld"><label for="f-perf">Perfil</label><select id="f-perf">${opts(L.perfil, e.perfil, '—')}</select></div>
       <div class="fld"><label for="f-exec">Execução</label><select id="f-exec">${opts(L.execucao, e.execucao, '—')}</select></div>
       <div class="fld"><label for="f-dsc">Data da solicitação do consultor</label><input id="f-dsc" type="date" value="${esc(e.dataSolicitacaoConsultor)}"></div>
-      <div class="fld"><label for="f-ds">Data da solicitação</label><input id="f-ds" type="date" required value="${esc(e.dataSolicitacao)}"></div>
-      <div class="fld"><label for="f-dp">Data prevista da coleta</label><input id="f-dp" type="date" value="${esc(e.dataPrevista)}"></div>
-      <div class="fld"><label for="f-dc">Data da coleta (realizada)</label><input id="f-dc" type="date" value="${esc(e.dataColeta)}"></div>
+      <div class="fld"><label>Data da solicitação</label><div class="ro-v">${e.id ? esc(D(e.dataSolicitacao)) + (e.criadoPor ? ' <span class="sub">· ' + esc(String(e.criadoPor).split('@')[0]) + '</span>' : '') : 'Hoje, ao registrar'}</div></div>
+      <div class="fld"><label for="f-dd">Data desejada pelo cliente</label><input id="f-dd" type="date" value="${esc(e.dataDesejada)}" title="Opcional: orienta a programadora"></div>
+      <div class="fld"><label>Data prevista da coleta (saída)</label><div class="ro-v">${e.dataPrevista ? esc(D(e.dataPrevista)) : '<span class="sub">—</span>'}</div><div class="hint">Saída da viagem, vem da Programação.</div></div>
+      <div class="fld"><label>Data da coleta</label><div class="ro-v">${e.dataColeta ? esc(D(e.dataColeta)) : '<span class="sub">—</span>'}</div><div class="hint">Chegada no cliente, informada pela programadora.</div></div>
       <div class="fld"><label for="f-val">Valor previsto (R$)</label><input id="f-val" type="number" step="any" min="0" value="${esc(e.valorPrevisto)}"></div>
       <div class="fld full" style="grid-column:1/-1"><label>Resíduos e destinação prevista (da precificação)</label>
         <div class="itens" id="f-itens">${itensHTML(e, travado)}</div>
         ${travado ? '' : '<div class="row" style="gap:8px;margin-top:6px"><button class="btn sm" type="button" id="f-it-add">+ Resíduo</button><span class="hint" style="min-height:0">Um destinador ou reciclador por resíduo. O preço e se é custo ou receita vêm do Mapa.</span></div>'}</div>
-      <div class="fld"><label for="f-km">Km prevista (total)</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="f-km" type="number" step="any" min="0" value="${esc(e.kmPrevista)}" ${travado ? 'disabled' : ''}>${travado ? '' : '<button class="btn sm" type="button" id="f-km-rota" style="white-space:nowrap" title="Unidade → cliente → destinadores → unidade, pelas localizações do Mapa">Pela rota</button>'}</div><div class="hint" id="h-km"></div><div class="hint" id="h-kmv">${kmEstimadoTxt(e.clienteId, e.kmPrevista, e.dataColeta || e.dataPrevista)}</div></div>
+      <div class="fld"><label for="f-km">Km prevista (total)</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="f-km" type="number" step="any" min="0" value="${esc(e.kmPrevista)}" ${travado ? 'disabled' : ''}>${travado ? '' : '<button class="btn sm" type="button" id="f-km-rota" style="white-space:nowrap" title="Unidade → cliente → destinadores → unidade, pelas localizações do Mapa">Pela rota</button>'}</div><div class="hint" id="h-km"></div><div class="hint" id="h-kmv">${kmEstimadoTxt(e.clienteId, e.kmPrevista, e.dataColeta || e.dataDesejada)}</div></div>
       <div class="fld"><label for="f-dia">Diárias da equipe (dias)</label><input id="f-dia" type="number" step="1" min="0" value="${esc(e.diariasPrevistas)}" title="Dias de operação contados na precificação" ${travado ? 'disabled' : ''}></div>
       <div class="fld"><label for="f-pern">Pernoites previstos</label><input id="f-pern" type="number" step="1" min="0" value="${esc(e.pernoitesPrevistos)}" ${travado ? 'disabled' : ''}></div>
       <div class="fld full"><label for="f-desc">Descrição do serviço</label><textarea id="f-desc" rows="2" placeholder="O que coletar, quantidade estimada, equipamento…">${esc(e.descricao)}</textarea></div>
@@ -628,15 +674,14 @@ function funil(e) {
   const b = [];
   if (!S.ro && !emBm) {
     if (['Recebida', 'Documentação pendente', 'Frustrada', 'Cancelada'].includes(e.status)) b.push(['Liberada para programar', 'Liberar para programar', 'pri']);
-    if (e.status === 'Liberada para programar') b.push(['Programada', 'Marcar programada', 'pri']);
-    if (['Liberada para programar', 'Programada'].includes(e.status)) b.push(['Realizada', 'Marcar realizada', e.status === 'Programada' ? 'pri' : '']);
-    if (['Liberada para programar', 'Programada', 'Realizada'].includes(e.status)) b.push(['Recebida', 'Voltar para recebida', '']);
-    if (['Liberada para programar', 'Programada'].includes(e.status)) b.push(['Frustrada', 'Frustrada', '']);
-    if (!fora && e.status !== 'Realizada' && e.status !== 'Destinação') b.push(['Cancelada', 'Cancelar', 'danger']);
+    if (e.status === 'Liberada para programar') b.push(['Recebida', 'Voltar para recebida', '']);
   }
+  // cancelar: até a véspera da saída (programada); a partir do dia da saída, só a programadora
+  const saiuHoje = e.status === 'Programada' && e.dataPrevista && e.dataPrevista <= (S.d.hoje || hojeISO());
+  if (!S.ro && !e.faturamento && ['Recebida', 'Documentação pendente', 'Liberada para programar', 'Frustrada', 'Programada'].includes(e.status) && !saiuHoje) b.push(['Cancelada', 'Cancelar', 'danger']);
   return `<ol class="funil">${passos.map((p, i) => `<li class="${fora ? '' : i < iA ? 'feito' : i === iA ? 'agora' : ''}">${esc(p === 'Recebida' && e.status === 'Documentação pendente' ? 'Doc. pendente' : p)}</li>`).join('')}</ol>
     ${b.length ? `<div class="row" style="gap:6px;margin:4px 0 12px">${b.map(x => `<button class="btn sm ${x[2]}" data-st="${esc(x[0])}">${esc(x[1])}</button>`).join('')}</div>` : ''}
-    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : e.status === 'Destinação' ? (kmPendente(e) ? '<p class="hint">Destinação confirmada. Falta definir o km da cobrança (abaixo) para o Faturamento montar o BM.</p>' : '<p class="hint">Destinação confirmada no Controle de Destinação: segue para o BM no Faturamento.</p>') : e.status === 'Realizada' && e.exigeDestinacao !== false ? '<p class="hint">Aguardando a confirmação da destinação (ticket da balança) no Controle de Destinação, aba "A destinar".</p>' : naProg ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem.</p>' : ''}`;
+    ${e.faturamento ? '<p class="hint">Está num BM do Faturamento: o status muda por lá.</p>' : e.status === 'Destinação' ? (kmPendente(e) ? '<p class="hint">Destinação confirmada. Falta definir o km da cobrança (abaixo) para o Faturamento montar o BM.</p>' : '<p class="hint">Destinação confirmada no Controle de Destinação: segue para o BM no Faturamento.</p>') : e.status === 'Realizada' && e.exigeDestinacao !== false ? '<p class="hint">Aguardando a confirmação da destinação (ticket da balança) no Controle de Destinação, aba "A destinar".</p>' : saiuHoje ? '<p class="hint">A viagem já saiu (' + esc(D(e.dataPrevista)) + '): realizada, frustrada ou cancelamento agora só pela programadora, na Programação.</p>' : naProg ? '<p class="hint">Está na Programação: o status muda pelas paradas da viagem. Até a véspera da saída você ainda pode cancelar (a coleta sai da viagem e a programadora é avisada).</p>' : ''}`;
 }
 function docsHTML(e, docs) {
   const L = S.d.listas;
@@ -677,10 +722,10 @@ function ligarForm() {
   };
   if (box) ligarItens();
   const ia = $('#f-it-add'); if (ia) ia.onclick = () => { e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' }); redesenharItens(); const l = $$('#f-itens [data-itr]'); l[l.length - 1].focus(); };
-  const kmv = () => { const h = $('#h-kmv'); if (h) h.innerHTML = kmEstimadoTxt(resolver(), $('#f-km').value, $('#f-dc').value || $('#f-dp').value); };
+  const kmv = () => { const h = $('#h-kmv'); if (h) h.innerHTML = kmEstimadoTxt(resolver(), $('#f-km').value, e.dataColeta || $('#f-dd').value); };
   const fkm = $('#f-km'); if (fkm) fkm.addEventListener('input', kmv);
   if (ic) ic.addEventListener('change', kmv);
-  ligarKm(e);
+  ligarKm(e); ligarCobrancas(e);
   const kr = $('#f-km-rota'); if (kr) kr.onclick = async () => {
     const cliId = resolver(); const uniId = $('#f-uni').value;
     if (!cliId || !uniId) { toast('Escolha o cliente e a unidade primeiro.'); return; }
@@ -695,8 +740,8 @@ function ligarForm() {
     ev.preventDefault();
     const clienteId = resolver(); if (!clienteId) { toast('Escolha um cliente da lista (ou cadastre com "+ Novo cliente").'); ic.focus(); return; }
     const reg = { id: e.id || '', clienteId, unidadeId: $('#f-uni').value, consultorId: $('#f-con').value, servico: $('#f-serv').value, demanda: $('#f-dem').value,
-      perfil: $('#f-perf').value, execucao: $('#f-exec').value, dataSolicitacaoConsultor: $('#f-dsc').value, dataSolicitacao: $('#f-ds').value,
-      dataPrevista: $('#f-dp').value, dataColeta: $('#f-dc').value, valorPrevisto: $('#f-val').value, descricao: $('#f-desc').value, obs: $('#f-obs').value,
+      perfil: $('#f-perf').value, execucao: $('#f-exec').value, dataSolicitacaoConsultor: $('#f-dsc').value, dataDesejada: $('#f-dd').value,
+      valorPrevisto: $('#f-val').value, descricao: $('#f-desc').value, obs: $('#f-obs').value,
       kmPrevista: $('#f-km').value, diariasPrevistas: $('#f-dia').value, pernoitesPrevistos: $('#f-pern').value,
       itens: e._itens.filter(i => i.residuoId || i.destinadorId || i.pesoEstimado !== '').map(i => ({ id: i.id || '', residuoId: i.residuoId, pesoEstimado: i.pesoEstimado, destinadorId: i.destinadorId })) };
     const b = $('#f-save'); b.disabled = true;
@@ -720,9 +765,12 @@ function ligarForm() {
 }
 async function mudarStatus(e, st) {
   let dados = {};
-  if (st === 'Realizada') { const v = await pedir('Coleta realizada', [{ rotulo: 'Data da coleta', tipo: 'date', valor: e.dataColeta || e.dataPrevista || hojeISO() }], 'Marcar realizada'); if (!v) return; dados.dataColeta = v[0]; }
-  if (st === 'Cancelada' || st === 'Frustrada') { const v = await pedir(st === 'Cancelada' ? 'Cancelar solicitação' : 'Coleta frustrada', [{ rotulo: 'Motivo', tipo: 'area' }], st === 'Cancelada' ? 'Cancelar solicitação' : 'Marcar frustrada'); if (!v) return; dados.motivo = v[0]; }
-  try { await Portal.api('sol.status', { id: e.id, status: st, dados }); toast('Status: ' + st); await carregar(true); } catch (er) { falha(er); }
+  if (st === 'Cancelada') {
+    const v = await pedir('Cancelar solicitação', [{ rotulo: 'Motivo', tipo: 'select', obrig: true, opcoes: motivosDe('Cancelamento').map(m => [m.id, m.nome]) },
+      { rotulo: 'Observação', tipo: 'area', obrig: true, dica: e.status === 'Programada' ? 'A coleta está na viagem de ' + esc(D(e.dataPrevista)) + ': ela sai da viagem e a programadora é avisada.' : '' }], 'Cancelar solicitação');
+    if (!v) return; dados.motivoId = v[0]; dados.obs = v[1];
+  }
+  try { const r = await Portal.api('sol.status', { id: e.id, status: st, dados }); toast(r.saiuDaViagem ? 'Cancelada; a coleta saiu da viagem e a programadora foi avisada' : 'Status: ' + st); await carregar(true); } catch (er) { falha(er); }
 }
 function novaSol() { return { unidadeId: S.uni || (S.d.unidades.length === 1 ? S.d.unidades[0].id : ''), dataSolicitacao: hojeISO(), residuoIds: [], status: 'Recebida' }; }
 function abrir(id) { const s = S.d.solicitacoes.find(x => x.id === id); if (!s) return; S.edit = { ...s }; render(); const p = $('#form-panel'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
@@ -738,7 +786,7 @@ function colsSol(comFat) {
     { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) },
     { k: 'sol', label: 'Solicitada', v: s => D(s.dataSolicitacao), ord: s => s.dataSolicitacao || '' },
     comFat ? { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '' }
-           : { k: 'prev', label: 'Prevista', v: s => D(s.dataPrevista || s.dataColeta), ord: s => s.dataPrevista || s.dataColeta || '' },
+           : { k: 'prev', label: 'Saída / desejada', v: s => s.dataPrevista ? D(s.dataPrevista) : s.dataDesejada ? 'desejada ' + D(s.dataDesejada) : '', ord: s => s.dataPrevista || s.dataDesejada || '' },
     { k: 'st', label: 'Status', v: s => s.status },
   ].concat(comFat ? [
     { k: 'val', label: 'Valor', v: s => R(valorSol(s)), ord: s => +valorSol(s) || 0, num: true, x: s => valorSol(s), fmt: FMT_R },
@@ -756,27 +804,31 @@ function linhaSol(s, comFat) {
     <td data-label="Unidade">${esc(uniNome(s.unidadeId))}</td>
     <td data-label="Consultor">${esc(conNome(s.consultorId) || '—')}</td>
     <td data-label="Solicitada" class="mono">${esc(D(s.dataSolicitacao))}</td>
-    <td data-label="${comFat ? 'Coleta' : 'Prevista'}" class="mono">${esc(D(comFat ? s.dataColeta : (s.dataPrevista || s.dataColeta)))}</td>
-    <td data-label="Status">${statusPill(s.status)}${kmPendente(s) ? ' <span class="pill warn" title="Escolher o km real ou o previsto">Definir km</span>' : ''}${pend ? ` <span class="pill warn" title="Documentos pendentes">${pend} doc</span>` : ''}</td>
+    <td data-label="${comFat ? 'Coleta' : 'Saída / desejada'}" class="mono">${comFat ? esc(D(s.dataColeta)) : s.dataPrevista ? esc(D(s.dataPrevista)) : s.dataDesejada ? '<span class="sub">desejada</span> ' + esc(D(s.dataDesejada)) : ''}</td>
+    <td data-label="Status">${statusPill(s.status)}${kmPendente(s) ? ' <span class="pill warn" title="Escolher o km real ou o previsto">Definir km</span>' : ''}${cobPendente(s) ? ' <span class="pill warn" title="Viagem frustrada por culpa do cliente">Decidir cobrança</span>' : ''}${pend ? ` <span class="pill warn" title="Documentos pendentes">${pend} doc</span>` : ''}</td>
     ${comFat ? `<td data-label="Valor" class="num">${R(s.faturamento ? (s.faturamento.nfValor !== '' ? s.faturamento.nfValor : s.faturamento.bmValor) : s.valorPrevisto)}</td><td data-label="BM/NF" class="mono">${s.faturamento ? esc((s.faturamento.nfNumero ? 'NF ' + s.faturamento.nfNumero : s.faturamento.bmNumero ? 'BM ' + s.faturamento.bmNumero : s.faturamento.status) + (s.faturamento.nfData ? ' · ' + D(s.faturamento.nfData) : '')) : ''}</td>` : ''}
   </tr>`;
 }
 function ligarLinhas() { $$('[data-sol]').forEach(tr => { tr.onclick = () => abrir(tr.dataset.sol); tr.onkeydown = ev => { if (ev.key === 'Enter') abrir(tr.dataset.sol); }; }); }
 function renderFila() {
-  const base = S.d.solicitacoes.filter(s => (ABERTAS.includes(s.status) || kmPendente(s)) && passaUni(s));
-  const cont = st => base.filter(s => st === 'km' ? kmPendente(s) : s.status === st).length;
-  const nKm = cont('km');
-  const lista = base.filter(s => (!S.st || (S.st === 'km' ? kmPendente(s) : s.status === S.st)) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog, conNome(s.consultorId), s.descricao].join(' ')))
-    .sort((a, b) => ABERTAS.indexOf(a.status) - ABERTAS.indexOf(b.status) || String(a.dataPrevista || a.dataSolicitacao).localeCompare(String(b.dataPrevista || b.dataSolicitacao)));
+  const base = S.d.solicitacoes.filter(s => (ABERTAS.includes(s.status) || kmPendente(s) || cobPendente(s)) && passaUni(s));
+  const filtro = (st, s) => st === 'km' ? kmPendente(s) : st === 'cob' ? cobPendente(s) : s.status === st;
+  const cont = st => base.filter(s => filtro(st, s)).length;
+  const nKm = cont('km'), nCob = cont('cob');
+  // não programadas primeiro (pela data da solicitação), depois pela saída da viagem
+  const chave = s => (s.dataPrevista ? '1' + s.dataPrevista : '0' + (s.dataSolicitacao || ''));
+  const lista = base.filter(s => (!S.st || filtro(S.st, s)) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog, conNome(s.consultorId), s.descricao].join(' ')))
+    .sort((a, b) => chave(a).localeCompare(chave(b)));
   const T = Portal.tabela('sol-fila', colsSol(false), { titulo: 'Fila de solicitações', arquivo: 'solicitacoes-fila', unidade: 'solicitações', aoMudar: render, extrasExport: EXTRAS_SOL,
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => filtrosTopo(S.st && 'Status: ' + S.st, S.busca && 'Busca: "' + S.busca + '"') });
   const listaTela = lista; const listaF = T.aplicar(listaTela);
-  const atrasadas = base.filter(s => (s.status === 'Liberada para programar' || s.status === 'Programada') && (s.dataPrevista || s.dataColeta) && (s.dataPrevista || s.dataColeta) < hojeISO()).length;
+  const atrasadas = base.filter(s => s.status === 'Programada' && s.dataPrevista && s.dataPrevista < hojeISO()).length;
   $('#main').innerHTML = formSol() + `<section class="panel">
     <div class="panel-h"><div><h2>Fila de solicitações</h2><p class="sub">Tudo que ainda não foi realizado, mais as destinadas que esperam a escolha do km da cobrança. Clique numa linha para ver, mudar o status ou conferir os documentos.</p></div></div>
     ${nKm ? `<div class="al"><span class="pill warn">Definir km</span><b>${nKm} coleta(s) destinada(s) de cliente que paga o transporte por km rodado: escolha o km real ou o previsto para liberar o BM.</b> <button class="btn sm" type="button" data-fst="km">Ver</button></div>` : ''}
-    ${atrasadas ? `<div class="al"><span class="pill warn">Atenção</span><b>${atrasadas} solicitação(ões) liberada(s)/programada(s) com data prevista já passada. Confira se foram realizadas.</b></div>` : ''}
-    <div class="toolbar"><div class="seg" role="group" aria-label="Status">${[['', 'Todas', base.length], ...ABERTAS.map(st => [st, st, cont(st)]), ...(nKm ? [['km', 'Definir km', nKm]] : [])].map(([v, l, n]) => `<button type="button" data-fst="${esc(v)}" aria-pressed="${S.st === v}">${esc(l)} <span class="ct">${n}</span></button>`).join('')}</div>
+    ${atrasadas ? `<div class="al"><span class="pill warn">Atenção</span><b>${atrasadas} coleta(s) programada(s) com a saída já passada e sem resultado na Programação.</b></div>` : ''}
+    ${nCob ? `<div class="al"><span class="pill warn">Decidir cobrança</span><b>${nCob} viagem(ns) frustrada(s) por responsabilidade do cliente esperando a decisão de cobrar ou não.</b> <button class="btn sm" type="button" data-fst="cob">Ver</button></div>` : ''}
+    <div class="toolbar"><div class="seg" role="group" aria-label="Status">${[['', 'Todas', base.length], ...ABERTAS.map(st => [st, st, cont(st)]), ...(nKm ? [['km', 'Definir km', nKm]] : []), ...(nCob ? [['cob', 'Decidir cobrança', nCob]] : [])].map(([v, l, n]) => `<button type="button" data-fst="${esc(v)}" aria-pressed="${S.st === v}">${esc(l)} <span class="ct">${n}</span></button>`).join('')}</div>
       <input type="search" id="busca" placeholder="Buscar cliente, código, consultor…" value="${esc(S.busca)}" aria-label="Buscar">
       <span style="margin-left:auto">${T.botao()}</span>${S.ro ? '' : '<button class="btn pri" id="novo">+ Solicitação</button>'}</div>
     ${T.info(listaF.length, listaTela.length)}
@@ -822,15 +874,16 @@ function renderRecorrentes() {
   const e = S.edit; const L = S.d.listas;
   const hoje = hojeISO();
   const lista = (S.d.rotinas || []).filter(r => passaUni(r) && (S.inativos || r.ativo)).sort((a, b) => (b.ativo - a.ativo) || cliNome(a.clienteId).localeCompare(cliNome(b.clienteId), 'pt-BR'));
-  const futuras = id => S.d.solicitacoes.filter(x => x.rotinaId === id && x.dataPrevista >= hoje).sort((a, b) => a.dataPrevista.localeCompare(b.dataPrevista));
-  const proxTxt = r => { const f = futuras(r.id); return r.ativo ? (f.length ? f.length + ' · próxima ' + D(f[0].dataPrevista) : '') : 'Pausada'; };
+  const dRef = x => x.dataDesejada || x.dataPrevista || '';
+  const futuras = id => S.d.solicitacoes.filter(x => x.rotinaId === id && dRef(x) >= hoje).sort((a, b) => dRef(a).localeCompare(dRef(b)));
+  const proxTxt = r => { const f = futuras(r.id); return r.ativo ? (f.length ? f.length + ' · próxima ' + D(dRef(f[0])) : '') : 'Pausada'; };
   const TR = Portal.tabela('sol-rot', [
     { k: 'cli', label: 'Cliente', v: r => cliNome(r.clienteId) },
     { k: 'qd', label: 'Quando', v: r => r.frequencia + ' · ' + rotQuando(r) },
     { k: 'uni', label: 'Unidade', v: r => uniNome(r.unidadeId) },
     { k: 'con', label: 'Consultor', v: r => conNome(r.consultorId) },
     { k: 'per', label: 'Período', v: r => D(r.dataInicio) + (r.dataFim ? ' a ' + D(r.dataFim) : ''), ord: r => r.dataInicio || '' },
-    { k: 'prox', label: 'Próximas', v: proxTxt, ord: r => { const f = futuras(r.id); return r.ativo && f.length ? f[0].dataPrevista : 'z'; } },
+    { k: 'prox', label: 'Próximas', v: proxTxt, ord: r => { const f = futuras(r.id); return r.ativo && f.length ? dRef(f[0]) : 'z'; } },
   ], { titulo: 'Coletas recorrentes', arquivo: 'coletas-recorrentes', unidade: 'coletas', aoMudar: render,
     extrasExport: [{ label: 'Situação', x: r => r.ativo ? 'Ativa' : 'Pausada' }, { label: 'Valor previsto', x: r => r.valorPrevisto === '' ? '' : +r.valorPrevisto }, { label: 'Descrição', x: r => r.descricao || '' }],
     filtrosExtras: () => filtrosTopo(S.inativos && 'Mostrando as pausadas') });
@@ -861,7 +914,7 @@ function renderRecorrentes() {
       ${listaRot.map(r => { const f = futuras(r.id); return `<tr class="${r.ativo ? '' : 'inativo'}"><td data-label="Cliente" class="full"><b>${esc(cliNome(r.clienteId))}</b>${r.descricao ? `<div class="sub">${esc(r.descricao)}</div>` : ''}</td>
         <td data-label="Quando">${esc(r.frequencia)} · ${esc(rotQuando(r))}</td><td data-label="Unidade">${esc(uniNome(r.unidadeId))}</td><td data-label="Consultor">${esc(conNome(r.consultorId) || '—')}</td>
         <td data-label="Período" class="mono">${esc(D(r.dataInicio))}${r.dataFim ? ' a ' + esc(D(r.dataFim)) : ''}</td>
-        <td data-label="Próximas">${r.ativo ? (f.length ? f.length + ' · próxima ' + esc(D(f[0].dataPrevista)) : '—') : '<span class="pill">Pausada</span>'}</td>
+        <td data-label="Próximas">${r.ativo ? (f.length ? f.length + ' · próxima ' + esc(D(dRef(f[0]))) : '—') : '<span class="pill">Pausada</span>'}</td>
         <td data-label=""><div class="acoes">${S.ro ? '' : `<button class="btn sm" data-red="${r.id}">Editar</button>`}<button class="btn sm" data-rhist="${r.id}">Histórico</button>${S.ro ? '' : r.ativo ? `<button class="btn sm danger" data-rpausa="${r.id}">Pausar</button>` : `<button class="btn sm" data-rreat="${r.id}">Retomar</button>`}</div></td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Nenhuma coleta com os filtros das colunas.</td></tr>'}
     </tbody></table></div>` : '<div class="empty">Nenhuma coleta recorrente.</div>'}</section>`;
   const achar = id => S.d.rotinas.find(r => r.id === id);
@@ -996,8 +1049,9 @@ function renderDocumentos() {
     <h3 class="sec" style="margin-top:12px">Serviços sem destinação</h3>
     <p class="sub">Marque os serviços que não levam resíduo para destinador (ex.: só locação). Eles não pedem destinador para liberar nem MTR na coleta, e vão de Realizada direto para o BM.</p>
     <div class="chips" id="serv-sd">${S.d.listas.servico.map(v => `<label class="chip"><input type="checkbox" value="${esc(v)}" ${semDest(v) ? 'checked' : ''} ${S.ro ? 'disabled' : ''}> ${esc(v)}</label>`).join('')}</div>
-    ${S.ro ? '' : '<div class="row" style="margin-top:8px"><button class="btn" id="serv-salvar">Salvar serviços</button></div>'}</section>`;
-  TD.ligar();
+    ${S.ro ? '' : '<div class="row" style="margin-top:8px"><button class="btn" id="serv-salvar">Salvar serviços</button></div>'}</section>
+  ${motivosHTML()}`;
+  TD.ligar(); ligarMotivos();
   const dc = $('#d-cli'); dc.onchange = () => { const v = dc.value.trim(); const c = S.d.clientes.find(c => cliRot(c) === v) || S.d.clientes.find(c => c.codigoUplog === v); S.abrir = c ? c.id : null; render(); };
   $$('[data-pcli]').forEach(a => a.onclick = ev => { ev.preventDefault(); S.abrir = a.dataset.pcli; render(); });
   const ps = $('#pad-salvar'); if (ps) ps.onclick = async () => { try { await Portal.api('sol.docsPadrao', { cadastroId: cliSel.id, itens: $$('[data-pad]:checked').map(x => ({ tipoDocumentoId: x.dataset.pad })) }); toast('Documentos do cliente salvos'); await carregar(true); } catch (e) { falha(e); } };
@@ -1012,6 +1066,40 @@ function renderDocumentos() {
     await Portal.api('sol.salvarLista', { lista: 'servico', valores: vals });
     await Portal.api('sol.salvarLista', { lista: 'servicoSemDestinacao', valores: $$('#serv-sd input:checked').map(x => x.value).filter(v => vals.includes(v)) });
     toast('Serviços salvos'); await carregar(true); } catch (e) { falha(e); } };
+}
+
+/* ---------- motivos de frustração e cancelamento ---------- */
+const RESP_TXT = { Cliente: 'Cliente', Interno: 'Interno (GVC)', Externo: 'Externo', 'Na hora': 'Escolhido na hora' };
+function motivosHTML() {
+  const pode = !!S.d.podeCadastrarMotivos;
+  const bloco = (tipo, titulo, sub) => { const l = (S.d.motivos || []).filter(m => m.tipo === tipo && (m.ativo || S.inativos));
+    return `<h3 class="sec">${titulo}</h3><p class="sub">${sub}</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Motivo</th><th>Responsável</th><th>Situação</th>${pode ? '<th></th>' : ''}</tr></thead><tbody>
+    ${l.map(m => `<tr class="${m.ativo ? '' : 'inativo'}"><td>${esc(m.nome)}</td><td>${esc(RESP_TXT[m.responsavel] || m.responsavel)}</td><td>${m.ativo ? 'Ativo' : '<span class="pill">Inativo</span>'}</td>
+      ${pode ? `<td><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-moted="${m.id}">Editar</button><button class="btn sm" data-motat="${m.id}">${m.ativo ? 'Inativar' : 'Reativar'}</button><button class="btn sm danger" data-motdel="${m.id}" aria-label="Excluir">×</button></div></td>` : ''}</tr>`).join('') || `<tr><td colspan="4" class="empty">Nenhum motivo.</td></tr>`}
+    </tbody></table></div>${pode ? `<div class="row" style="margin-top:6px"><button class="btn sm" data-motnovo="${tipo}">+ Motivo</button></div>` : ''}`; };
+  return `<section class="panel" id="motivos"><div class="panel-h"><div><h2>Motivos de frustração e cancelamento</h2><p class="sub">A programadora escolhe o motivo ao marcar uma coleta como frustrada ou cancelada, e o solicitante ao cancelar. Sempre com observação obrigatória. Quando o responsável é o <b>Cliente</b>, a viagem frustrada (ou cancelada com a equipe na rua) vai para a decisão de cobrança. Motivo já usado é inativado em vez de excluído.${pode ? '' : ' Só o administrador de Solicitações ou de Programação altera esta lista.'}</p></div>
+    <label class="chip"><input type="checkbox" id="mot-inat" ${S.inativos ? 'checked' : ''}> Mostrar inativos</label></div>
+    ${bloco('Frustração', 'Motivos de frustração', 'Usados na parada frustrada (Programação).')}
+    ${bloco('Cancelamento', 'Motivos de cancelamento', 'Usados ao cancelar a solicitação e na parada cancelada no dia.')}</section>`;
+}
+function ligarMotivos() {
+  const ia = $('#mot-inat'); if (ia) ia.onchange = () => { S.inativos = ia.checked; render(); const m = $('#motivos'); if (m) m.scrollIntoView({ block: 'start' }); };
+  const achar = id => (S.d.motivos || []).find(m => m.id === id);
+  const editar = async (m, tipo) => {
+    const v = await pedir(m ? 'Editar motivo' : 'Novo motivo de ' + tipo.toLowerCase(), [{ rotulo: 'Motivo', valor: m ? m.nome : '', obrig: true },
+      { rotulo: 'Responsável', tipo: 'select', obrig: true, valor: m ? m.responsavel : '', opcoes: Object.entries(RESP_TXT), dica: '"Escolhido na hora": a programadora diz se foi cliente, interno ou externo.' },
+      { rotulo: 'Ordem na lista', tipo: 'number', valor: m ? m.ordem : '' }], 'Salvar');
+    if (!v) return;
+    try { await Portal.api('mot.salvar', { registro: { id: m ? m.id : '', tipo, nome: v[0], responsavel: v[1], ordem: v[2] } }); toast('Motivo salvo'); await carregar(true); } catch (er) { falha(er); }
+  };
+  $$('[data-motnovo]').forEach(b => b.onclick = () => editar(null, b.dataset.motnovo));
+  $$('[data-moted]').forEach(b => b.onclick = () => { const m = achar(b.dataset.moted); editar(m, m.tipo); });
+  $$('[data-motat]').forEach(b => b.onclick = async () => { const m = achar(b.dataset.motat);
+    try { await Portal.api('mot.salvar', { registro: { id: m.id, nome: m.nome, responsavel: m.responsavel, ordem: m.ordem, ativo: !m.ativo } }); await carregar(true); } catch (er) { falha(er); } });
+  $$('[data-motdel]').forEach(b => b.onclick = async () => { const m = achar(b.dataset.motdel); if (!confirm('Excluir o motivo "' + m.nome + '"?')) return;
+    try { await Portal.api('mot.excluir', { id: m.id }); toast('Motivo excluído'); await carregar(true); }
+    catch (er) { if (er && er.erro === 'em_uso') { if (await Portal.confirmarInativar(er, m.nome)) { await Portal.api('mot.salvar', { registro: { id: m.id, nome: m.nome, responsavel: m.responsavel, ordem: m.ordem, ativo: false } }); await carregar(true); } } else falha(er); } });
 }
 
 /* ---------- importar a planilha de acompanhamento (admin do portal) ---------- */
