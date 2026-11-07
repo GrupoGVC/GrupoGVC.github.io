@@ -46,6 +46,8 @@ function migrarFase2_() {
 }
 
 /* ---------------- leitura ---------------- */
+/** Pode ser cliente de solicitação: cadastro marcado como Cliente ou Unidade GVC (tipo empresa). */
+function clienteDeSolicitacao_(c) { const t = separar_(c && c.tipos); return t.indexOf('cliente') >= 0 || t.indexOf('empresa') >= 0; }
 function clientesLista_() {
   return ler_('Cadastros').map(function (c) {
     return { id: c.id, nome: String(c.nome || c.razaoSocial || c.id), codigoUplog: String(c.codigoUplog || ''), tipos: separar_(c.tipos),
@@ -54,7 +56,7 @@ function clientesLista_() {
 }
 function solPublica_(r) {
   const o = publico_('Solicitacoes', r);
-  ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'].forEach(function (c) { o[c] = dataTexto_(r[c]); });
+  ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'dataDesejada'].forEach(function (c) { o[c] = dataTexto_(r[c]); });
   o.valorPrevisto = r.valorPrevisto === '' ? '' : num_(r.valorPrevisto);
   o.residuoIds = separar_(r.residuoIds);
   ['kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'].forEach(function (c) { o[c] = numOuVazio_(r[c]); });
@@ -109,6 +111,8 @@ function solDados_(u) {
     rotinas: ler_('Rotinas').filter(function (r) { return veUnidade_(u, r.unidadeId); }).map(rotPublica_),
     precosKm: ler_('PrecosCliente').filter(function (p) { return p.ativo && modalidadeKm_(p.modalidade) && p.valorTransporte !== ''; })
       .map(function (p) { return { cadastroId: String(p.cadastroId), valorKm: num_(p.valorTransporte), modalidade: String(p.modalidade), vigenciaInicio: dataTexto_(p.vigenciaInicio), vigenciaFim: dataTexto_(p.vigenciaFim) }; }),
+    motivos: motivosTodos_(), cobrancas: cobrancasVisiveis_(u), podeDecidirCobranca: !!(u.adminPortal || u.decideCobranca),
+    podeCadastrarMotivos: podeCadastrarMotivos_(u), hoje: dataTexto_(new Date()),
     frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,
     podeImportar: !!u.adminPortal };
 }
@@ -129,10 +133,12 @@ function statusPelosDocumentos_(status, solId) {
 function validarSol_(r, atual, u) {
   if (!porId_('Unidades', r.unidadeId)) return 'Escolha a unidade.';
   if (!veUnidade_(u, r.unidadeId)) return 'Você não tem acesso a esta unidade.';
-  if (!porId_('Cadastros', r.clienteId)) return 'Escolha o cliente (cadastro do Mapa Operacional).';
+  const cli = porId_('Cadastros', r.clienteId);
+  if (!cli) return 'Escolha o cliente (cadastro do Mapa Operacional).';
+  // cliente: só cadastros marcados como Cliente ou Unidade GVC (a solicitação antiga pode manter o que já tinha)
+  if (!(atual && String(atual.clienteId) === String(r.clienteId)) && !clienteDeSolicitacao_(cli)) return '"' + cli.nome + '" não está marcado como Cliente nem como Unidade GVC no Mapa.';
   if (r.consultorId && !porId_('Pessoas', r.consultorId)) return 'Consultor não encontrado.';
   ['demanda', 'perfil', 'execucao', 'servico'].forEach(function (l) { if (r[l] && listaValores_(l).indexOf(r[l]) < 0 && !(atual && atual[l] === r[l])) r[l] = ''; });
-  if (!r.dataSolicitacao) return 'Informe a data da solicitação.';
   r.residuoIds = (Array.isArray(r.residuoIds) ? r.residuoIds : separar_(r.residuoIds)).filter(function (id) { return porId_('Residuos', id); }).join('; ');
   r.valorPrevisto = r.valorPrevisto === '' || r.valorPrevisto == null ? '' : num_(r.valorPrevisto);
   return '';
@@ -144,11 +150,13 @@ function solSalvar_(reg, u) {
   const atual = id ? porId_('Solicitacoes', id) : null;
   if (id && !atual) return erroDados_('Solicitação não encontrada. Atualize a página.');
   if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
+  // data da solicitação = dia da criação; data prevista e data da coleta vêm da Programação (não são editadas aqui)
   const campos = ['unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds', 'descricao',
-                  'dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'valorPrevisto', 'obs', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'];
+                  'dataSolicitacaoConsultor', 'dataDesejada', 'valorPrevisto', 'obs', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'];
   const r = {};
   campos.forEach(function (c) { r[c] = c in reg ? reg[c] : (atual ? atual[c] : ''); });
-  ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta'].forEach(function (c) { r[c] = dataTexto_(r[c]); });
+  ['dataSolicitacaoConsultor', 'dataDesejada'].forEach(function (c) { r[c] = dataTexto_(r[c]); });
+  r.dataSolicitacao = atual ? dataTexto_(atual.dataSolicitacao) : dataTexto_(new Date());
   ['kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'].forEach(function (c) {
     r[c] = r[c] === '' || r[c] == null ? '' : num_(r[c]);
     if (r[c] !== '' && r[c] < 0) r[c] = '';
@@ -169,7 +177,6 @@ function solSalvar_(reg, u) {
     if (e2) return erroDados_(e2);
   }
   if (atual) {
-    if (atual.status === 'Realizada' && !r.dataColeta) return erroDados_('Solicitação realizada precisa da data da coleta.');
     if (r.clienteId !== String(atual.clienteId) && faturamentoPorSolicitacao_()[id]) return erroDados_('Esta solicitação já está num BM. Para trocar o cliente, cancele o BM no Faturamento.');
     // km previsto escolhido para a cobrança acompanha a km prevista enquanto a coleta não está no BM
     if (atual.kmCobranca === 'Previsto' && r.kmPrevista !== numOuVazio_(atual.kmPrevista) && !faturamentoPorSolicitacao_()[id]) {
@@ -179,7 +186,7 @@ function solSalvar_(reg, u) {
     atualizar_('Solicitacoes', id, r, u, 'solicitacoes', { registroNome: rotuloSol_(r) });
     return { ok: true, id: id };
   }
-  r.status = 'Recebida'; r.origem = 'portal'; r.ativo = true;
+  r.status = 'Recebida'; r.origem = 'portal'; r.ativo = true; r.dataPrevista = ''; r.dataColeta = '';
   const nova = inserir_('Solicitacoes', r, u, 'solicitacoes', rotuloSol_(r));
   if (temItens) { const e3 = salvarItensSolicitacao_(nova, reg.itens, u); if (e3) return { ok: true, id: nova.id, aviso: e3 }; }
   // documentos padrão do cliente (e do cadastro principal), para o serviço escolhido ou para todos
@@ -208,7 +215,9 @@ function solStatus_(id, status, dados, u) {
   if (status === 'Destinação') return erroDados_('A destinação é confirmada no Controle de Destinação (aba A destinar).');
   if (s.status === 'Destinação') return erroDados_('A destinação desta coleta já foi confirmada no Controle de Destinação. O próximo passo é o BM, no Faturamento.');
   if (faturamentoPorSolicitacao_()[id]) return erroDados_('Esta solicitação já está num BM do Faturamento. Para mudar o status, cancele o BM primeiro.');
-  // pendente ou realizada numa viagem: quem manda é a Programação (frustrada/no-show libera a mudança manual, ex.: cancelar)
+  // programada, realizada e frustrada vêm só da Programação (paradas da viagem)
+  if (['Programada', 'Realizada', 'Frustrada'].indexOf(status) >= 0) return erroDados_('"' + status + '" é registrado pela Programação, na parada da viagem.');
+  if (status === 'Cancelada') return cancelarSolicitacao_(s, dados, u);
   const naProg = paradasAtivasDaSolicitacao_(id).filter(function (x) { return !x.p.resultado || x.p.resultado === 'Pendente' || x.p.resultado === 'Realizada'; });
   if (naProg.length) return erroDados_('Esta solicitação está na Programação (' + rotuloViagem_(naProg[0].v) + '). O status muda pelas paradas da viagem.');
   const campos = { status: status };
@@ -216,15 +225,6 @@ function solStatus_(id, status, dados, u) {
     const pend = docsPendentes_(id);
     if (pend.length) return erroDados_('Ainda faltam documentos: ' + pend.map(function (d) { return (porId_('TiposDocumento', d.tipoDocumentoId) || {}).nome; }).join(', ') + '. Marque como recebido ou dispensado.');
     const falta = faltaParaLiberar_(s); if (falta) return erroDados_(falta);
-  }
-  if (status === 'Realizada') {
-    const dc = dataTexto_(dados.dataColeta || s.dataColeta);
-    if (!dc) return erroDados_('Informe a data da coleta.');
-    campos.dataColeta = dc;
-  }
-  if (status === 'Cancelada' || status === 'Frustrada') {
-    const m = String(dados.motivo || '').trim(); if (!m) return erroDados_('Informe o motivo.');
-    campos.motivo = m;
   }
   if (status === 'Recebida' || status === 'Documentação pendente') campos.status = statusPelosDocumentos_(status, id);
   atualizar_('Solicitacoes', id, campos, u, 'solicitacoes', { registroNome: rotuloSol_(s) });

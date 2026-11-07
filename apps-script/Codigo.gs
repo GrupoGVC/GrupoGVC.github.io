@@ -45,7 +45,9 @@ const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.exc
                            'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar', 'sol.definirKm'];
 const ACOES_MINHAS = ['minhas.dados', 'minhas.linhaTempo'];
 const ACOES_PROG_LEITURA = ['prog.dados', 'prog.verFoto'];
-const ACOES_PROG_ESCRITA = ['prog.salvarViagem', 'prog.viagemAcao'];
+const ACOES_PROG_ESCRITA = ['prog.salvarViagem', 'prog.viagemAcao', 'prog.ciente'];
+// a permissão é conferida dentro da própria ação (motivos: admin de Solicitações ou Programação; cobrança: autorização no usuário)
+const ACOES_PROPRIAS = ['mot.salvar', 'mot.excluir', 'sol.cobranca'];
 const ACOES_PES_LEITURA = ['pes.dados', 'pes.verFoto'];
 const ACOES_PES_ESCRITA = ['pes.salvar', 'pes.ativo', 'pes.excluir', 'pes.foto', 'pes.salvarFuncoes'];
 const ACOES_AMB_LEITURA = ['amb.dados'];
@@ -162,6 +164,8 @@ function rotear_(body) {
     if (!podeEditar_(u, 'ambiental')) return semPermissao_(podeLer_(u, 'ambiental') ? 'Seu acesso ao módulo Ambiental é só de leitura.' : 'Você não tem acesso ao módulo Ambiental.');
   } else if (ACOES_DP_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'dp')) return semPermissao_(podeLer_(u, 'dp') ? 'Seu acesso ao DP é só de leitura.' : 'Você não tem acesso ao DP.');
+  } else if (ACOES_PROPRIAS.indexOf(acao) >= 0) {
+    // conferida na ação
   } else if (ACOES_FAT_ESCRITA.indexOf(acao) >= 0) {
     if (!podeEditar_(u, 'faturamento')) return semPermissao_(podeLer_(u, 'faturamento') ? 'Seu acesso ao Faturamento é só de leitura.' : 'Você não tem acesso ao Faturamento.');
   } else {
@@ -220,6 +224,10 @@ function rotear_(body) {
       case 'pes.acesso': return pesAcesso_(String(body.id), String(body.tipo), u);
       case 'prog.salvarViagem': return progSalvarViagem_(body.registro, body.confirmar === true, u);
       case 'prog.viagemAcao': return progViagemAcao_(String(body.id), String(body.tipo), body.dados, u);
+      case 'prog.ciente': return progCiente_(String(body.id), u);
+      case 'mot.salvar': return motSalvar_(body.registro, u);
+      case 'mot.excluir': return motExcluir_(String(body.id), u);
+      case 'sol.cobranca': return solCobranca_(body.cobranca, u);
       case 'prog.importarEquipe': return progImportarEquipe_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'prog.importarProgramacao': return progImportarProgramacao_(String(body.unidadeId), body.linhas, body.simular === true, u);
       case 'dp.acao': return dpAcao_(String(body.tipo), body.dados, u);

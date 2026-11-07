@@ -3,8 +3,9 @@
  * viagens terceirizadas e movimentação de caixas. Importação da planilha de programação
  * (abas por mês) e da planilha de equipe.
  *
- * Viagem: Programada → Concluída (ou Cancelada). Parada: Pendente → Realizada | Frustrada | No-show.
- * A parada ligada a uma solicitação muda o status dela (Programada / Realizada / Frustrada).
+ * Viagem: Programada → Concluída (ou Cancelada). Parada: Pendente → Realizada | Frustrada | Cancelada (motivo padrão, Frustracao.gs).
+ * A parada ligada a uma solicitação muda o status dela (Programada / Realizada / Frustrada / Cancelada) e as datas
+ * (prevista = saída da viagem, coleta = data da parada).
  * Pernoite: valor por pessoa por noite (parâmetro valorPernoite, congelado na viagem); terceirizado não recebe.
  * CPF e foto: só quem edita a Programação ou é admin do portal.
  * ===================================================================== */
@@ -13,7 +14,7 @@ const PROG_LISTAS = {
   funcaoColaborador: ['Motorista', 'Ajudante', 'Motorista e ajudante'],
   vinculoColaborador: ['Próprio', 'Terceirizado'],
   categoriaCnhPessoa: ['A', 'B', 'AB', 'C', 'AC', 'D', 'AD', 'E', 'AE'],
-  resultadoParada: ['Pendente', 'Realizada', 'Frustrada', 'No-show'],
+  resultadoParada: ['Pendente', 'Realizada', 'Frustrada', 'Cancelada'],
   execucaoViagem: ['Própria', 'Terceirizada'],
 };
 const VIAGEM_STATUS = ['Programada', 'Concluída', 'Cancelada'];
@@ -122,7 +123,8 @@ function progDados_(u) {
     itens: (function () { const ids = {}; sols.forEach(function (x) { ids[x.id] = 1; }); return ler_('SolicitacaoItens').filter(function (it) { return ids[it.solicitacaoId]; }).map(itemPublico_); })(),
     destinadores: destinadoresProgramacao_(),
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome), ativo: r.ativo }; }),
-    podeImportar: !!u.adminPortal };
+    podeImportar: !!u.adminPortal,
+    motivos: motivosTodos_(), cancelamentos: cancelamentosAvisar_(u), hoje: dataTexto_(new Date()) };
 }
 
 /* ---------------- equipe ---------------- */
@@ -151,24 +153,37 @@ function paradasAtivasDaSolicitacao_(solId) {
   return ler_('Paradas').filter(function (p) { return String(p.solicitacaoId) === String(solId) && vs[p.viagemId]; })
     .map(function (p) { return { p: p, v: vs[p.viagemId] }; });
 }
-/** O status da solicitação acompanha as paradas dela (só nas etapas da programação). */
+/** O status e as datas da solicitação acompanham as paradas dela (só nas etapas da programação).
+ *  Data prevista = saída da viagem; data da coleta = data da parada. */
 function sincronizarSolicitacao_(solId, u) {
   const s = porId_('Solicitacoes', solId); if (!s) return;
-  if (['Liberada para programar', 'Programada', 'Realizada', 'Frustrada'].indexOf(String(s.status)) < 0) return;
-  if (faturamentoPorSolicitacao_()[solId]) return;
   const ps = paradasAtivasDaSolicitacao_(solId);
+  const canceladaNaProg = s.status === 'Cancelada' && !s.canceladaDaViagemId && (ps.some(function (x) { return x.p.resultado === 'Cancelada'; }) || String(s.motivo || '').indexOf('(cancelada pela programação)') >= 0);
+  if (['Liberada para programar', 'Programada', 'Realizada', 'Frustrada'].indexOf(String(s.status)) < 0 && !canceladaNaProg) return;
+  if (faturamentoPorSolicitacao_()[solId]) return;
+  const dt = function (x) { return dataTexto_(x.p.data) || dataTexto_(x.v.dataSaida); };
+  const porData = function (l) { return l.slice().sort(function (a, b) { return dt(a).localeCompare(dt(b)); }); };
   const campos = {};
   const real = ps.filter(function (x) { return x.p.resultado === 'Realizada'; });
+  const pend = ps.filter(function (x) { return x.p.resultado === 'Pendente' || !x.p.resultado; });
+  const nomeMot = function (p) { const m = porId_('Motivos', p.motivoId); return m ? String(m.nome) : ''; };
   if (real.length) {
-    campos.status = 'Realizada';
-    campos.dataColeta = real.map(function (x) { return dataTexto_(x.p.data) || dataTexto_(x.v.dataSaida); }).sort().pop();
-  } else if (ps.some(function (x) { return x.p.resultado === 'Pendente' || !x.p.resultado; })) {
-    campos.status = 'Programada';
+    const r = porData(real).pop();
+    campos.status = 'Realizada'; campos.dataColeta = dt(r); campos.dataPrevista = dataTexto_(r.v.dataSaida);
+  } else if (pend.length) {
+    const r = porData(pend)[0];
+    campos.status = 'Programada'; campos.dataColeta = dt(r); campos.dataPrevista = dataTexto_(r.v.dataSaida);
   } else if (ps.length) {
-    const ult = ps.sort(function (a, b) { return String(dataTexto_(a.p.data)).localeCompare(String(dataTexto_(b.p.data))); }).pop().p;
-    campos.status = 'Frustrada'; campos.motivo = (ult.resultado === 'No-show' ? 'No-show' : 'Frustrada') + (ult.motivo ? ': ' + ult.motivo : '');
+    const ult = porData(ps).pop().p;
+    const txt = [nomeMot(ult), ult.motivo].filter(String).join(' — ');
+    if (ult.resultado === 'Cancelada') {
+      campos.status = 'Cancelada'; campos.motivoId = String(ult.motivoId || ''); campos.motivo = txt + ' (cancelada pela programação)';
+      campos.dataColeta = dt({ p: ult, v: porId_('Viagens', ult.viagemId) }); campos.dataPrevista = dataTexto_(porId_('Viagens', ult.viagemId).dataSaida);
+    } else {
+      campos.status = 'Frustrada'; campos.motivo = 'Frustrada: ' + txt; campos.dataColeta = ''; campos.dataPrevista = '';
+    }
   } else {
-    campos.status = s.status === 'Frustrada' ? 'Frustrada' : 'Liberada para programar';
+    campos.status = s.status === 'Frustrada' ? 'Frustrada' : 'Liberada para programar'; campos.dataColeta = ''; campos.dataPrevista = '';
   }
   atualizar_('Solicitacoes', solId, campos, u, 'programacao', { registroNome: rotuloSol_(s) });
   // serviço sem destinação: já pode ir para o BM, então o km é definido agora
@@ -252,7 +267,8 @@ function progSalvarViagem_(reg, confirmar, u) {
   (reg.paradas || []).forEach(function (p, i) {
     if (erroP) return;
     const x = { id: String(p.id || ''), ordem: i + 1, solicitacaoId: String(p.solicitacaoId || ''), clienteId: String(p.clienteId || ''), data: dataTexto_(p.data) || v.dataSaida,
-                resultado: listaValores_('resultadoParada').indexOf(p.resultado) >= 0 ? p.resultado : 'Pendente', motivo: String(p.motivo || '').trim(),
+                resultado: p.resultado === 'No-show' ? 'Frustrada' : listaValores_('resultadoParada').indexOf(p.resultado) >= 0 ? p.resultado : 'Pendente', motivo: String(p.motivo || '').trim(),
+                motivoId: String(p.motivoId || ''), responsavel: String(p.responsavel || ''), equipeSaiu: p.equipeSaiu === true || p.equipeSaiu === 'SIM' ? 'SIM' : p.equipeSaiu === false || p.equipeSaiu === 'NÃO' ? 'NÃO' : '',
                 caixaEntregueId: String(p.caixaEntregueId || ''), caixaRetiradaId: String(p.caixaRetiradaId || ''),
                 peso: p.peso === '' || p.peso == null ? '' : num_(p.peso), destinacao: String(p.destinacao || '').trim(), obs: String(p.obs || '').trim() };
     const mtrs = Array.isArray(p.mtrs) ? p.mtrs : null; // null = não mexe (tela antiga)
@@ -265,9 +281,10 @@ function progSalvarViagem_(reg, confirmar, u) {
       if (outra) { erroP = 'A solicitação de ' + rotuloSol_(s) + ' já está pendente em outra viagem (' + rotuloViagem_(outra.v) + ').'; return; }
     }
     if (!porId_('Cadastros', x.clienteId)) { erroP = 'Parada ' + (i + 1) + ': escolha o cliente.'; return; }
-    if ((x.resultado === 'Frustrada' || x.resultado === 'No-show') && !x.motivo) { erroP = 'Parada ' + (i + 1) + ': informe o motivo (' + x.resultado + ').'; return; }
-    [x.caixaEntregueId, x.caixaRetiradaId].forEach(function (c) { if (c && !porId_('Caixas', c)) erroP = 'Parada ' + (i + 1) + ': caixa não encontrada.'; });
     const antes = x.id ? pAntes.filter(function (y) { return y.id === x.id; })[0] : null;
+    if (x.data < v.dataSaida && !(antes && dataTexto_(antes.data) === x.data)) { erroP = 'Parada ' + (i + 1) + ': a data da coleta (' + dataBr_(x.data) + ') é antes da saída da viagem (' + dataBr_(v.dataSaida) + ').'; return; }
+    const eF = conferirParadaFrustrada_(x, antes, v, i + 1); if (eF) { erroP = eF; return; }
+    [x.caixaEntregueId, x.caixaRetiradaId].forEach(function (c) { if (c && !porId_('Caixas', c)) erroP = 'Parada ' + (i + 1) + ': caixa não encontrada.'; });
     if (antes && antes.resultado === 'Realizada' && x.resultado !== 'Realizada' && paradaTemDestinado_(antes.id)) {
       erroP = 'Parada ' + (i + 1) + ': a destinação desta coleta já foi confirmada no Controle de Destinação; ela não pode deixar de estar realizada.'; return; }
     if (mtrs) {
@@ -309,6 +326,7 @@ function progSalvarViagem_(reg, confirmar, u) {
   });
   if (erroP) conf.erros.push(erroP);
   if (!paradas.length) conf.erros.push('Inclua pelo menos uma parada (cliente).');
+  if (!erroP) conferirCobrancasViagem_(paradas, pAntes).forEach(function (e) { conf.erros.push(e); });
   pAntes.filter(function (a) { return !paradas.some(function (x) { return x.id === a.id; }) && paradaTemDestinado_(a.id); })
     .forEach(function (a) { conf.erros.push('A parada de ' + nomeCad_(a.clienteId) + ' já tem a destinação confirmada no Controle e não pode sair da viagem.'); });
   if (conf.erros.length) return { ok: false, erro: 'dados_invalidos', mensagem: conf.erros.join(' '), erros: conf.erros, avisos: conf.avisos };
@@ -356,8 +374,10 @@ function progSalvarViagem_(reg, confirmar, u) {
     }
     if (x.solicitacaoId) solAfetadas[x.solicitacaoId] = 1;
   });
+  const removidas = [];
   pAtuais.filter(function (a) { return !paradas.some(function (x) { return x.id === a.id; }); })
     .sort(function (a, b) { return b._linha - a._linha; }).forEach(function (a) {
+      removidas.push(a.id);
       if (a.solicitacaoId) solAfetadas[a.solicitacaoId] = 1;
       inativarLancamentosParada_(a.id, u, 'Parada removida da viagem.');
       aba_('Paradas').deleteRow(porId_('Paradas', a.id)._linha); limparCache_('Paradas');
@@ -371,6 +391,7 @@ function progSalvarViagem_(reg, confirmar, u) {
     else if (x.resultado !== 'Realizada') inativarLancamentosParada_(x._id, u, 'A parada deixou de estar realizada.');
   });
   Object.keys(solAfetadas).forEach(function (sid) { sincronizarSolicitacao_(sid, u); });
+  sincronizarCobrancasViagem_(vGravada, paradas, removidas, u);
   sincronizarAdiantamentos_(id, u);
   if (vGravada.origem !== 'planilha') {
     const pend = paradas.filter(function (x) { return x.solicitacaoId && x.resultado === 'Pendente'; }).map(function (x) { return x.solicitacaoId; });

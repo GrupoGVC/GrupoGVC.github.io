@@ -24,10 +24,10 @@ function acharUsuario_(email) {
   return { id: r.id, linha: r._linha, email: email, nome: String(r.nome || email.split('@')[0]), ativo: r.ativo,
            adminPortal: simNao_(r.adminPortal), unidades: separar_(r.unidades), senhaHash: String(r.senhaHash || ''),
            salt: String(r.salt || ''), modulos: modulos, nivel: modulos.destinacao,
-           ultimoAcesso: r.ultimoAcesso, pessoaId: String(r.pessoaId || '') };
+           ultimoAcesso: r.ultimoAcesso, pessoaId: String(r.pessoaId || ''), decideCobranca: simNao_(r.decideCobranca) };
 }
 function usuarioPublico_(u) {
-  return { email: u.email, nome: u.nome, adminPortal: u.adminPortal, modulos: u.modulos, unidades: u.unidades };
+  return { email: u.email, nome: u.nome, adminPortal: u.adminPortal, modulos: u.modulos, unidades: u.unidades, decideCobranca: !!(u.decideCobranca || u.adminPortal) };
 }
 function hash_(senha, salt) {
   let h = salt + '|' + senha;
@@ -135,7 +135,7 @@ function listarUsuarios_() {
   return { ok: true, modulos: MODULOS, unidades: unidadesLista_(), usuarios: ler_('Usuarios').map(function (r) {
     const u = acharUsuario_(r.email);
     const p = u.pessoaId ? porId_('Pessoas', u.pessoaId) : null;
-    return { email: u.email, nome: p ? String(p.nome) : u.nome, modulos: u.modulos, adminPortal: u.adminPortal, ativo: u.ativo, temSenha: !!u.senhaHash,
+    return { email: u.email, nome: p ? String(p.nome) : u.nome, modulos: u.modulos, adminPortal: u.adminPortal, decideCobranca: u.decideCobranca, ativo: u.ativo, temSenha: !!u.senhaHash,
              pessoaId: u.pessoaId, funcoes: p ? separar_(p.funcoes) : [], pessoaAtiva: p ? p.ativo : true,
              unidades: u.unidades, ultimoAcesso: r.ultimoAcesso instanceof Date ? Utilities.formatDate(r.ultimoAcesso, tz_(), 'dd/MM/yyyy HH:mm') : '',
              auditoria: auditoria_(r) };
@@ -167,7 +167,9 @@ function salvarUsuario_(x, quem) {
   }
   if (ativo && !porId_('Pessoas', pessoaId).ativo) return { ok: false, erro: 'dados_invalidos', mensagem: 'A pessoa está inativa no cadastro de Pessoas. Reative a pessoa antes de liberar o acesso.' };
   nome = String(porId_('Pessoas', pessoaId).nome);
-  const campos = { email: email, nome: nome, adminPortal: adminPortal ? 'SIM' : 'NÃO', unidades: unidades.join('; '), ativo: ativo, pessoaId: pessoaId };
+  // decide cobrança de viagem frustrada: só muda quando vem no pedido (telas antigas não mandam)
+  const decide = 'decideCobranca' in x ? x.decideCobranca === true : !!(u && u.decideCobranca);
+  const campos = { email: email, nome: nome, adminPortal: adminPortal ? 'SIM' : 'NÃO', unidades: unidades.join('; '), ativo: ativo, pessoaId: pessoaId, decideCobranca: decide ? 'SIM' : 'NÃO' };
   let id;
   if (u) { id = u.id; atualizar_('Usuarios', id, campos, quem, 'portal', { registroNome: nome }); }
   else { id = inserir_('Usuarios', campos, quem, 'portal', nome).id; }

@@ -16,7 +16,7 @@ const AUDITORIA = ['criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor'];
 // numero = colunas numéricas; data = só a data; ocultas = escondidas na planilha.
 const TABELAS = {
   Unidades:             { prefixo: 'UNI', colunas: ['id', 'nome', 'ativo', 'cadastroId'] },
-  Usuarios:             { prefixo: 'USU', colunas: ['id', 'email', 'nome', 'adminPortal', 'unidades', 'ativo', 'senhaHash', 'salt', 'ultimoAcesso', 'pessoaId'],
+  Usuarios:             { prefixo: 'USU', colunas: ['id', 'email', 'nome', 'adminPortal', 'unidades', 'ativo', 'senhaHash', 'salt', 'ultimoAcesso', 'pessoaId', 'decideCobranca'],
                           texto: ['email', 'unidades', 'senhaHash', 'salt', 'pessoaId'], ocultas: ['senhaHash', 'salt'], momento: ['ultimoAcesso'] },
   UsuarioModulos:       { prefixo: 'UMO', colunas: ['id', 'usuarioId', 'modulo', 'nivel'] },
   Cadastros:            { prefixo: 'CAD', colunas: ['id', 'codigoUplog', 'tipos', 'nome', 'razaoSocial', 'categoria', 'cnpj', 'contatoNome',
@@ -50,8 +50,11 @@ const TABELAS = {
                                                       'status', 'motivo', 'obs', 'solicitanteNome', 'programadorNome', 'origem', 'idOrigem', 'rotinaId',
                                                       'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos',
                                                       // cobrança por km rodado: o solicitante escolhe o km real ou o previsto (Km.gs)
-                                                      'kmCobranca', 'kmCobrado', 'kmDefinidoPor', 'kmDefinidoEm', 'kmObs', 'ativo'],
-                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'kmCobrado'], data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'kmDefinidoEm'] },
+                                                      'kmCobranca', 'kmCobrado', 'kmDefinidoPor', 'kmDefinidoEm', 'kmObs',
+                                                      // datas pela Programação (dataPrevista = saída da viagem, dataColeta = data da parada); motivo padrão do cancelamento
+                                                      'dataDesejada', 'motivoId', 'canceladaDaViagemId', 'cancelCiente', 'ativo'],
+                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'kmCobrado'],
+                          data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'kmDefinidoEm', 'dataDesejada'] },
   // Resíduos da solicitação, com a destinação prevista na precificação (o destinador pode ser trocado na Programação, com justificativa)
   SolicitacaoItens:     { prefixo: 'SIT', colunas: ['id', 'solicitacaoId', 'ordem', 'residuoId', 'pesoEstimado', 'destinadorId', 'destinadorPrevistoId', 'precoKg', 'natureza',
                                                       'justificativaTroca'], numero: ['ordem', 'pesoEstimado', 'precoKg'] },
@@ -63,7 +66,7 @@ const TABELAS = {
   Faturamentos:         { prefixo: 'FAT', colunas: ['id', 'unidadeId', 'clienteId', 'bmNumero', 'bmData', 'bmValor', 'aprovacaoData', 'nfNumero', 'nfData', 'nfValor',
                                                       'status', 'motivo', 'obs', 'origem', 'idOrigem', 'ativo'],
                           texto: ['bmNumero', 'nfNumero', 'idOrigem'], numero: ['bmValor', 'nfValor'], data: ['bmData', 'aprovacaoData', 'nfData'] },
-  FaturamentoItens:     { prefixo: 'FIT', colunas: ['id', 'faturamentoId', 'solicitacaoId', 'precoClienteId', 'descricao', 'quantidade', 'unidadeMedida', 'valorUnitario', 'sentido', 'valor'],
+  FaturamentoItens:     { prefixo: 'FIT', colunas: ['id', 'faturamentoId', 'solicitacaoId', 'precoClienteId', 'descricao', 'quantidade', 'unidadeMedida', 'valorUnitario', 'sentido', 'valor', 'cobrancaId'],
                           numero: ['quantidade', 'valorUnitario', 'valor'] },
   // Cadastro único de pessoas (motoristas, ajudantes, consultores, equipe do escritório). Quem vem da antiga
   // equipe (COL-) e dos antigos consultores (CON-) manteve o código; os novos são PES-. unidadeId vazio = todas.
@@ -80,7 +83,7 @@ const TABELAS = {
                           data: ['dataSaida', 'dataRetornoPrevisto', 'dataRetorno'] },
   ViagemEquipe:         { prefixo: 'VEQ', colunas: ['id', 'viagemId', 'colaboradorId', 'funcao'] },
   Paradas:              { prefixo: 'PAR', colunas: ['id', 'viagemId', 'ordem', 'solicitacaoId', 'clienteId', 'data', 'resultado', 'motivo', 'caixaEntregueId', 'caixaRetiradaId',
-                                                      'peso', 'destinacao', 'obs'],
+                                                      'peso', 'destinacao', 'obs', 'motivoId', 'responsavel', 'equipeSaiu'],
                           numero: ['ordem', 'peso'], data: ['data'] },
   // Fase 4: DP (adiantamentos de pernoite)
   Adiantamentos:        { prefixo: 'ADI', colunas: ['id', 'viagemId', 'unidadeId', 'colaboradorId', 'noites', 'valorNoite', 'valor', 'status', 'pagoEm', 'pagoPor',
@@ -90,6 +93,12 @@ const TABELAS = {
   Rotinas:              { prefixo: 'ROT', colunas: ['id', 'unidadeId', 'clienteId', 'consultorId', 'servico', 'residuoIds', 'descricao', 'frequencia', 'diaSemana', 'diaMes',
                                                       'dataInicio', 'dataFim', 'valorPrevisto', 'geradaAte', 'obs', 'ativo'],
                           texto: ['residuoIds'], numero: ['diaSemana', 'diaMes', 'valorPrevisto'], data: ['dataInicio', 'dataFim', 'geradaAte'] },
+  // Motivos padrão de frustração e de cancelamento (responsável: Cliente / Interno / Externo / Na hora)
+  Motivos:              { prefixo: 'MOT', colunas: ['id', 'tipo', 'nome', 'responsavel', 'ordem', 'ativo'], numero: ['ordem'] },
+  // Cobrança de viagem frustrada (ou cancelada no dia com a equipe na rua) por culpa do cliente
+  CobrancasFrustracao:  { prefixo: 'CFR', colunas: ['id', 'solicitacaoId', 'paradaId', 'viagemId', 'clienteId', 'unidadeId', 'data', 'tipo', 'motivoId', 'motivo',
+                                                      'obsProgramacao', 'decisao', 'valor', 'justificativa', 'decididoPor', 'decididoEm', 'ativo'],
+                          numero: ['valor'], data: ['data', 'decididoEm'] },
   Cdfs:                 { prefixo: 'CDF', colunas: ['id', 'numero', 'data', 'destinadorId', 'obs', 'ativo'], texto: ['numero'], data: ['data'] },
   Listas:               { prefixo: 'LIS', colunas: ['id', 'lista', 'valor', 'ordem', 'ativo'], numero: ['ordem'] },
   Parametros:           { prefixo: 'PRM', colunas: ['id', 'chave', 'valor', 'vigenciaInicio', 'descricao'], data: ['vigenciaInicio'] },
@@ -111,7 +120,8 @@ const REFERENCIAS = {
                  ['Viagens', 'transportadorId', 'viagem(ns) terceirizada(s) na Programação'],
                  ['Rotinas', 'clienteId', 'coleta(s) recorrente(s)'],
                  ['Unidades', 'cadastroId', 'unidade do grupo GVC'],
-                 ['Cdfs', 'destinadorId', 'CDF(s) no módulo Ambiental']],
+                 ['Cdfs', 'destinadorId', 'CDF(s) no módulo Ambiental'],
+                 ['CobrancasFrustracao', 'clienteId', 'cobrança(s) de viagem frustrada']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['SolicitacaoItens', 'residuoId', 'resíduo(s) de solicitações'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
@@ -142,7 +152,10 @@ const REFERENCIAS = {
   Locais:       [['CadastroLocais', 'localId', 'cadastro(s) que usam este local']],
   TiposDocumento: [['DocumentosPadrao', 'tipoDocumentoId', 'cliente(s) com este documento como padrão'],
                    ['SolicitacaoDocumentos', 'tipoDocumentoId', 'solicitação(ões) com este documento']],
+  Motivos:      [['Paradas', 'motivoId', 'parada(s) de viagem'], ['Solicitacoes', 'motivoId', 'solicitação(ões) cancelada(s)'], ['CobrancasFrustracao', 'motivoId', 'cobrança(s) de viagem frustrada']],
+  CobrancasFrustracao: [['FaturamentoItens', 'cobrancaId', 'BM/NF no Faturamento']],
   Solicitacoes: [['FaturamentoItens', 'solicitacaoId', 'BM/NF no Faturamento'],
+                 ['CobrancasFrustracao', 'solicitacaoId', 'cobrança(s) de viagem frustrada'],
                  ['Lancamentos', 'solicitacaoId', 'lançamento(s) de destinação no Controle'],
                  ['Paradas', 'solicitacaoId', 'parada(s) de viagem na Programação']],
   PrecosCliente: [['FaturamentoItens', 'precoClienteId', 'item(ns) de BM/NF no Faturamento']],
@@ -426,7 +439,8 @@ const ROTULOS_CAMPOS = {
   unidadeMedida: 'Unidade de medida', valorUnitario: 'Valor unitário', sentido: 'Sentido',
   kmPrevista: 'Km prevista', diariasPrevistas: 'Diárias previstas', pesoEstimado: 'Peso estimado (kg)', destinadorPrevistoId: 'Destinador previsto',
   justificativaTroca: 'Justificativa da troca de destinador', kmInicial: 'Km inicial', kmFinal: 'Km na volta à base', fonte: 'Origem do descarte', pesoMtr: 'Peso no MTR (kg)',
-  motivoDivergencia: 'Divergência', cdfId: 'CDF', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados', kmCobranca: 'Km da cobrança', kmCobrado: 'Km cobrado', kmDefinidoPor: 'Km definido por', kmDefinidoEm: 'Km definido em', kmObs: 'Observação do km',
+  motivoDivergencia: 'Divergência', cdfId: 'CDF', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados', kmCobranca: 'Km da cobrança', kmCobrado: 'Km cobrado', kmDefinidoPor: 'Km definido por', kmDefinidoEm: 'Km definido em', kmObs: 'Observação do km', dataDesejada: 'Data desejada pelo cliente', motivoId: 'Motivo', canceladaDaViagemId: 'Cancelada da viagem', cancelCiente: 'Cancelamento visto pela programadora',
+  responsavel: 'Responsável', equipeSaiu: 'A equipe já tinha saído', decisao: 'Decisão', justificativa: 'Justificativa', decididoPor: 'Decidido por', decididoEm: 'Decidido em', obsProgramacao: 'Observação da programação', cobrancaId: 'Cobrança de frustrada', decideCobranca: 'Decide cobrança de frustrada',
   apelido: 'Nome na programação', funcao: 'Função', funcoes: 'Funções', pessoaId: 'Pessoa', vinculo: 'Vínculo', cpf: 'CPF', cnhCategoria: 'Categoria da CNH', cnhValidade: 'Validade da CNH', fotoId: 'Foto',
   dataSaida: 'Data de saída', dataRetornoPrevisto: 'Retorno previsto', dataRetorno: 'Retorno à base', motoristaId: 'Motorista', transportadorId: 'Transportadora',
   custoTerceiro: 'Custo do terceiro (R$)', pernoitesPrevistos: 'Pernoites previstos', pernoitesRealizados: 'Pernoites realizados', valorNoite: 'Valor do pernoite (R$)',

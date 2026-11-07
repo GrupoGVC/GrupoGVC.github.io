@@ -186,7 +186,7 @@ function gerarRecorrentes_(u, forcar, jaComTrava) {
         const k = 'ROT|' + r.id + '|' + d; if (existe[k]) return; existe[k] = 1;
         novas.push({ unidadeId: String(r.unidadeId), clienteId: String(r.clienteId), consultorId: String(r.consultorId || ''), servico: String(r.servico || ''),
           demanda: 'Recorrente', perfil: 'Contrato', execucao: 'Própria', residuoIds: String(r.residuoIds || ''), descricao: String(r.descricao || ''),
-          dataSolicitacaoConsultor: '', dataSolicitacao: hoje, dataPrevista: d, dataColeta: '', valorPrevisto: r.valorPrevisto === '' ? '' : num_(r.valorPrevisto),
+          dataSolicitacaoConsultor: '', dataSolicitacao: hoje, dataPrevista: '', dataColeta: '', dataDesejada: d, valorPrevisto: r.valorPrevisto === '' ? '' : num_(r.valorPrevisto),
           status: 'Liberada para programar', motivo: '', obs: 'Coleta recorrente: ' + rotuloRotina_(r) + '.', solicitanteNome: '', programadorNome: '',
           origem: 'rotina', idOrigem: k, rotinaId: r.id, ativo: true });
         porRotina[r.id] = (porRotina[r.id] || 0) + 1;
@@ -195,7 +195,7 @@ function gerarRecorrentes_(u, forcar, jaComTrava) {
     });
     // a destinação prevista (resíduos, pesos, destinadores, km e diárias) repete a da última solicitação da rotina
     const modelo = {};
-    ler_('Solicitacoes').filter(function (s) { return s.rotinaId; }).sort(function (a, b) { return String(dataTexto_(a.dataPrevista)).localeCompare(String(dataTexto_(b.dataPrevista))); })
+    ler_('Solicitacoes').filter(function (s) { return s.rotinaId; }).sort(function (a, b) { return String(dataTexto_(a.dataDesejada || a.dataPrevista)).localeCompare(String(dataTexto_(b.dataDesejada || b.dataPrevista))); })
       .forEach(function (s) { const its = itensDaSolicitacao_(s.id); if (its.length) modelo[s.rotinaId] = { s: s, itens: its }; });
     novas.forEach(function (n) { const m = modelo[n.rotinaId]; if (m) { n.kmPrevista = numOuVazio_(m.s.kmPrevista); n.diariasPrevistas = numOuVazio_(m.s.diariasPrevistas); n.pernoitesPrevistos = numOuVazio_(m.s.pernoitesPrevistos); } });
     const criadas = inserirLote_('Solicitacoes', novas, u);
@@ -221,7 +221,7 @@ function gerarRecorrentes_(u, forcar, jaComTrava) {
 function limparFuturasRotina_(rid, u) {
   const hoje = dataTexto_(new Date());
   const tem = {}; ler_('Paradas').forEach(function (p) { if (p.solicitacaoId) tem[p.solicitacaoId] = 1; });
-  const fora = ler_('Solicitacoes').filter(function (s) { return String(s.rotinaId) === rid && s.status === 'Liberada para programar' && !tem[s.id] && dataTexto_(s.dataPrevista) >= hoje; });
+  const fora = ler_('Solicitacoes').filter(function (s) { return String(s.rotinaId) === rid && s.status === 'Liberada para programar' && !tem[s.id] && dataTexto_(s.dataDesejada || s.dataPrevista) >= hoje; });
   fora.sort(function (a, b) { return b._linha - a._linha; }).forEach(function (s) { aba_('Solicitacoes').deleteRow(s._linha); });
   limparCache_('Solicitacoes');
   if (fora.length) hist_(u, 'solicitacoes', 'Rotinas', rid, rotuloRotina_(porId_('Rotinas', rid)), 'alterou', 'Solicitações futuras removidas', String(fora.length), '', 'Ainda não programadas; serão geradas de novo com a regra atual.');
@@ -281,7 +281,7 @@ function minhasDados_(u) {
   const sols = ler_('Solicitacoes').filter(function (s) { return meus.indexOf(String(s.consultorId)) >= 0; }).map(function (s) {
     const f = fat[s.id];
     return { id: s.id, clienteId: String(s.clienteId), unidadeId: String(s.unidadeId), status: String(s.status), motivo: String(s.motivo || ''),
-             dataSolicitacao: dataTexto_(s.dataSolicitacao), dataSolicitacaoConsultor: dataTexto_(s.dataSolicitacaoConsultor), dataPrevista: dataTexto_(s.dataPrevista),
+             dataSolicitacao: dataTexto_(s.dataSolicitacao), dataSolicitacaoConsultor: dataTexto_(s.dataSolicitacaoConsultor), dataPrevista: dataTexto_(s.dataPrevista), dataDesejada: dataTexto_(s.dataDesejada),
              dataColeta: dataTexto_(s.dataColeta), descricao: String(s.descricao || ''), demanda: String(s.demanda || ''), valorPrevisto: s.valorPrevisto === '' ? '' : num_(s.valorPrevisto),
              programacao: prog[s.id] || null, faturamento: f ? { status: f.status, bmNumero: f.bmNumero, bmData: f.bmData, nfNumero: f.nfNumero, nfData: f.nfData, valor: f.nfValor !== '' ? f.nfValor : f.bmValor } : null };
   });

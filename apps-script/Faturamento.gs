@@ -42,6 +42,7 @@ function fatDados_(u) {
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome) }; }),
     precos: ler_('PrecosCliente').filter(function (p) { return p.ativo; }).map(precoPublico_),
     destinacao: destinacaoPorSolicitacao_(),
+    cobrancas: cobrancasVisiveis_(u).filter(function (c) { return c.decisao === 'Cobrar'; }),
     listas: { unidadeMedida: listaValores_('unidadeMedida'), sentido: FAT_SENTIDOS } };
 }
 
@@ -75,17 +76,26 @@ function fatSalvar_(reg, u) {
   const bmNumero = String(reg.bmNumero || '').trim();
   if (bmNumero && ler_('Faturamentos').some(function (f) { return String(f.bmNumero).trim() === bmNumero && f.id !== reg.id && f.status !== 'Cancelado'; }))
     return erroDados_('Já existe um BM com o número ' + bmNumero + '.');
-  const jaNoBm = faturamentoPorSolicitacao_();
+  const jaNoBm = faturamentoPorSolicitacao_(), cobNoBm = cobrancasNoBm_();
   const itens = [];
   let erro = '', unidadeId = '';
   (reg.itens || []).forEach(function (x, i) {
     if (erro) return;
-    const it = { solicitacaoId: String(x.solicitacaoId || ''), precoClienteId: String(x.precoClienteId || ''), descricao: String(x.descricao || '').trim(),
+    const it = { solicitacaoId: String(x.solicitacaoId || ''), cobrancaId: String(x.cobrancaId || ''), precoClienteId: String(x.precoClienteId || ''), descricao: String(x.descricao || '').trim(),
                  quantidade: num_(x.quantidade), unidadeMedida: String(x.unidadeMedida || '').trim(), valorUnitario: num_(x.valorUnitario),
                  sentido: FAT_SENTIDOS.indexOf(x.sentido) >= 0 ? x.sentido : 'Cobrança' };
     if (!it.descricao) { erro = 'Item ' + (i + 1) + ': informe a descrição.'; return; }
     if (!(it.quantidade > 0)) { erro = 'Item ' + (i + 1) + ': a quantidade precisa ser maior que zero.'; return; }
     if (it.precoClienteId && !porId_('PrecosCliente', it.precoClienteId)) it.precoClienteId = '';
+    if (it.cobrancaId) { // cobrança de viagem frustrada: não leva a solicitação (a coleta segue o fluxo dela)
+      const c = porId_('CobrancasFrustracao', it.cobrancaId);
+      if (!c || !c.ativo) { erro = 'Item ' + (i + 1) + ': cobrança de viagem frustrada não encontrada.'; return; }
+      if (c.decisao !== 'Cobrar') { erro = 'Item ' + (i + 1) + ': a cobrança da viagem frustrada ainda não foi decidida como "Cobrar".'; return; }
+      if (!veUnidade_(u, c.unidadeId)) { erro = 'Você não tem acesso à unidade da cobrança.'; return; }
+      if (String(c.clienteId) !== cli.id && String(cli.cadastroPrincipalId) !== String(c.clienteId) && String((porId_('Cadastros', c.clienteId) || {}).cadastroPrincipalId) !== cli.id) { erro = 'Todas as cobranças do BM precisam ser do mesmo cliente.'; return; }
+      const outroC = cobNoBm[c.id]; if (outroC && outroC.id !== reg.id) { erro = 'A cobrança da viagem frustrada de ' + dataTexto_(c.data).split('-').reverse().join('/') + ' já está no BM ' + (outroC.bmNumero || outroC.id) + '.'; return; }
+      it.solicitacaoId = ''; unidadeId = unidadeId || String(c.unidadeId || '');
+    }
     if (it.solicitacaoId) {
       const s = porId_('Solicitacoes', it.solicitacaoId);
       if (!s) { erro = 'Item ' + (i + 1) + ': solicitação não encontrada.'; return; }
@@ -104,7 +114,7 @@ function fatSalvar_(reg, u) {
   if (erro) return erroDados_(erro);
   const kmMudou = kmAlteradoNoBm_(itens, atual ? onde_('FaturamentoItens', 'faturamentoId', atual.id) : []);
   const solIds = itens.map(function (it) { return it.solicitacaoId; }).filter(String).filter(function (v, i, a) { return a.indexOf(v) === i; });
-  if (!solIds.length) return erroDados_('Inclua pelo menos uma solicitação realizada no BM.');
+  if (!solIds.length && !itens.some(function (it) { return it.cobrancaId; })) return erroDados_('Inclua pelo menos uma solicitação realizada (ou uma viagem frustrada a cobrar) no BM.');
   const total = arred2_(itens.reduce(function (t, it) { return t + (it.sentido === 'Desconto' ? -it.valor : it.valor); }, 0));
   const campos = { unidadeId: unidadeId, clienteId: cli.id, bmNumero: bmNumero, bmData: bmData, bmValor: total, obs: String(reg.obs || '').trim() };
   let id;

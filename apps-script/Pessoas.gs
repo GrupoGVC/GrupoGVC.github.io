@@ -136,7 +136,7 @@ function pesPublica_(p, u, veCpf) {
                  ultimoAcesso: us.ultimoAcesso instanceof Date ? Utilities.formatDate(us.ultimoAcesso, tz_(), 'dd/MM/yyyy HH:mm') : '' };
     if (u.adminPortal) {
       const a = acharUsuario_(us.email);
-      o.acesso.modulos = a.modulos; o.acesso.unidades = a.unidades; o.acesso.adminPortal = a.adminPortal;
+      o.acesso.modulos = a.modulos; o.acesso.unidades = a.unidades; o.acesso.adminPortal = a.adminPortal; o.acesso.decideCobranca = a.decideCobranca;
     }
   }
   return o;
@@ -310,7 +310,9 @@ function pesGerarAcesso_(x, quem) {
   const us = acharUsuario_(email);
   if (us && us.pessoaId && us.pessoaId !== p.id) return erroDados_('Este e-mail já é o acesso de outra pessoa do cadastro.');
   if (normEmail_(p.email) !== email) atualizar_('Pessoas', p.id, { email: email }, quem, 'pessoas', { registroNome: String(p.nome) });
-  const r = salvarUsuario_({ email: email, nome: String(p.nome), modulos: x.modulos || {}, unidades: x.unidades || [], adminPortal: x.adminPortal === true, ativo: true, pessoaId: p.id }, quem);
+  const reqU = { email: email, nome: String(p.nome), modulos: x.modulos || {}, unidades: x.unidades || [], adminPortal: x.adminPortal === true, ativo: true, pessoaId: p.id };
+  if ('decideCobranca' in x) reqU.decideCobranca = x.decideCobranca === true;
+  const r = salvarUsuario_(reqU, quem);
   if (!r.ok) return r;
   let convite = false;
   if (x.convite !== false) convite = enviarConvite_(email, String(p.nome), quem);
