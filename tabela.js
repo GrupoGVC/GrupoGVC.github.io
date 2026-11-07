@@ -8,7 +8,13 @@
  *   depois de pôr o HTML na página: T.ligar();
  *
  * Coluna: { k, label, v: linha => texto, ord?: linha => valor para ordenar, num?: true, cls?: 'classe',
- *           x?: linha => valor na exportação, exp?: false (não exporta), filtro?: false (sem filtro) }
+ *           x?: linha => valor na exportação, exp?: false (não exporta), filtro?: false (sem filtro),
+ *           h?: linha => HTML da célula (padrão: o texto de v), tdc?: linha => classe da célula,
+ *           oculta?: true (coluna extra: começa escondida e o usuário mostra em ⚙ Colunas) }
+ * Linhas: <tr>${T.celulas(linha)}</tr> (só as colunas visíveis, na ordem escolhida pelo usuário).
+ * Rodapé: T.rodape({ chave: 'HTML do total' }, 'texto da 1ª célula', extraFim, extraIni). Linha vazia: colspan = T.nVis() (+ extras).
+ * ⚙ Colunas: cada usuário mostra/esconde e reordena as colunas; a ordenação também é lembrada.
+ *   Fica no servidor (Preferencias), por usuário e por tabela. opc.colunas = false desliga (tabela sem T.celulas).
  * ===================================================================== */
 (function () {
   const REG = {};
@@ -50,6 +56,7 @@ th .fh.on .fi{border-color:var(--accent,#1d6b52);background:var(--accent-soft,#d
 .fpop .fp-bot{display:flex;gap:6px;align-items:center}
 .filtro-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px;padding:6px 10px;border-radius:var(--r,6px);background:var(--accent-soft,#dcefe6);font-size:13px}
 .filtro-info span{flex:1}
+td.nowrap{white-space:nowrap}
 td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
 .exp-wrap{position:relative;display:inline-block}
 .exp-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:40;background:var(--surface,#fff);border:1px solid var(--line,#d8dfda);border-radius:var(--r,6px);box-shadow:0 10px 30px rgba(0,0,0,.14);min-width:240px;display:flex;flex-direction:column;overflow:hidden}
@@ -60,7 +67,24 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
 .exp-menu button{background:none;border:0;border-bottom:1px solid var(--line-soft,#e6ebe7);padding:10px 14px;text-align:left;font:500 13px var(--f-body,"IBM Plex Sans",system-ui,sans-serif);color:var(--ink,#14211b);cursor:pointer}
 .exp-menu button:last-child{border-bottom:0}
 .exp-menu button:hover,.exp-menu button:focus-visible{background:var(--accent-soft,#dcefe6);color:var(--accent,#1d6b52);outline:none}
-@media (max-width:640px){.exp-menu{right:auto;left:0}}`;
+@media (max-width:640px){.exp-menu{right:auto;left:0}}
+.tb-acts{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.cpop{position:absolute;z-index:61;width:300px;max-width:calc(100vw - 16px);background:var(--surface,#fff);color:var(--ink,#14211b);border:1px solid var(--line,#d8dfda);border-radius:var(--r,6px);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;display:flex;flex-direction:column;gap:8px;font:13.5px var(--f-body,"IBM Plex Sans",system-ui,sans-serif);text-transform:none;letter-spacing:0}
+.cpop h4{margin:0;font-size:14px}
+.cpop .cp-sub{margin:0;font-size:12px;color:var(--ink-3,#77857d)}
+.cpop .cp-lista{max-height:min(380px,60vh);overflow:auto;border:1px solid var(--line-soft,#e6ebe7);border-radius:4px}
+.cpop .cp-it{display:flex;align-items:center;gap:6px;padding:5px 6px;border-bottom:1px solid var(--line-soft,#e6ebe7);background:var(--surface,#fff)}
+.cpop .cp-it:last-child{border-bottom:0}
+.cpop .cp-it.off span{color:var(--ink-3,#77857d)}
+.cpop .cp-it.arrasta{opacity:.45}
+.cpop .cp-it.alvo{box-shadow:inset 0 2px 0 var(--accent,#1d6b52)}
+.cpop .cp-al{cursor:grab;color:var(--ink-3,#77857d);user-select:none;padding:0 2px}
+.cpop .cp-it input{width:auto;margin:0}
+.cpop .cp-it span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpop .cp-it button{all:unset;cursor:pointer;width:24px;height:24px;display:grid;place-items:center;border-radius:4px;color:var(--ink-2,#4b5a52)}
+.cpop .cp-it button:hover,.cpop .cp-it button:focus-visible{background:var(--sunken,#edf1ee)}
+.cpop .cp-it button[disabled]{opacity:.3;cursor:default}
+.cpop .cp-bot{display:flex;gap:6px;align-items:center}`;
     document.head.appendChild(st);
   }
 
@@ -82,12 +106,42 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
   }
+  /* ---------- preferências do usuário (servidor + cópia no navegador) ---------- */
+  const PREFS = { d: null, buscou: false, timers: {} };
+  const chaveLocal = () => { try { const se = window.Portal && Portal.sessao && Portal.sessao(); return 'gvc-tab-prefs:' + ((se && se.usuario && se.usuario.email) || ''); } catch (e) { return 'gvc-tab-prefs:'; } };
+  function prefsLer() {
+    if (PREFS.d) return PREFS.d;
+    try { PREFS.d = JSON.parse(localStorage.getItem(chaveLocal()) || '{}') || {}; } catch (e) { PREFS.d = {}; }
+    return PREFS.d;
+  }
+  function prefDe(id) { const v = prefsLer()['tab:' + id]; if (!v) return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch (e) { return null; } }
+  function prefGravar(id, obj) {
+    const d = prefsLer(); if (obj) d['tab:' + id] = JSON.stringify(obj); else delete d['tab:' + id];
+    try { localStorage.setItem(chaveLocal(), JSON.stringify(d)); } catch (e) { /* sem armazenamento: vale só nesta página */ }
+    clearTimeout(PREFS.timers[id]);
+    PREFS.timers[id] = setTimeout(() => { try { window.Portal.api('pref.salvar', { chave: 'tab:' + id, valor: obj || null }).catch(() => {}); } catch (e) { /* offline */ } }, 700);
+  }
+  async function prefsServidor() {
+    if (PREFS.buscou) return; PREFS.buscou = true;
+    try {
+      const r = await window.Portal.api('pref.dados', {});
+      const antes = JSON.stringify(prefsLer()); PREFS.d = r.prefs || {};
+      try { localStorage.setItem(chaveLocal(), JSON.stringify(PREFS.d)); } catch (e) {}
+      if (antes !== JSON.stringify(PREFS.d)) Object.keys(REG).forEach(id => { const T = REG[id]; if (T.reaplicar() && T.opc.aoMudar) T.opc.aoMudar(); });
+    } catch (e) { PREFS.buscou = false; }
+  }
   const hojeArq = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
   function fecharFiltro() {
     const p = document.getElementById('fpop'); if (p) p.remove();
     document.removeEventListener('mousedown', fecharFora, true); document.removeEventListener('keydown', escFiltro, true);
   }
+  function fecharColunas() {
+    const p = document.getElementById('cpop'); if (p) p.remove();
+    document.removeEventListener('mousedown', foraColunas, true); document.removeEventListener('keydown', escColunas, true);
+  }
+  function foraColunas(ev) { const p = document.getElementById('cpop'); if (p && !p.contains(ev.target) && !ev.target.closest('[data-tb-col]')) fecharColunas(); }
+  function escColunas(ev) { if (ev.key !== 'Escape') return; const p = document.getElementById('cpop'); const tb = p && p.dataset.tb; fecharColunas(); const b = tb && document.querySelector(`[data-tb-col="${tb}"]`); if (b) b.focus(); }
   function fecharFora(ev) { const p = document.getElementById('fpop'); if (p && !p.contains(ev.target) && !ev.target.closest('[data-fcol]')) fecharFiltro(); }
   function escFiltro(ev) {
     if (ev.key !== 'Escape') return;
@@ -97,8 +151,34 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
   }
 
   function criar(id) {
-    const T = { id, cols: [], opc: {}, filtros: {}, ordem: null, base: [] };
-    const cols = () => T.cols;
+    const T = { id, cols: [], opc: {}, filtros: {}, ordem: null, base: [], _pref: '' };
+    const comColunas = () => T.opc.colunas !== false && T.cols.length > 1;
+    // colunas visíveis, na ordem do usuário (colunas novas que não são extras entram no fim)
+    T.vis = () => {
+      if (!comColunas()) return T.cols;
+      const p = prefDe(id); const porK = {}; T.cols.forEach(c => { porK[c.k] = c; });
+      if (!p || !Array.isArray(p.v)) return T.cols.filter(c => !c.oculta);
+      const conhecidas = p.t || [];
+      const out = p.v.map(k => porK[k]).filter(Boolean);
+      T.cols.forEach(c => { if (!c.oculta && out.indexOf(c) < 0 && conhecidas.indexOf(c.k) < 0) out.push(c); });
+      return out.length ? out : T.cols.filter(c => !c.oculta);
+    };
+    T.nVis = () => T.vis().length;
+    const cols = () => T.vis();
+    T.reaplicar = () => { // preferências chegaram do servidor
+      const p = prefDe(id); const j = JSON.stringify(p || null); if (j === T._pref) return false;
+      T._pref = j; if (!T._mexeu) T.ordem = p && p.o && p.o.k ? { k: p.o.k, dir: p.o.dir > 0 ? 1 : -1 } : null; return true;
+    };
+    const salvarPref = (visKeys) => {
+      const p = prefDe(id) || {};
+      if (visKeys !== undefined) { if (visKeys) { p.v = visKeys; p.t = T.cols.map(c => c.k); } else { delete p.v; delete p.t; } }
+      p.o = T.ordem ? { k: T.ordem.k, dir: T.ordem.dir } : null;
+      const vazio = !p.v && !p.o;
+      prefGravar(id, vazio ? null : p); T._pref = JSON.stringify(vazio ? null : p);
+    };
+    T.celulas = x => T.vis().map(c => `<td data-label="${esc(c.label)}" class="${[c.num ? 'num' : '', c.cls || '', c.tdc ? c.tdc(x) : ''].filter(Boolean).join(' ')}">${c.h ? c.h(x) : esc(c.v(x) == null ? '' : c.v(x))}</td>`).join('');
+    // rodapé de totais que acompanha as colunas visíveis: vals = { chave da coluna: HTML }; primeiro = texto da 1ª célula
+    T.rodape = (vals, primeiro, extraFim, extraIni) => '<tfoot><tr>' + (extraIni || '') + T.vis().map((c, i) => `<td class="${c.num ? 'num' : ''}">${c.k in vals ? vals[c.k] : i === 0 ? (primeiro || '') : ''}</td>`).join('') + (extraFim || '') + '</tr></tfoot>';
     const vazioDe = c => c.vazio || VAZIO;
     const txt = (c, x) => { const v = c.v(x); return v === '' || v == null || v === '—' ? vazioDe(c) : String(v); };
     const valOrd = (c, x) => c.ord ? c.ord(x) : c.num ? (Number(String(c.v(x)).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0) : txt(c, x);
@@ -121,10 +201,10 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
     }).join('') + (extraFim || '') + '</tr>';
     T.info = (nVis, nTotal) => T.temFiltro()
       ? `<div class="filtro-info"><span>${nVis} de ${nTotal} ${nTotal === 1 ? 'linha' : 'linhas'} com os filtros das colunas</span><button type="button" class="btn sm" data-tb-limpar="${esc(id)}">Limpar filtros</button></div>` : '';
-    T.botao = (rotulo) => `<span class="exp-wrap"><button class="btn sm" type="button" data-tb-exp="${esc(id)}" aria-haspopup="menu" aria-expanded="false">${esc(rotulo || '↓ Exportar')}</button>
+    T.botao = (rotulo) => `<span class="tb-acts">${comColunas() ? `<button class="btn sm" type="button" data-tb-col="${esc(id)}" aria-haspopup="dialog" title="Mostrar, esconder e mudar a ordem das colunas">⚙ Colunas</button>` : ''}<span class="exp-wrap"><button class="btn sm" type="button" data-tb-exp="${esc(id)}" aria-haspopup="menu" aria-expanded="false">${esc(rotulo || '↓ Exportar')}</button>
       <span class="exp-menu" role="menu" data-tb-menu="${esc(id)}" hidden><span class="exp-info"></span>
-      <button type="button" role="menuitem" data-fmt="xlsx">📊 Planilha Excel (.xlsx)</button><button type="button" role="menuitem" data-fmt="csv">📄 CSV</button><button type="button" role="menuitem" data-fmt="pdf">🖨 PDF</button></span></span>`;
-    const mudou = () => { fecharFiltro(); if (T.opc.aoMudar) T.opc.aoMudar(); };
+      <button type="button" role="menuitem" data-fmt="xlsx">📊 Planilha Excel (.xlsx)</button><button type="button" role="menuitem" data-fmt="csv">📄 CSV</button><button type="button" role="menuitem" data-fmt="pdf">🖨 PDF</button>${temMaisColunas() ? '<button type="button" role="menuitem" data-fmt="xlsx-todas">📊 Excel com todas as colunas</button>' : ''}</span></span></span>`;
+    const mudou = () => { fecharFiltro(); T._mexeu = true; salvarPref(); if (T.opc.aoMudar) T.opc.aoMudar(); };
     T.limpar = () => { T.filtros = {}; T.ordem = null; mudou(); };
 
     T.ligar = () => {
@@ -135,6 +215,8 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
         abrir(cols().find(c => c.k === b.dataset.fcol), b);
       });
       document.querySelectorAll(`[data-tb-limpar="${id}"]`).forEach(b => b.onclick = T.limpar);
+      document.querySelectorAll(`[data-tb-col="${id}"]`).forEach(b => b.onclick = ev => { ev.stopPropagation(); const ja = document.getElementById('cpop'); if (ja && ja.dataset.tb === id) { fecharColunas(); return; } abrirColunas(b); });
+      const cp = document.getElementById('cpop'); if (cp && cp.dataset.tb === id) desenharColunas(cp); // painel aberto: acompanha a tabela redesenhada
       document.querySelectorAll(`[data-tb-exp="${id}"]`).forEach(b => {
         const m = b.parentElement.querySelector(`[data-tb-menu="${id}"]`); if (!m) return;
         const fechar = () => { m.hidden = true; b.setAttribute('aria-expanded', 'false'); document.removeEventListener('mousedown', fora, true); };
@@ -151,6 +233,48 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
       });
     };
 
+    /* ---------- ⚙ Colunas ---------- */
+    function aplicarColunas(keys) {
+      const vis = keys.filter(k => T.cols.some(c => c.k === k));
+      Object.keys(T.filtros).forEach(k => { if (vis.indexOf(k) < 0) delete T.filtros[k]; }); // filtro de coluna escondida não fica preso
+      if (T.ordem && vis.indexOf(T.ordem.k) < 0) T.ordem = null;
+      const padrao = T.cols.filter(c => !c.oculta).map(c => c.k);
+      salvarPref(vis.join('|') === padrao.join('|') ? null : vis);
+      if (T.opc.aoMudar) T.opc.aoMudar();
+    }
+    function desenharColunas(p) {
+      const vis = T.vis().map(c => c.k);
+      const ordem = vis.concat(T.cols.map(c => c.k).filter(k => vis.indexOf(k) < 0));
+      const lab = k => (T.cols.find(c => c.k === k) || {}).label || k;
+      p.innerHTML = `<h4>Colunas</h4><p class="cp-sub">Marque as que quer ver e arraste (≡) ou use ↑ ↓ para mudar a ordem. Fica salvo para você, em qualquer computador.</p>
+        <div class="cp-lista">${ordem.map((k, i) => { const on = vis.indexOf(k) >= 0; return `<div class="cp-it${on ? '' : ' off'}" draggable="${on}" data-k="${esc(k)}">
+          <span class="cp-al" aria-hidden="true">≡</span><input type="checkbox" data-cpk="${esc(k)}" ${on ? 'checked' : ''} ${on && vis.length === 1 ? 'disabled' : ''} aria-label="Mostrar ${esc(lab(k))}"><span>${esc(lab(k))}</span>
+          <button type="button" data-cpup="${esc(k)}" ${on && vis.indexOf(k) > 0 ? '' : 'disabled'} aria-label="Subir ${esc(lab(k))}">↑</button><button type="button" data-cpdn="${esc(k)}" ${on && vis.indexOf(k) < vis.length - 1 ? '' : 'disabled'} aria-label="Descer ${esc(lab(k))}">↓</button></div>`; }).join('')}</div>
+        <div class="cp-bot"><button type="button" class="btn sm" data-cprest>Restaurar padrão</button><span style="flex:1"></span><button type="button" class="btn sm pri" data-cpok>Fechar</button></div>`;
+      p.querySelectorAll('[data-cpk]').forEach(c => c.onchange = () => { const k = c.dataset.cpk; aplicarColunas(c.checked ? vis.concat(k) : vis.filter(x => x !== k)); });
+      const mover = (k, d) => { const v = vis.slice(), i = v.indexOf(k), j = i + d; if (i < 0 || j < 0 || j >= v.length) return; v.splice(i, 1); v.splice(j, 0, k); aplicarColunas(v); setTimeout(() => { const b = p.querySelector(`[data-${d < 0 ? 'cpup' : 'cpdn'}="${k}"]`); if (b && !b.disabled) b.focus(); }, 0); };
+      p.querySelectorAll('[data-cpup]').forEach(b => b.onclick = () => mover(b.dataset.cpup, -1));
+      p.querySelectorAll('[data-cpdn]').forEach(b => b.onclick = () => mover(b.dataset.cpdn, 1));
+      p.querySelector('[data-cprest]').onclick = () => { salvarPref(null); if (T.opc.aoMudar) T.opc.aoMudar(); desenharColunas(p); };
+      p.querySelector('[data-cpok]').onclick = fecharColunas;
+      let arr = null;
+      p.querySelectorAll('.cp-it[draggable="true"]').forEach(it => {
+        it.ondragstart = e => { arr = it.dataset.k; it.classList.add('arrasta'); try { e.dataTransfer.setData('text/plain', arr); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} };
+        it.ondragend = () => { it.classList.remove('arrasta'); p.querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); };
+        it.ondragover = e => { if (!arr || arr === it.dataset.k) return; e.preventDefault(); p.querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); it.classList.add('alvo'); };
+        it.ondrop = e => { e.preventDefault(); if (!arr || arr === it.dataset.k) return; const v = vis.filter(x => x !== arr); v.splice(v.indexOf(it.dataset.k), 0, arr); arr = null; aplicarColunas(v); };
+      });
+    }
+    function abrirColunas(btn) {
+      fecharFiltro(); fecharColunas(); css();
+      const p = document.createElement('div'); p.id = 'cpop'; p.className = 'cpop'; p.dataset.tb = id; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Colunas da tabela');
+      document.body.appendChild(p); desenharColunas(p);
+      const r = btn.getBoundingClientRect(), w = Math.min(300, window.innerWidth - 16);
+      p.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + window.scrollX + 'px';
+      p.style.top = r.bottom + 4 + window.scrollY + 'px';
+      document.addEventListener('mousedown', foraColunas, true); document.addEventListener('keydown', escColunas, true);
+      const f = p.querySelector('input:not([disabled])'); if (f) f.focus();
+    }
     function abrir(col, btn) {
       fecharFiltro(); css();
       const cont = new Map(), rep = new Map();
@@ -210,15 +334,17 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
       return out;
     }
     T.descricaoFiltros = descricaoFiltros;
-    const colsExp = () => cols().filter(c => c.exp !== false).concat(T.opc.extrasExport || []);
+    // tela: as colunas visíveis, na ordem do usuário (tabela sem ⚙ Colunas: + extrasExport); todas: todas as colunas + extrasExport
+    const colsExp = todas => { const cs = (todas ? T.cols : cols()).filter(c => c.exp !== false); return todas || !comColunas() ? cs.concat((T.opc.extrasExport || []).filter(e => !cs.some(c => c.label === e.label))) : cs; };
+    const temMaisColunas = () => comColunas() && (T.cols.length > T.nVis() || (T.opc.extrasExport || []).some(e => !T.cols.some(c => c.label === e.label)));
     const valExp = (c, x) => {
       if (c.x) { const v = c.x(x); return v == null ? '' : v; }
       if (c.num) { const v = valOrd(c, x); return typeof v === 'number' ? v : ''; }
       const t = c.v(x); return t == null || t === '—' ? '' : String(t);
     };
-    function dados() {
+    function dados(todas) {
       const lista = T.aplicar(T.base);
-      const cs = colsExp();
+      const cs = colsExp(todas);
       const linhas = lista.map(x => { const o = {}; cs.forEach(c => { o[c.label] = valExp(c, x); }); return o; });
       const filtros = descricaoFiltros();
       const tot = T.opc.totais ? T.opc.totais(lista) : null;
@@ -226,7 +352,8 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
       return { lista, cs, linhas, filtros, tot, nome };
     }
     T.exportar = async fmt => {
-      const d = dados();
+      const todas = fmt === 'xlsx-todas'; if (todas) fmt = 'xlsx';
+      const d = dados(todas);
       if (!d.linhas.length) { aviso('Nenhuma linha na tela para exportar. Confira os filtros.'); return; }
       try {
         if (fmt === 'csv') return exportarCsv(d);
@@ -293,8 +420,11 @@ td.empty{text-align:center;color:var(--ink-3,#77857d);padding:18px}
 
   function tabela(id, colunas, opc) {
     css();
+    const novo = !REG[id];
     const T = REG[id] || (REG[id] = criar(id));
     T.cols = colunas || []; T.opc = opc || {};
+    if (novo) T.reaplicar(); // ordenação lembrada
+    prefsServidor();
     return T;
   }
   function boot() {

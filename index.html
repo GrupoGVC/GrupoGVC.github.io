@@ -115,7 +115,7 @@ tr.inativo td{opacity:.55}
 </style>
 <script src="config.js"></script>
 <script src="portal.js?v=20261107"></script>
-<script src="tabela.js?v=20261102"></script>
+<script src="tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -280,15 +280,16 @@ tr.inativo td{opacity:.55}
     const NIV = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
     const parseAcesso = t => { const m = String(t || '').match(/(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?/); return m ? m[3] + m[2] + m[1] + (m[4] || '00') + (m[5] || '00') : ''; };
     const TU = Portal.tabela('portal-usuarios', [
-      { k: 'nome', label: 'Nome', v: u => u.nome }, { k: 'email', label: 'E-mail', v: u => u.email },
-      { k: 'fun', label: 'Funções', v: u => (u.funcoes || []).join(', '), vazio: '(Sem função)' },
-    ].concat(mods.map(([k, m]) => ({ k: 'm-' + k, label: m.nome, v: u => NIV[(u.modulos || {})[k]] || 'Sem acesso' }))).concat([
-      { k: 'uni', label: 'Unidades', v: u => (u.unidades || []).length ? u.unidades.map(nomeUni).join(', ') : 'Todas' },
-      { k: 'adm', label: 'Admin do portal', v: u => u.adminPortal ? 'Sim' : 'Não' },
-      { k: 'cob', label: 'Decide cobrança de frustrada', v: u => u.decideCobranca || u.adminPortal ? 'Sim' : 'Não' },
-      { k: 'at', label: 'Ativo', v: u => u.ativo ? 'Sim' : 'Não' },
-      { k: 'sen', label: 'Senha', v: u => u.temSenha ? 'criada' : 'aguardando 1º acesso' },
-      { k: 'ult', label: 'Último acesso', v: u => u.ultimoAcesso, ord: u => parseAcesso(u.ultimoAcesso) },
+      { k: 'nome', label: 'Nome', v: u => u.nome, h: u => `<b>${esc(u.nome)}</b>${u.pessoaId ? `<br><a class="sub" href="pessoas/#p=${encodeURIComponent(u.pessoaId)}">abrir em Pessoas</a>` : ''}${u.pessoaAtiva === false ? ' <span class="pill warn">pessoa inativa</span>' : ''}` },
+      { k: 'email', label: 'E-mail', v: u => u.email, cls: 'mono' },
+      { k: 'fun', label: 'Funções', v: u => (u.funcoes || []).join(', '), vazio: '(Sem função)', h: u => esc((u.funcoes || []).join(', ') || '—') },
+    ].concat(mods.map(([k, m]) => ({ k: 'm-' + k, label: m.nome, v: u => NIV[(u.modulos || {})[k]] || 'Sem acesso', h: u => `<select data-mod="${k}" aria-label="${esc(m.nome)}">${optNivel((u.modulos || {})[k])}</select>` }))).concat([
+      { k: 'uni', label: 'Unidades', v: u => (u.unidades || []).length ? u.unidades.map(nomeUni).join(', ') : 'Todas', h: u => `<div data-unis style="display:flex;flex-direction:column;gap:2px;min-width:120px">${chkUnidades('u-' + esc(u.email), u.unidades)}</div>` },
+      { k: 'adm', label: 'Admin do portal', v: u => u.adminPortal ? 'Sim' : 'Não', h: u => `<select data-k="admin" aria-label="Admin do portal"><option value="1" ${u.adminPortal ? 'selected' : ''}>Sim</option><option value="0" ${u.adminPortal ? '' : 'selected'}>Não</option></select>` },
+      { k: 'cob', label: 'Decide cobrança de frustrada', v: u => u.decideCobranca || u.adminPortal ? 'Sim' : 'Não', h: u => `<select data-k="cob" aria-label="Decide cobrança de viagem frustrada" title="Pode decidir se a viagem frustrada por culpa do cliente será cobrada (o admin do portal sempre pode)"><option value="1" ${u.decideCobranca ? 'selected' : ''}>Sim</option><option value="0" ${u.decideCobranca ? '' : 'selected'}>Não</option></select>` },
+      { k: 'at', label: 'Ativo', v: u => u.ativo ? 'Sim' : 'Não', h: u => `<select data-k="ativo" aria-label="Ativo"><option value="1" ${u.ativo ? 'selected' : ''}>Sim</option><option value="0" ${u.ativo ? '' : 'selected'}>Não</option></select>` },
+      { k: 'sen', label: 'Senha', v: u => u.temSenha ? 'criada' : 'aguardando 1º acesso', h: u => u.temSenha ? '<span class="pill ok">criada</span>' : '<span class="pill warn">aguardando 1º acesso</span>' },
+      { k: 'ult', label: 'Último acesso', v: u => u.ultimoAcesso || '—', ord: u => parseAcesso(u.ultimoAcesso) },
     ]), { titulo: 'Usuários e acessos', arquivo: 'portal-usuarios', unidade: 'usuários', aoMudar: renderUsuarios });
     const us = TU.aplicar(usTela);
     $('#main').innerHTML = `<section class="panel">
@@ -300,16 +301,7 @@ tr.inativo td{opacity:.55}
       <div class="tbl-wrap"><table>
         <thead>${TU.cab('<th></th>')}</thead>
         <tbody>${us.map(u => `<tr data-email="${esc(u.email)}" class="${u.ativo ? '' : 'inativo'}">
-          <td><b>${esc(u.nome)}</b>${u.pessoaId ? `<br><a class="sub" href="pessoas/#p=${encodeURIComponent(u.pessoaId)}">abrir em Pessoas</a>` : ''}${u.pessoaAtiva === false ? ' <span class="pill warn">pessoa inativa</span>' : ''}</td>
-          <td class="mono">${esc(u.email)}</td>
-          <td>${esc((u.funcoes || []).join(', ') || '—')}</td>
-          ${mods.map(([k, m]) => `<td><select data-mod="${k}" aria-label="${esc(m.nome)}">${optNivel((u.modulos || {})[k])}</select></td>`).join('')}
-          <td><div data-unis style="display:flex;flex-direction:column;gap:2px;min-width:120px">${chkUnidades('u-' + esc(u.email), u.unidades)}</div></td>
-          <td><select data-k="admin" aria-label="Admin do portal"><option value="1" ${u.adminPortal ? 'selected' : ''}>Sim</option><option value="0" ${u.adminPortal ? '' : 'selected'}>Não</option></select></td>
-          <td><select data-k="cob" aria-label="Decide cobrança de viagem frustrada" title="Pode decidir se a viagem frustrada por culpa do cliente será cobrada (o admin do portal sempre pode)"><option value="1" ${u.decideCobranca ? 'selected' : ''}>Sim</option><option value="0" ${u.decideCobranca ? '' : 'selected'}>Não</option></select></td>
-          <td><select data-k="ativo" aria-label="Ativo"><option value="1" ${u.ativo ? 'selected' : ''}>Sim</option><option value="0" ${u.ativo ? '' : 'selected'}>Não</option></select></td>
-          <td>${u.temSenha ? '<span class="pill ok">criada</span>' : '<span class="pill warn">aguardando 1º acesso</span>'}</td>
-          <td>${esc(u.ultimoAcesso || '—')}</td>
+          ${TU.celulas(u)}
           <td><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="btn sm pri" data-salvar hidden>Salvar</button>${u.temSenha ? '<span data-rz><button class="btn sm" data-reset>Apagar senha</button></span>' : ''}</div></td>
         </tr>`).join('')}</tbody>
       </table></div>
@@ -322,10 +314,13 @@ tr.inativo td{opacity:.55}
       tr.querySelectorAll('[data-k],[data-mod],[data-uni]').forEach(x => x.oninput = x.onchange = () => sv.hidden = false);
       sv.onclick = async () => {
         sv.disabled = true;
-        const modulos = {}; tr.querySelectorAll('[data-mod]').forEach(s => modulos[s.dataset.mod] = s.value);
+        // coluna escondida em ⚙ Colunas: mantém o valor que já estava
+        const atual = usuarios.find(x => x.email === email) || {};
+        const modulos = Object.assign({}, atual.modulos || {}); tr.querySelectorAll('[data-mod]').forEach(s => modulos[s.dataset.mod] = s.value);
+        const sel = (k, padrao) => { const el = tr.querySelector(`[data-k="${k}"]`); return el ? el.value === '1' : !!padrao; };
         try {
           await Portal.api('salvarUsuario', { usuario: { email, modulos,
-            adminPortal: tr.querySelector('[data-k="admin"]').value === '1', decideCobranca: tr.querySelector('[data-k="cob"]').value === '1', ativo: tr.querySelector('[data-k="ativo"]').value === '1', unidades: lerUnidades(tr) } });
+            adminPortal: sel('admin', atual.adminPortal), decideCobranca: sel('cob', atual.decideCobranca), ativo: sel('ativo', atual.ativo), unidades: tr.querySelector('[data-unis]') ? lerUnidades(tr) : (atual.unidades || []) } });
           toast('Usuário atualizado'); usuarios = null;
           if (email === usuario.email) { const j = await Portal.api('eu', {}); usuario = j.usuario; const s = Portal.sessao(); s.usuario = usuario; Portal.gravarSessao(s); }
           renderUsuarios();
@@ -359,25 +354,21 @@ tr.inativo td{opacity:.55}
     sel.innerHTML = '<option value="">Todas</option>' + (j.pessoas || []).map(p => `<option ${p === atual ? 'selected' : ''}>${esc(p)}</option>`).join('');
     const cls = a => a === 'criou' ? 'ok' : (a === 'inativou' || a === 'excluiu') ? 'crit' : a === 'alterou' ? 'warn' : 'off';
     const TH = Portal.tabela('portal-historico', [
-      { k: 'q', label: 'Quando', v: x => Portal.dataHora(x.quando).replace(' às ', ' '), ord: x => String(x.quando || '') },
+      { k: 'q', label: 'Quando', v: x => Portal.dataHora(x.quando).replace(' às ', ' '), ord: x => String(x.quando || ''), cls: 'mono', tdc: () => 'nowrap' },
       { k: 'quem', label: 'Quem', v: x => x.nome || x.email },
-      { k: 'mod', label: 'Módulo', v: x => NOMES_MOD[x.modulo] || x.modulo },
-      { k: 'reg', label: 'Registro', v: x => [x.registroId, x.registroNome].filter(Boolean).join(' · ') },
-      { k: 'acao', label: 'Ação', v: x => ACOES[x.acao] || x.acao },
-      { k: 'campo', label: 'Campo', v: x => x.campo || (x.detalhe ? x.detalhe : '') },
+      { k: 'mod', label: 'Módulo', v: x => NOMES_MOD[x.modulo] || x.modulo || '—' },
+      { k: 'reg', label: 'Registro', v: x => [x.registroId, x.registroNome].filter(Boolean).join(' · '), h: x => `<span class="mono" style="white-space:nowrap">${esc(x.registroId)}</span>${x.registroNome ? `<div class="sub" style="margin:0">${esc(x.registroNome)}</div>` : ''}` },
+      { k: 'acao', label: 'Ação', v: x => ACOES[x.acao] || x.acao, h: x => `<span class="pill ${cls(x.acao)}">${esc(ACOES[x.acao] || x.acao)}</span>` },
+      { k: 'campo', label: 'Campo', v: x => x.campo || (x.detalhe ? x.detalhe : ''), h: x => esc(x.campo) + (!x.campo && x.detalhe ? `<div class="sub" style="margin:0;max-width:360px">${esc(x.detalhe)}</div>` : '') },
       { k: 'de', label: 'De', v: x => x.de }, { k: 'para', label: 'Para', v: x => x.para },
+      { k: 'email', label: 'E-mail de quem fez', v: x => x.email || '', oculta: true },
+      { k: 'tab', label: 'Tabela', v: x => x.tabela || '', oculta: true },
     ], { titulo: 'Histórico geral', arquivo: 'historico-geral', unidade: 'alterações', aoMudar: desenharHistorico,
       filtrosExtras: () => { const f = histFiltros || {}; return [f.de && 'De ' + f.de.split('-').reverse().join('/'), f.ate && 'Até ' + f.ate.split('-').reverse().join('/'), f.modulo && 'Módulo: ' + (NOMES_MOD[f.modulo] || f.modulo), f.pessoa && 'Pessoa: ' + f.pessoa, f.registro && 'Registro: ' + f.registro, f.acessos && 'Inclui entradas no portal'].filter(Boolean); } });
     const itens = TH.aplicar(j.itens);
     $('#h-res').innerHTML = j.itens.length ? `<div class="row" style="justify-content:flex-end;padding:10px 14px 0">${TH.botao()}</div><div style="padding:0 14px">${TH.info(itens.length, j.itens.length)}</div><div class="tbl-wrap" style="margin-top:0;border:0"><table>
       <thead>${TH.cab()}</thead>
-      <tbody>${itens.map(x => `<tr>
-        <td class="mono" style="white-space:nowrap">${esc(Portal.dataHora(x.quando).replace(' às ', ' '))}</td>
-        <td>${esc(x.nome || x.email)}</td><td>${esc(NOMES_MOD[x.modulo] || x.modulo || '—')}</td>
-        <td><span class="mono" style="white-space:nowrap">${esc(x.registroId)}</span>${x.registroNome ? `<div class="sub" style="margin:0">${esc(x.registroNome)}</div>` : ''}</td>
-        <td><span class="pill ${cls(x.acao)}">${esc(ACOES[x.acao] || x.acao)}</span></td>
-        <td>${esc(x.campo)}${!x.campo && x.detalhe ? `<div class="sub" style="margin:0;max-width:360px">${esc(x.detalhe)}</div>` : ''}</td>
-        <td>${esc(x.de)}</td><td>${esc(x.para)}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Nada com os filtros das colunas.</td></tr>'}</tbody></table></div>
+      <tbody>${itens.map(x => `<tr>${TH.celulas(x)}</tr>`).join('') || `<tr><td colspan="${TH.nVis()}" class="empty">Nada com os filtros das colunas.</td></tr>`}</tbody></table></div>
       <p class="sub" style="padding:10px 14px">Mostrando ${j.itens.length} de ${j.total} alterações encontradas${j.total > j.itens.length ? ' (refine os filtros para ver as mais antigas)' : ''}.</p>`
       : '<p class="sub" style="padding:14px">Nenhuma alteração com esses filtros.</p>';
     TH.ligar();
