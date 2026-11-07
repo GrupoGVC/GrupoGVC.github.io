@@ -288,7 +288,7 @@ table.itens td input,table.itens td select{min-width:70px}
 </style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
-<script src="../tabela.js?v=20261102"></script>
+<script src="../tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -406,25 +406,38 @@ const FMT_R = '"R$" #,##0.00';
 const valorFat = f => +(f.nfValor !== '' ? f.nfValor : f.bmValor) || 0;
 const nfTxt = f => f.nfNumero || f.nfData ? (f.nfNumero || 's/nº') + (f.nfData ? ' · ' + D(f.nfData) : '') : '';
 const COLS_FAT = [
-  { k: 'bm', label: 'BM', v: f => f.bmNumero || 's/nº' },
-  { k: 'cli', label: 'Cliente', v: f => cliNome(f.clienteId) },
+  { k: 'bm', label: 'BM', v: f => f.bmNumero || 's/nº', cls: 'mono', h: f => `<b>${esc(f.bmNumero || 's/nº')}</b>${f.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : ''}` },
+  { k: 'cli', label: 'Cliente', v: f => cliNome(f.clienteId), cls: 'full', h: f => { const c = cliDe(f.clienteId); return `<b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}`; } },
   { k: 'uni', label: 'Unidade', v: f => uniNome(f.unidadeId) },
-  { k: 'env', label: 'Envio', v: f => D(f.bmData), ord: f => f.bmData || '' },
-  { k: 'apr', label: 'Aprovação', v: f => D(f.aprovacaoData), ord: f => f.aprovacaoData || '' },
-  { k: 'nf', label: 'NF', v: nfTxt, ord: f => f.nfData || '' },
+  { k: 'env', label: 'Envio', v: f => D(f.bmData), ord: f => f.bmData || '', cls: 'mono' },
+  { k: 'apr', label: 'Aprovação', v: f => D(f.aprovacaoData), ord: f => f.aprovacaoData || '', cls: 'mono' },
+  { k: 'nf', label: 'NF', v: f => nfTxt(f) || '—', ord: f => f.nfData || '', cls: 'mono' },
   { k: 'val', label: 'Valor', v: f => R(valorFat(f)), ord: valorFat, num: true, x: valorFat, fmt: FMT_R },
-  { k: 'st', label: 'Status', v: f => f.status },
+  { k: 'st', label: 'Status', v: f => f.status, h: f => stPill(f.status) },
+  { k: 'upl', label: 'Código UPLOG', v: f => cliDe(f.clienteId).codigoUplog || '', oculta: true },
+  { k: 'vbm', label: 'Valor do BM', v: f => f.bmValor === '' ? '' : R(f.bmValor), ord: f => +f.bmValor || 0, x: f => f.bmValor === '' ? '' : +f.bmValor, fmt: FMT_R, num: true, oculta: true },
+  { k: 'vnf', label: 'Valor da NF', v: f => f.nfValor === '' ? '' : R(f.nfValor), ord: f => +f.nfValor || 0, x: f => f.nfValor === '' ? '' : +f.nfValor, fmt: FMT_R, num: true, oculta: true },
+  { k: 'nfn', label: 'Nº da NF', v: f => f.nfNumero || '', oculta: true },
+  { k: 'nfd', label: 'Data da NF', v: f => D(f.nfData), ord: f => f.nfData || '', cls: 'mono', oculta: true },
+  { k: 'nit', label: 'Itens', v: f => String((f.itens || []).length), ord: f => (f.itens || []).length, num: true, oculta: true },
+  { k: 'obs', label: 'Observações', v: f => f.obs || '', oculta: true },
+  { k: 'orig', label: 'Origem', v: f => f.origem || '', oculta: true },
 ];
 const EXTRAS_FAT = [{ label: 'Código UPLOG', x: f => cliDe(f.clienteId).codigoUplog || '' }, { label: 'Valor do BM', x: f => f.bmValor === '' ? '' : +f.bmValor },
   { label: 'Valor da NF', x: f => f.nfValor === '' ? '' : +f.nfValor }, { label: 'Origem', x: f => f.origem || '' }];
 function renderAFaturar() {
   const solsTela = S.d.solicitacoes.filter(s => prontaBm(s) && passaUni(s) && passaBusca([cliNome(s.clienteId), cliDe(s.clienteId).codigoUplog].join(' ')));
   const T = Portal.tabela('fat-afaturar', [
-    { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '' },
+    { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '', cls: 'mono' },
     { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
-    { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) },
-    { k: 'desc', label: 'Descrição', v: s => s.descricao },
+    { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) || '—' },
+    { k: 'desc', label: 'Descrição', v: s => s.descricao, cls: 'wrap', h: s => esc(s.descricao || '') + (kmPend(s) ? ' <span class="pill warn" title="O solicitante escolhe o km real ou o previsto em Solicitações">aguardando km</span>' : s.km && s.km.escolha ? ` <span class="sub">· ${esc(s.km.kmCobrado)} km (${esc(s.km.escolha.toLowerCase())})</span>` : '') },
     { k: 'val', label: 'Valor previsto', v: s => R(s.valorPrevisto), ord: s => +s.valorPrevisto || 0, num: true, x: s => s.valorPrevisto === '' ? '' : +s.valorPrevisto, fmt: FMT_R },
+    { k: 'cli', label: 'Cliente', v: s => cliNome(s.clienteId), oculta: true },
+    { k: 'upl', label: 'Código UPLOG', v: s => cliDe(s.clienteId).codigoUplog || '', oculta: true },
+    { k: 'serv', label: 'Serviço', v: s => s.servico || '', oculta: true },
+    { k: 'dsol', label: 'Data da solicitação', v: s => D(s.dataSolicitacao), ord: s => s.dataSolicitacao || '', cls: 'mono', oculta: true },
+    { k: 'kmc', label: 'Km cobrado', v: s => s.km && s.km.escolha ? s.km.kmCobrado + ' km (' + s.km.escolha.toLowerCase() + ')' : '', ord: s => s.km && +s.km.kmCobrado || 0, oculta: true },
   ], { titulo: 'Destinadas — falta BM', arquivo: 'faturamento-falta-bm', unidade: 'coletas', aoMudar: render,
     extrasExport: [{ label: 'Cliente', x: s => cliNome(s.clienteId) }, { label: 'Código UPLOG', x: s => cliDe(s.clienteId).codigoUplog || '' }],
     subtitulo: () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '', filtrosExtras: () => [S.busca && 'Busca: "' + S.busca + '"'].filter(Boolean),
@@ -447,7 +460,7 @@ function renderAFaturar() {
         ${S.ro ? '' : `<button class="btn sm pri" data-montar="${esc(cid)}">Montar BM</button>`}</div>
         ${l.length ? `<div class="tbl-wrap"><table><thead>${T.cab('', S.ro ? '' : '<th></th>')}</thead><tbody>
         ${l.map(s => `<tr>${S.ro ? '' : `<td><input type="checkbox" data-sel="${esc(s.id)}" data-cli="${esc(cid)}" ${S.sel[s.id] && !kmPend(s) ? 'checked' : ''} ${kmPend(s) ? 'disabled title="Aguardando o solicitante definir o km"' : ''} aria-label="Incluir no BM" style="width:auto"></td>`}
-          <td class="mono">${esc(D(s.dataColeta))}</td><td>${esc(uniNome(s.unidadeId))}</td><td>${esc(conNome(s.consultorId) || '—')}</td><td class="wrap">${esc(s.descricao || '')}${kmPend(s) ? ' <span class="pill warn" title="O solicitante escolhe o km real ou o previsto em Solicitações">aguardando km</span>' : s.km && s.km.escolha ? ` <span class="sub">· ${esc(s.km.kmCobrado)} km (${esc(s.km.escolha.toLowerCase())})</span>` : ''}</td><td class="num">${R(s.valorPrevisto)}</td></tr>`).join('')}
+          ${T.celulas(s)}</tr>`).join('')}
         </tbody></table></div>` : ''}
         ${(cobs[cid] || []).length ? `<h3 class="sec">Frustradas a cobrar</h3><div class="chips">${cobs[cid].map(c => `<label class="chip">${S.ro ? '' : `<input type="checkbox" data-selc="${esc(c.id)}" ${S.selc[c.id] ? 'checked' : ''}>`} ${esc(cobTxt(c))} · <b>${R(c.valor)}</b></label>`).join('')}</div>` : ''}</div>`; }).join('') : `<div class="empty">${solsTela.length ? 'Nenhuma coleta com os filtros das colunas.' : 'Nenhuma coleta realizada esperando BM.'}</div>`}
   </section>`;
@@ -608,17 +621,8 @@ function renderBM() {
 }
 
 /* ---------- BMs em aberto ---------- */
-function linhaFat(f, acoes) {
-  const c = cliDe(f.clienteId);
-  return `<tr><td data-label="BM" class="mono"><b>${esc(f.bmNumero || 's/nº')}</b>${f.origem === 'planilha' ? ' <span class="tag-imp">planilha</span>' : ''}</td>
-    <td data-label="Cliente" class="full"><b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}</td>
-    <td data-label="Unidade">${esc(uniNome(f.unidadeId))}</td>
-    <td data-label="Envio" class="mono">${esc(D(f.bmData))}</td>
-    <td data-label="Aprovação" class="mono">${esc(D(f.aprovacaoData))}</td>
-    <td data-label="NF" class="mono">${f.nfNumero || f.nfData ? esc((f.nfNumero || 's/nº') + (f.nfData ? ' · ' + D(f.nfData) : '')) : '—'}</td>
-    <td data-label="Valor" class="num">${R(f.nfValor !== '' ? f.nfValor : f.bmValor)}</td>
-    <td data-label="Status">${stPill(f.status)}</td>
-    <td data-label="">${acoes(f)}</td></tr>`;
+function linhaFat(f, acoes, T) {
+  return `<tr>${T.celulas(f)}<td data-label="">${acoes(f)}</td></tr>`;
 }
 function renderAbertos() {
   const lista = S.d.faturamentos.filter(f => (f.status === 'BM enviado' || f.status === 'Aprovado') && passaUni(f) && passaBusca([cliNome(f.clienteId), cliDe(f.clienteId).codigoUplog, f.bmNumero].join(' ')))
@@ -633,7 +637,7 @@ function renderAbertos() {
     <div class="toolbar"><input type="search" id="busca" placeholder="Buscar cliente, código ou nº do BM…" value="${esc(S.busca)}" aria-label="Buscar"><span class="sub" style="margin:0 0 0 auto">${listaF.length} BM(s) · ${R(total)}</span>${T.botao()}</div>
     ${T.info(listaF.length, listaTela.length)}
     ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>')}</thead><tbody>
-      ${listaF.map(f => linhaFat(f, x => `<div class="acoes">${S.ro ? `<button class="btn sm" data-ver="${x.id}">Ver</button>` : `<button class="btn sm" data-ed="${x.id}">Editar</button>${x.status === 'BM enviado' ? `<button class="btn sm" data-apr="${x.id}">Aprovado</button>` : ''}<button class="btn sm pri" data-nf="${x.id}">Emitir NF</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>`}</div>`)).join('') || '<tr><td colspan="9" class="empty">Nenhum BM com os filtros das colunas.</td></tr>'}
+      ${listaF.map(f => linhaFat(f, x => `<div class="acoes">${S.ro ? `<button class="btn sm" data-ver="${x.id}">Ver</button>` : `<button class="btn sm" data-ed="${x.id}">Editar</button>${x.status === 'BM enviado' ? `<button class="btn sm" data-apr="${x.id}">Aprovado</button>` : ''}<button class="btn sm pri" data-nf="${x.id}">Emitir NF</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>`}</div>`, T)).join('') || `<tr><td colspan="${T.nVis() + 1}" class="empty">Nenhum BM com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhum BM aguardando.</div>'}
   </section>`;
   ligarBusca(); ligarAcoesFat(); T.ligar();
@@ -659,7 +663,7 @@ function renderEmitidas() {
       <span class="sub" style="margin:0 0 0 auto">${listaF.length} NF(s) · ${R(total)}</span>${T.botao()}</div>
     ${T.info(listaF.length, listaTela.length)}
     ${lista.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>')}</thead><tbody>
-      ${listaF.map(f => linhaFat(f, x => `<div class="acoes"><button class="btn sm" data-ver="${x.id}">Ver</button>${admin && x.status === 'NF emitida' ? `<button class="btn sm" data-reab="${x.id}">Reabrir</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>` : ''}</div>`)).join('') || '<tr><td colspan="9" class="empty">Nenhuma NF com os filtros das colunas.</td></tr>'}
+      ${listaF.map(f => linhaFat(f, x => `<div class="acoes"><button class="btn sm" data-ver="${x.id}">Ver</button>${admin && x.status === 'NF emitida' ? `<button class="btn sm" data-reab="${x.id}">Reabrir</button><button class="btn sm danger" data-canc="${x.id}">Cancelar</button>` : ''}</div>`, T)).join('') || `<tr><td colspan="${T.nVis() + 1}" class="empty">Nenhuma NF com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhuma NF neste filtro.</div>'}
   </section>`;
   ligarBusca(); ligarAcoesFat(); T.ligar();
