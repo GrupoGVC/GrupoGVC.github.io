@@ -289,7 +289,7 @@ table.itens td input,table.itens td select{min-width:70px}
 <style>.tot{text-align:right;font-size:14px}.tot b{font:700 20px var(--f-display);font-stretch:85%}.tot b.neg,td.neg{color:var(--crit)}.pill.st.warn{background:var(--warn-bg);color:var(--warn)}</style>
 <script src="../config.js"></script>
 <script src="../portal.js?v=20261105"></script>
-<script src="../tabela.js?v=20261102"></script>
+<script src="../tabela.js?v=20261107"></script>
 </head>
 <body>
 <header class="top">
@@ -408,10 +408,13 @@ const subUni = () => S.uni ? 'Unidade: ' + uniNome(S.uni) : '';
 function renderAPagar() {
   const listaTela = aPagar();
   const T = Portal.tabela('dp-apagar', [
-    { k: 'pes', label: 'Pessoa', v: nomeP },
+    { k: 'pes', label: 'Pessoa', v: nomeP, cls: 'full', h: a => pessoaCel(a) + (a.obs ? `<div class="sub">${esc(a.obs)}</div>` : '') },
     { k: 'noi', label: 'Noites', v: a => String(a.noites), ord: a => +a.noites || 0, num: true },
     { k: 'vn', label: 'Valor da noite', v: a => R(a.valorNoite), ord: a => +a.valorNoite || 0, num: true, fmt: FMT_R },
-    { k: 'val', label: 'A pagar', v: a => R(a.valor), ord: a => +a.valor || 0, num: true, fmt: FMT_R },
+    { k: 'val', label: 'A pagar', v: a => R(a.valor), ord: a => +a.valor || 0, num: true, fmt: FMT_R, h: a => `<b>${R(a.valor)}</b>` },
+    { k: 'via', label: 'Viagem', v: a => viaRot(viaDe(a.viagemId)), ord: a => viaDe(a.viagemId).dataSaida || '', oculta: true },
+    { k: 'uni', label: 'Unidade', v: a => uniNome(viaDe(a.viagemId).unidadeId), oculta: true },
+    { k: 'obs', label: 'Observação', v: a => a.obs || '', oculta: true },
   ], { titulo: 'Pernoites a pagar', arquivo: 'dp-pernoites-a-pagar', unidade: 'adiantamentos', aoMudar: render, subtitulo: subUni,
     extrasExport: [{ label: 'Viagem', x: a => viaRot(viaDe(a.viagemId)) }, { label: 'Unidade', x: a => uniNome(viaDe(a.viagemId).unidadeId) }, { label: 'Observação', x: a => a.obs || '' }],
     totais: l => ({ 'Noites': l.reduce((t, a) => t + (+a.noites || 0), 0), 'A pagar': l.reduce((t, a) => t + a.valor, 0) }) });
@@ -428,8 +431,7 @@ function renderAPagar() {
       return `<div class="cli-card"><div class="cli-h"><div>${S.ro ? '' : `<input type="checkbox" data-selv="${esc(vid)}" aria-label="Marcar a viagem toda" style="width:auto;margin-right:6px">`}<b>${esc(viaRot(v))}</b> <span class="sub">${esc(uniNome(v.unidadeId))} · ${esc(v.status)}</span></div><b>${R(as.reduce((t, a) => t + a.valor, 0))}</b></div>
         <div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>', S.ro ? '' : '<th></th>')}</thead><tbody>
         ${as.map(a => `<tr>${S.ro ? '' : `<td data-label=""><input type="checkbox" data-sel="${esc(a.id)}" data-v="${esc(vid)}" ${S.sel[a.id] ? 'checked' : ''} aria-label="Marcar" style="width:auto"></td>`}
-          <td data-label="Pessoa" class="full">${pessoaCel(a)}${a.obs ? `<div class="sub">${esc(a.obs)}</div>` : ''}</td><td data-label="Noites" class="num">${a.noites}</td><td data-label="Valor da noite" class="num">${R(a.valorNoite)}</td>
-          <td data-label="A pagar" class="num"><b>${R(a.valor)}</b></td><td data-label=""><button class="btn sm" data-hist="${esc(a.id)}">Histórico</button></td></tr>`).join('')}
+          ${T.celulas(a)}<td data-label=""><button class="btn sm" data-hist="${esc(a.id)}">Histórico</button></td></tr>`).join('')}
         </tbody></table></div></div>`; }).join('') : `<div class="empty">${listaTela.length ? 'Nada com os filtros das colunas.' : 'Nenhum pernoite a pagar.'}</div>`}
   </section>`;
   ligarSel('pagar'); ligarHist(); T.ligar();
@@ -444,12 +446,15 @@ function renderAPagar() {
 function renderAcertos() {
   const listaTela = acertosAbertos().sort((a, b) => String(viaDe(a.viagemId).dataSaida).localeCompare(String(viaDe(b.viagemId).dataSaida)));
   const T = Portal.tabela('dp-acertos', [
-    { k: 'pes', label: 'Pessoa', v: nomeP },
-    { k: 'via', label: 'Viagem', v: a => viaRot(viaDe(a.viagemId)), ord: a => viaDe(a.viagemId).dataSaida || '' },
-    { k: 'pag', label: 'Pagas', v: a => String(a.noites), ord: a => +a.noites || 0, num: true },
+    { k: 'pes', label: 'Pessoa', v: nomeP, cls: 'full', h: a => pessoaCel(a) },
+    { k: 'via', label: 'Viagem', v: a => viaRot(viaDe(a.viagemId)), ord: a => viaDe(a.viagemId).dataSaida || '', h: a => esc(viaRot(viaDe(a.viagemId))) + (a.obs ? `<div class="sub">${esc(a.obs)}</div>` : '') },
+    { k: 'pag', label: 'Pagas', v: a => String(a.noites), ord: a => +a.noites || 0, num: true, h: a => `${a.noites}<div class="sub">${esc(D(a.pagoEm))}</div>` },
     { k: 'rea', label: 'Realizadas', v: a => String(a.acertoNoites), ord: a => +a.acertoNoites || 0, num: true },
-    { k: 'dif', label: 'Diferença', v: a => (a.acertoValor > 0 ? '+ ' : '− ') + R(Math.abs(a.acertoValor)), ord: a => +a.acertoValor || 0, num: true, fmt: FMT_R },
-    { k: 'ace', label: 'Acerto', v: a => a.acertoStatus },
+    { k: 'dif', label: 'Diferença', v: a => (a.acertoValor > 0 ? '+ ' : '− ') + R(Math.abs(a.acertoValor)), ord: a => +a.acertoValor || 0, num: true, fmt: FMT_R, tdc: a => a.acertoValor < 0 ? 'neg' : '', h: a => `<b>${a.acertoValor > 0 ? '+ ' : '− '}${R(Math.abs(a.acertoValor))}</b>` },
+    { k: 'ace', label: 'Acerto', v: a => a.acertoStatus, h: a => stPill(a.acertoStatus) },
+    { k: 'pgem', label: 'Pago em', v: a => D(a.pagoEm), ord: a => a.pagoEm || '', cls: 'mono', oculta: true },
+    { k: 'uni', label: 'Unidade', v: a => uniNome(viaDe(a.viagemId).unidadeId), oculta: true },
+    { k: 'obs', label: 'Observação', v: a => a.obs || '', oculta: true },
   ], { titulo: 'Acertos depois da viagem', arquivo: 'dp-acertos', unidade: 'acertos', aoMudar: render, subtitulo: subUni,
     extrasExport: [{ label: 'Pago em', x: a => D(a.pagoEm) }, { label: 'Observação', x: a => a.obs || '' }],
     totais: l => ({ 'Diferença': l.reduce((t, a) => t + (+a.acertoValor || 0), 0) }) });
@@ -462,10 +467,7 @@ function renderAcertos() {
     ${T.info(lista.length, listaTela.length)}
     ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>', S.ro ? '' : '<th></th>')}</thead><tbody>
       ${lista.map(a => `<tr>${S.ro ? '' : `<td data-label=""><input type="checkbox" data-sel="${esc(a.id)}" ${S.sel[a.id] ? 'checked' : ''} aria-label="Marcar" style="width:auto"></td>`}
-        <td data-label="Pessoa" class="full">${pessoaCel(a)}</td><td data-label="Viagem">${esc(viaRot(viaDe(a.viagemId)))}${a.obs ? `<div class="sub">${esc(a.obs)}</div>` : ''}</td>
-        <td data-label="Pagas" class="num">${a.noites}<div class="sub">${esc(D(a.pagoEm))}</div></td><td data-label="Realizadas" class="num">${a.acertoNoites}</td>
-        <td data-label="Diferença" class="num ${a.acertoValor < 0 ? 'neg' : ''}"><b>${a.acertoValor > 0 ? '+ ' : '− '}${R(Math.abs(a.acertoValor))}</b></td>
-        <td data-label="Acerto">${stPill(a.acertoStatus)}</td><td data-label=""><button class="btn sm" data-hist="${esc(a.id)}">Histórico</button></td></tr>`).join('') || `<tr><td colspan="${S.ro ? 7 : 8}" class="empty">Nada com os filtros das colunas.</td></tr>`}
+        ${T.celulas(a)}<td data-label=""><button class="btn sm" data-hist="${esc(a.id)}">Histórico</button></td></tr>`).join('') || `<tr><td colspan="${T.nVis() + (S.ro ? 1 : 2)}" class="empty">Nada com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhum acerto pendente.</div>'}
   </section>`;
   ligarSel('acertar'); ligarHist(); T.ligar();
@@ -489,13 +491,14 @@ function renderRelatorio() {
   const linhasTela = Object.values(pessoas).sort((a, b) => (colDe(a.id).nome || '').localeCompare(colDe(b.id).nome || '', 'pt-BR'));
   const liq = p => p.pago + p.comp - p.dev;
   const TR = Portal.tabela('dp-relatorio', [
-    { k: 'pes', label: 'Pessoa', v: p => colDe(p.id).nome },
-    { k: 'cpf', label: 'CPF', v: p => colDe(p.id).cpf },
+    { k: 'pes', label: 'Pessoa', v: p => colDe(p.id).nome, cls: 'full', h: p => `<b>${esc(colDe(p.id).nome || '—')}</b>` },
+    { k: 'cpf', label: 'CPF', v: p => colDe(p.id).cpf, cls: 'mono', h: p => esc(colDe(p.id).cpf || '—') },
     { k: 'noi', label: 'Noites pagas', v: p => String(p.noites), ord: p => p.noites, num: true },
     { k: 'pag', label: 'Adiantado', v: p => R(p.pago), ord: p => p.pago, num: true, fmt: FMT_R },
-    { k: 'com', label: 'Complemento', v: p => p.comp ? R(p.comp) : '', ord: p => p.comp, num: true, fmt: FMT_R },
-    { k: 'dev', label: 'Devolução', v: p => p.dev ? R(p.dev) : '', ord: p => p.dev, num: true, fmt: FMT_R },
-    { k: 'liq', label: 'Líquido', v: p => R(liq(p)), ord: liq, num: true, fmt: FMT_R },
+    { k: 'com', label: 'Complemento', v: p => p.comp ? R(p.comp) : '', ord: p => p.comp, num: true, fmt: FMT_R, h: p => p.comp ? R(p.comp) : '—' },
+    { k: 'dev', label: 'Devolução', v: p => p.dev ? R(p.dev) : '', ord: p => p.dev, num: true, fmt: FMT_R, tdc: () => 'neg', h: p => p.dev ? R(p.dev) : '—' },
+    { k: 'liq', label: 'Líquido', v: p => R(liq(p)), ord: liq, num: true, fmt: FMT_R, h: p => `<b>${R(liq(p))}</b>` },
+    { k: 'qtd', label: 'Adiantamentos pagos', v: p => String(p.n), ord: p => p.n, num: true, oculta: true },
   ], { titulo: 'Pernoites do mês por pessoa', aba: 'Pernoites por pessoa', arquivo: 'pernoites-' + S.mes, unidade: 'pessoas', aoMudar: render,
     subtitulo: () => ['Mês: ' + mesLbl(S.mes), subUni()].filter(Boolean).join(' · '),
     totais: l => ({ 'Noites pagas': l.reduce((t, p) => t + p.noites, 0), 'Adiantado': l.reduce((t, p) => t + p.pago, 0), 'Complemento': l.reduce((t, p) => t + p.comp, 0), 'Devolução': l.reduce((t, p) => t + p.dev, 0), 'Líquido': l.reduce((t, p) => t + liq(p), 0) }) });
@@ -504,12 +507,17 @@ function renderRelatorio() {
   const todosTela = S.d.adiantamentos.filter(a => passaUni(a))
     .sort((a, b) => String(viaDe(b.viagemId).dataSaida).localeCompare(String(viaDe(a.viagemId).dataSaida)));
   const TA = Portal.tabela('dp-todos', [
-    { k: 'pes', label: 'Pessoa', v: nomeP },
+    { k: 'pes', label: 'Pessoa', v: nomeP, cls: 'full', h: a => `<b>${esc(colDe(a.colaboradorId).nome || '—')}</b>` },
     { k: 'via', label: 'Viagem', v: a => viaRot(viaDe(a.viagemId)), ord: a => viaDe(a.viagemId).dataSaida || '' },
     { k: 'noi', label: 'Noites', v: a => String(a.noites), ord: a => +a.noites || 0, num: true },
     { k: 'val', label: 'Valor', v: a => R(a.valor), ord: a => +a.valor || 0, num: true, fmt: FMT_R },
-    { k: 'sit', label: 'Situação', v: a => a.status },
-    { k: 'ace', label: 'Acerto', v: a => a.acertoStatus },
+    { k: 'sit', label: 'Situação', v: a => a.status, h: a => stPill(a.status) + (a.pagoEm ? ` <span class="sub">${esc(D(a.pagoEm))}</span>` : '') },
+    { k: 'ace', label: 'Acerto', v: a => a.acertoStatus, h: a => a.acertoStatus ? stPill(a.acertoStatus) + (a.acertoValor ? ` <span class="sub">${a.acertoValor > 0 ? '+' : '−'}${esc(R(Math.abs(a.acertoValor)))}</span>` : '') : '—' },
+    { k: 'pgem', label: 'Pago em', v: a => D(a.pagoEm), ord: a => a.pagoEm || '', cls: 'mono', oculta: true },
+    { k: 'vac', label: 'Valor do acerto', v: a => a.acertoValor === '' || a.acertoValor == null ? '' : R(a.acertoValor), ord: a => +a.acertoValor || 0, x: a => a.acertoValor === '' || a.acertoValor == null ? '' : +a.acertoValor, fmt: FMT_R, num: true, oculta: true },
+    { k: 'acem', label: 'Acertado em', v: a => D(a.acertoEm), ord: a => a.acertoEm || '', cls: 'mono', oculta: true },
+    { k: 'uni', label: 'Unidade', v: a => uniNome(viaDe(a.viagemId).unidadeId), oculta: true },
+    { k: 'obs', label: 'Observação', v: a => a.obs || '', oculta: true },
   ], { titulo: 'Todos os adiantamentos', arquivo: 'dp-adiantamentos', unidade: 'adiantamentos', aoMudar: render, subtitulo: subUni,
     extrasExport: [{ label: 'Pago em', x: a => D(a.pagoEm) }, { label: 'Valor do acerto', x: a => a.acertoValor === '' || a.acertoValor == null ? '' : +a.acertoValor }, { label: 'Acertado em', x: a => D(a.acertoEm) }, { label: 'Observação', x: a => a.obs || '' }],
     totais: l => ({ 'Noites': l.reduce((t, a) => t + (+a.noites || 0), 0), 'Valor': l.reduce((t, a) => t + (+a.valor || 0), 0) }) });
@@ -520,20 +528,16 @@ function renderRelatorio() {
     <div class="toolbar"><span style="margin-left:auto">${TR.botao()}</span></div>
     ${TR.info(linhas.length, linhasTela.length)}
     ${linhasTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TR.cab()}</thead><tbody>
-      ${linhas.map(p => { const c = colDe(p.id); return `<tr><td data-label="Pessoa" class="full"><b>${esc(c.nome || '—')}</b></td><td data-label="CPF" class="mono">${esc(c.cpf || '—')}</td><td data-label="Noites pagas" class="num">${p.noites}</td>
-        <td data-label="Adiantado" class="num">${R(p.pago)}</td><td data-label="Complemento" class="num">${p.comp ? R(p.comp) : '—'}</td><td data-label="Devolução" class="num neg">${p.dev ? R(p.dev) : '—'}</td><td data-label="Líquido" class="num"><b>${R(p.pago + p.comp - p.dev)}</b></td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Ninguém com os filtros das colunas.</td></tr>'}
-    </tbody><tfoot><tr><td colspan="2">${linhas.length} pessoa(s)</td><td class="num">${tot.noites}</td><td class="num">${R(tot.pago)}</td><td class="num">${R(tot.comp)}</td><td class="num">${R(tot.dev)}</td><td class="num"><b>${R(tot.pago + tot.comp - tot.dev)}</b></td></tr></tfoot></table></div>`
+      ${linhas.map(p => `<tr>${TR.celulas(p)}</tr>`).join('') || `<tr><td colspan="${TR.nVis()}" class="empty">Ninguém com os filtros das colunas.</td></tr>`}
+    </tbody>${TR.rodape({ noi: tot.noites, pag: R(tot.pago), com: R(tot.comp), dev: R(tot.dev), liq: `<b>${R(tot.pago + tot.comp - tot.dev)}</b>`, qtd: linhas.reduce((t, p) => t + p.n, 0) }, linhas.length + ' pessoa(s)')}</table></div>`
       : '<div class="empty">Nada pago ou acertado neste mês.</div>'}
   </section>
   <section class="panel"><div class="panel-h"><div><h2>Todos os adiantamentos</h2></div></div>
     <div class="toolbar"><span style="margin-left:auto">${TA.botao()}</span></div>
     ${TA.info(todos.length, todosTela.length)}
     ${todosTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${TA.cab('<th></th>')}</thead><tbody>
-      ${todos.map(a => `<tr><td data-label="Pessoa" class="full"><b>${esc(colDe(a.colaboradorId).nome || '—')}</b></td><td data-label="Viagem">${esc(viaRot(viaDe(a.viagemId)))}</td>
-        <td data-label="Noites" class="num">${a.noites}</td><td data-label="Valor" class="num">${R(a.valor)}</td>
-        <td data-label="Situação">${stPill(a.status)}${a.pagoEm ? ` <span class="sub">${esc(D(a.pagoEm))}</span>` : ''}</td>
-        <td data-label="Acerto">${a.acertoStatus ? stPill(a.acertoStatus) + (a.acertoValor ? ` <span class="sub">${a.acertoValor > 0 ? '+' : '−'}${esc(R(Math.abs(a.acertoValor)))}</span>` : '') : '—'}</td>
-        <td data-label=""><div class="acoes"><button class="btn sm" data-hist="${esc(a.id)}">Histórico</button>${!S.ro && (a.status === 'Pago' && !a.acertoStatus || a.acertoStatus === 'Acertado') ? `<button class="btn sm" data-desf="${esc(a.id)}">Desfazer ${a.acertoStatus === 'Acertado' ? 'acerto' : 'pagamento'}</button>` : ''}</div></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nada com os filtros das colunas.</td></tr>'}
+      ${todos.map(a => `<tr>${TA.celulas(a)}
+        <td data-label=""><div class="acoes"><button class="btn sm" data-hist="${esc(a.id)}">Histórico</button>${!S.ro && (a.status === 'Pago' && !a.acertoStatus || a.acertoStatus === 'Acertado') ? `<button class="btn sm" data-desf="${esc(a.id)}">Desfazer ${a.acertoStatus === 'Acertado' ? 'acerto' : 'pagamento'}</button>` : ''}</div></td></tr>`).join('') || `<tr><td colspan="${TA.nVis() + 1}" class="empty">Nada com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhum adiantamento.</div>'}</section>`;
   $('#mes').onchange = e => { S.mes = e.target.value; render(); };
   TR.ligar(); TA.ligar();
