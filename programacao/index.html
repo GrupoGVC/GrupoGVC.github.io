@@ -483,6 +483,19 @@ function cnhStatus(c) {
   return { cls: 'ok', txt: 'até ' + D(c.cnhValidade) };
 }
 const stPill = st => `<span class="pill st ${{ 'Programada': 'lib', 'Concluída': 'nf', 'Cancelada': 'crit', 'Realizada': 'ok', 'Frustrada': 'crit', 'No-show': 'crit', 'Pendente': '' }[st] || ''}">${esc(st)}</span>`;
+/* ---------- motivos padrão (frustração / cancelamento) e alerta de cancelamento ---------- */
+const motivosP = tipo => (S.d.motivos || []).filter(m => m.tipo === tipo);
+const motDe = id => (S.d.motivos || []).find(m => m.id === id) || null;
+function cancelamentosHTML() {
+  const l = (S.d.cancelamentos || []).filter(c => passaUni(c)); if (!l.length) return '';
+  return `<section class="panel" style="border-color:var(--warn)"><div class="panel-h"><div><h2>Coletas canceladas pelo solicitante</h2><p class="sub">Estas coletas saíram das viagens. Confira as viagens e marque "Ciente".</p></div></div>
+    ${l.map(c => `<div class="al"><span class="pill warn">Cancelada</span><b>${esc(cliDe(c.clienteId).nome || '—')}</b> · viagem ${esc(c.viagem || '')} · ${esc(c.motivo)}${c.por ? ' <span class="sub">(' + esc(String(c.por).split('@')[0]) + ')</span>' : ''}
+      ${S.ro ? '' : `<button class="btn sm" data-ciente="${esc(c.id)}">Ciente</button>`} ${c.viagemId ? `<button class="btn sm" data-vercanc="${esc(c.viagemId)}">Abrir viagem</button>` : ''}</div>`).join('')}</section>`;
+}
+function ligarCancelamentos() {
+  $$('[data-ciente]').forEach(b => b.onclick = async () => { b.disabled = true; try { await Portal.api('prog.ciente', { id: b.dataset.ciente }); await carregar(true); } catch (e) { b.disabled = false; falha(e); } });
+  $$('[data-vercanc]').forEach(b => b.onclick = () => { abrirViagem(b.dataset.vercanc); render(); scrollTo({ top: 0 }); });
+}
 
 /* ---------- carregar ---------- */
 async function carregar(silencioso, semRedesenhar) {
@@ -524,18 +537,19 @@ function render() {
   const ce = $('#ct-eq'); ce.textContent = alerta; ce.hidden = !alerta;
   if (S.v) return renderViagem();
   ({ fila: renderFila, viagens: renderViagens, equipe: renderEquipe, importar: renderImportar })[S.tab]();
+  if (S.tab === 'fila' || S.tab === 'viagens') { const ch = cancelamentosHTML(); if (ch) { $('#main').insertAdjacentHTML('afterbegin', ch); ligarCancelamentos(); } }
 }
 
 /* ---------- A programar ---------- */
 function renderFila() {
   const lista = S.d.solicitacoes.filter(s => (s.status === 'Liberada para programar' || s.status === 'Frustrada') && passaUni(s))
-    .sort((a, b) => String(a.dataPrevista || a.dataSolicitacao).localeCompare(String(b.dataPrevista || b.dataSolicitacao)));
+    .sort((a, b) => String(a.dataDesejada || a.dataSolicitacao).localeCompare(String(b.dataDesejada || b.dataSolicitacao)));
   const abertas = S.d.viagens.filter(v => v.status === 'Programada' && passaUni(v)).sort((a, b) => a.dataSaida.localeCompare(b.dataSaida));
   const stTxt = s => s.status === 'Frustrada' ? 'Frustrada' : 'Liberada';
   const T = Portal.tabela('prog-fila', [
     { k: 'cli', label: 'Cliente', v: s => cliDe(s.clienteId).nome },
     { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
-    { k: 'prev', label: 'Prevista', v: s => D(s.dataPrevista), ord: s => s.dataPrevista || '' },
+    { k: 'prev', label: 'Desejada pelo cliente', v: s => D(s.dataDesejada), ord: s => s.dataDesejada || '' },
     { k: 'desc', label: 'Descrição', v: s => s.descricao },
     { k: 'dest', label: 'Destino', v: s => [...new Set(itensSol(s.id).map(i => destNome(i.destinadorId)).filter(Boolean))].join(', '), vazio: '(sem destino)' },
     { k: 'st', label: 'Status', v: stTxt },
@@ -552,7 +566,7 @@ function renderFila() {
       ${listaF.map(s => { const c = cliDe(s.clienteId); return `<tr>${S.ro ? '' : `<td data-label=""><input type="checkbox" data-sel="${esc(s.id)}" ${S.sel[s.id] ? 'checked' : ''} aria-label="Marcar" style="width:auto"></td>`}
         <td data-label="Cliente" class="full"><b>${esc(c.nome || '—')}</b>${c.codigoUplog ? ` <span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}</td>
         <td data-label="Unidade">${esc(uniNome(s.unidadeId))}</td>
-        <td data-label="Prevista" class="mono ${s.dataPrevista && s.dataPrevista < hojeISO() ? 'atraso' : ''}">${esc(D(s.dataPrevista) || '—')}</td>
+        <td data-label="Desejada" class="mono ${s.dataDesejada && s.dataDesejada < hojeISO() ? 'atraso' : ''}">${esc(D(s.dataDesejada) || '—')}</td>
         <td data-label="Descrição" class="wrap">${esc(s.descricao || '')}${itensSol(s.id).length ? `<div class="sub">${esc(resumoItens(s.id))}</div>` : ''}${s.status === 'Frustrada' && s.motivo ? `<div class="sub">${esc(s.motivo)}</div>` : ''}</td>
         <td data-label="Status">${stPill(s.status === 'Frustrada' ? 'Frustrada' : 'Pendente').replace('Pendente', 'Liberada')}</td></tr>`; }).join('') || `<tr><td colspan="${S.ro ? 5 : 6}" class="empty">Nada com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nada esperando programação.</div>'}
@@ -598,7 +612,7 @@ function renderViagens() {
 /* ---------- formulário da viagem ---------- */
 function novaViagem(solIds) {
   const uni = S.uni || (solIds.length ? solDe(solIds[0]).unidadeId : '') || (S.d.unidades.length === 1 ? S.d.unidades[0].id : '');
-  const prevista = solIds.map(id => solDe(id).dataPrevista).filter(Boolean).sort()[0];
+  const prevista = solIds.map(id => solDe(id).dataDesejada).filter(Boolean).sort()[0];
   const saida = prevista && prevista >= hojeISO() ? prevista : addDias(hojeISO(), 1);
   S.v = { id: '', unidadeId: uni, execucao: 'Própria', dataSaida: saida, dataRetornoPrevisto: saida, veiculoId: '', motoristaId: '', equipe: [], transportadorId: '', custoTerceiro: '',
           pernoitesPrevistos: 0, noitesManual: false, obs: '', status: 'Programada', paradas: [], sujo: true };
@@ -612,7 +626,7 @@ function abrirViagem(id) {
 }
 function addParadaSol(id) {
   const s = solDe(id); if (!s.id || S.v.paradas.some(p => p.solicitacaoId === id)) return;
-  S.v.paradas.push(prepararParada({ id: '', solicitacaoId: id, clienteId: s.clienteId, data: '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: s.descricao || '' }));
+  S.v.paradas.push(prepararParada({ id: '', solicitacaoId: id, clienteId: s.clienteId, data: S.v.dataSaida || '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: s.descricao || '' }));
 }
 function alertasLocais(v) {
   const a = [];
@@ -699,19 +713,37 @@ function renderViagem_() {
   </section>`;
   ligarViagem(ro);
 }
+// frustrada ou cancelada só a partir do dia da saída da viagem
+function resultadoOpts(p) {
+  const antes = S.v && S.v.dataSaida && S.v.dataSaida > (S.d.hoje || hojeISO());
+  const l = S.d.listas.resultado.concat(p.resultado && !S.d.listas.resultado.includes(p.resultado) ? [p.resultado] : []);
+  return l.map(r => { const bloq = antes && (r === 'Frustrada' || r === 'Cancelada') && p.resultado !== r;
+    return `<option value="${esc(r)}" ${r === p.resultado ? 'selected' : ''} ${bloq ? 'disabled' : ''}>${esc(r)}${bloq ? ' (a partir da saída)' : ''}</option>`; }).join('');
+}
+function motivoParadaHTML(p, ro) {
+  const tipo = p.resultado === 'Cancelada' ? 'Cancelamento' : 'Frustração';
+  const lista = motivosP(tipo).filter(m => m.ativo || m.id === p.motivoId);
+  const m = motDe(p.motivoId);
+  return `<div class="fld"><label>Motivo ${tipo === 'Frustração' ? 'da frustração' : 'do cancelamento'}</label><select data-f="motivoId" ${ro ? 'disabled' : ''}>${opts(lista.map(x => [x.id, x.nome]), p.motivoId, 'Escolha…')}</select></div>
+    ${m && m.responsavel === 'Na hora' ? `<div class="fld"><label>Responsável</label><select data-f="responsavel" ${ro ? 'disabled' : ''}>${opts([['Cliente', 'Cliente'], ['Interno', 'Interno (GVC)'], ['Externo', 'Externo']], p.responsavel, 'Escolha…')}</select></div>`
+      : m ? `<div class="fld"><label>Responsável</label><div style="padding:8px 0">${esc(m.responsavel === 'Interno' ? 'Interno (GVC)' : m.responsavel)}</div></div>` : ''}
+    ${p.resultado === 'Cancelada' ? `<div class="fld"><label>A equipe já tinha saído da base?</label><select data-f="equipeSaiu" ${ro ? 'disabled' : ''}>${opts([['SIM', 'Sim, já estava na rua'], ['NÃO', 'Não saiu']], p.equipeSaiu, 'Escolha…')}</select></div>` : ''}
+    <div class="fld full"><label>Observação (obrigatória)</label><input data-f="motivo" value="${esc(p.motivo)}" ${ro ? 'disabled' : ''}></div>
+    ${(m && (m.responsavel === 'Cliente' || (m.responsavel === 'Na hora' && p.responsavel === 'Cliente'))) && (p.resultado === 'Frustrada' || p.equipeSaiu === 'SIM') ? '<p class="hint full">Responsabilidade do cliente: vai para a decisão de cobrança da viagem.</p>' : ''}`;
+}
 function paradaHTML(p, i, ro, cxs) {
   const c = cliDe(p.clienteId); const s = p.solicitacaoId ? solDe(p.solicitacaoId) : null;
-  const ruim = p.resultado === 'Frustrada' || p.resultado === 'No-show';
+  const ruim = p.resultado === 'Frustrada' || p.resultado === 'No-show' || p.resultado === 'Cancelada';
   const cxEnt = cxs.filter(x => x.situacao !== 'Em cliente' || x.id === p.caixaEntregueId);
   const cxRet = cxs.filter(x => x.situacao === 'Em cliente' && (!x.cadastroAtualId || x.cadastroAtualId === p.clienteId) || x.id === p.caixaRetiradaId);
   return `<div class="parada ${p.resultado === 'Realizada' ? 'ok' : ruim ? 'x' : ''}" data-p="${i}">
     <div class="pa-h"><span class="pa-n">${i + 1}</span><div style="flex:1;min-width:0"><b>${esc(c.nome || '—')}</b> ${c.codigoUplog ? `<span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}
-      <div class="sub">${s ? 'Solicitação de ' + esc(D(s.dataSolicitacao)) + (s.dataPrevista ? ' · prevista ' + esc(D(s.dataPrevista)) : '') : 'Parada avulsa'}</div></div>
+      <div class="sub">${s ? 'Solicitação de ' + esc(D(s.dataSolicitacao)) + (s.dataDesejada ? ' · desejada pelo cliente ' + esc(D(s.dataDesejada)) : '') : 'Parada avulsa'}</div></div>
       ${ro ? '' : `<div class="pa-acts"><button class="btn sm" data-up="${i}" aria-label="Subir" ${i ? '' : 'disabled'}>↑</button><button class="btn sm" data-down="${i}" aria-label="Descer">↓</button><button class="btn sm danger" data-rm="${i}" aria-label="Remover parada">×</button></div>`}</div>
     <div class="form pa-f">
-      <div class="fld"><label>Resultado</label><select data-f="resultado" ${ro ? 'disabled' : ''}>${opts(S.d.listas.resultado, p.resultado)}</select></div>
-      <div class="fld"><label>Data</label><input type="date" data-f="data" value="${esc(p.data)}" ${ro ? 'disabled' : ''}></div>
-      ${ruim ? `<div class="fld"><label>Motivo</label><input data-f="motivo" value="${esc(p.motivo)}" ${ro ? 'disabled' : ''}></div>` : ''}
+      <div class="fld"><label>Resultado</label><select data-f="resultado" ${ro ? 'disabled' : ''}>${resultadoOpts(p)}</select></div>
+      <div class="fld"><label>Data da coleta (chegada no cliente)</label><input type="date" data-f="data" value="${esc(p.data)}" required ${ro ? 'disabled' : ''}></div>
+      ${ruim ? motivoParadaHTML(p, ro) : ''}
       <div class="fld"><label>Caixa entregue</label><select data-f="caixaEntregueId" ${ro ? 'disabled' : ''}>${opts(cxEnt.map(x => [x.id, cxRot(x)]), p.caixaEntregueId, '—')}</select></div>
       <div class="fld"><label>Caixa retirada</label><select data-f="caixaRetiradaId" ${ro ? 'disabled' : ''}>${opts(cxRet.map(x => [x.id, cxRot(x)]), p.caixaRetiradaId, '—')}</select></div>
       ${p.resultado === 'Realizada' && (p.mtrs || []).length || p.travada ? '' : `<div class="fld"><label>Peso (kg)</label><input type="number" step="any" min="0" data-f="peso" value="${esc(p.peso)}" ${ro ? 'disabled' : ''}></div>`}
@@ -763,7 +795,9 @@ function ligarViagem(ro) {
   const uni = $('#v-uni'); if (uni) uni.onchange = () => { v.unidadeId = uni.value; v.veiculoId = ''; v.motoristaId = ''; v.equipe = []; sujo(); re(); };
   $$('[data-exe]').forEach(b => b.onclick = () => { v.execucao = b.dataset.exe; sujo(); re(); });
   const noitesAuto = () => { if (!v.noitesManual) v.pernoitesPrevistos = Math.max(0, diasEntre(v.dataSaida, v.dataRetornoPrevisto || v.dataSaida)); };
-  $('#v-saida').onchange = e => { v.dataSaida = e.target.value; if (!v.dataRetornoPrevisto || v.dataRetornoPrevisto < v.dataSaida) v.dataRetornoPrevisto = v.dataSaida; noitesAuto(); sujo(); re(); };
+  $('#v-saida').onchange = e => { const antiga = v.dataSaida; v.dataSaida = e.target.value;
+    // a data da coleta das paradas pendentes acompanha a saída (quando era a mesma ou ficou antes dela)
+    v.paradas.forEach(p => { if ((p.resultado || 'Pendente') === 'Pendente' && (!p.data || p.data === antiga || p.data < v.dataSaida)) p.data = v.dataSaida; }); if (!v.dataRetornoPrevisto || v.dataRetornoPrevisto < v.dataSaida) v.dataRetornoPrevisto = v.dataSaida; noitesAuto(); sujo(); re(); };
   $('#v-ret').onchange = e => { v.dataRetornoPrevisto = e.target.value; noitesAuto(); sujo(); re(); };
   const bind = (sel, k, rerender) => { const el = $(sel); if (el) el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { v[k] = el.value; sujo(); if (rerender) re(); }; };
   bind('#v-transp', 'transportadorId'); bind('#v-custo', 'custoTerceiro'); bind('#v-vei', 'veiculoId', true); bind('#v-mot', 'motoristaId', true); bind('#v-obs', 'obs');
@@ -773,7 +807,9 @@ function ligarViagem(ro) {
   $$('[data-p]').forEach(card => {
     const p = v.paradas[+card.dataset.p];
     card.querySelectorAll('[data-f]').forEach(el => {
-      el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { p[el.dataset.f] = el.value; sujo(); if (el.dataset.f === 'resultado') { if (el.value === 'Realizada') { if (!p.data) p.data = v.dataSaida; syncMtrs(p); } re(); } };
+      el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { p[el.dataset.f] = el.value; sujo();
+        if (el.dataset.f === 'resultado') { if (el.value === 'Realizada') { if (!p.data) p.data = v.dataSaida; syncMtrs(p); } if (el.value === 'Frustrada' || el.value === 'Cancelada') { const m = motDe(p.motivoId); if (m && m.tipo !== (el.value === 'Cancelada' ? 'Cancelamento' : 'Frustração')) p.motivoId = ''; } re(); }
+        if (['motivoId', 'responsavel', 'equipeSaiu'].includes(el.dataset.f)) re(); };
     });
   });
   $$('[data-p]').forEach(card => {
@@ -802,7 +838,7 @@ function ligarViagem(ro) {
   const fa = $('#p-fila-add'); if (fa) fa.onclick = () => { const id = $('#p-fila').value; if (!id) return; addParadaSol(id); sujo(); re(); };
   const ca = $('#p-cli-add'); if (ca) ca.onclick = () => { const t = $('#p-cli').value.trim(); const c = S.d.clientes.find(x => cliRot(x) === t) || S.d.clientes.find(x => x.codigoUplog && x.codigoUplog === t);
     if (!c) { toast('Escolha o cliente da lista.'); return; }
-    v.paradas.push(prepararParada({ id: '', solicitacaoId: '', clienteId: c.id, data: '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: '' })); sujo(); re(); };
+    v.paradas.push(prepararParada({ id: '', solicitacaoId: '', clienteId: c.id, data: v.dataSaida || '', resultado: 'Pendente', motivo: '', caixaEntregueId: '', caixaRetiradaId: '', peso: '', destinacao: '', obs: '' })); sujo(); re(); };
   $('#v-salvar').onclick = () => salvarViagem(false);
   const cc = $('#v-concluir'); if (cc) cc.onclick = concluir;
   const cn = $('#v-cancel'); if (cn) cn.onclick = async () => { const r = await pedir('Cancelar viagem', [{ rotulo: 'Motivo', tipo: 'area', dica: 'As solicitações voltam para a fila "A programar".' }], 'Cancelar viagem'); if (!r) return;
@@ -810,11 +846,14 @@ function ligarViagem(ro) {
   const ra = $('#v-reabrir'); if (ra) ra.onclick = async () => { try { await Portal.api('prog.viagemAcao', { id: v.id, tipo: 'reabrir' }); await carregar(true); abrirViagem(v.id); renderViagem(); } catch (e) { falha(e); } };
 }
 async function salvarViagem(confirmar) {
-  const v = S.v; const b = $('#v-salvar'); if (b) b.disabled = true;
+  const v = S.v;
+  const semData = v.paradas.findIndex(p => !p.data); if (semData >= 0) { toast('Parada ' + (semData + 1) + ': informe a data da coleta (chegada no cliente).'); return; }
+  const b = $('#v-salvar'); if (b) b.disabled = true;
   const reg = { id: v.id, unidadeId: v.unidadeId, execucao: v.execucao, dataSaida: v.dataSaida, dataRetornoPrevisto: v.dataRetornoPrevisto, veiculoId: v.veiculoId, motoristaId: v.motoristaId,
     equipe: v.equipe, transportadorId: v.transportadorId, custoTerceiro: v.custoTerceiro, pernoitesPrevistos: v.noitesManual ? v.pernoitesPrevistos : '', obs: v.obs,
     kmInicial: v.kmInicial ?? '', kmFinal: v.kmFinal ?? '',
-    paradas: v.paradas.map(p => { const x = { id: p.id, solicitacaoId: p.solicitacaoId, clienteId: p.clienteId, data: p.data, resultado: p.resultado, motivo: p.motivo, caixaEntregueId: p.caixaEntregueId,
+    paradas: v.paradas.map(p => { const x = { id: p.id, solicitacaoId: p.solicitacaoId, clienteId: p.clienteId, data: p.data, resultado: p.resultado, motivo: p.motivo,
+      motivoId: p.motivoId || '', responsavel: p.responsavel || '', equipeSaiu: p.equipeSaiu || '', caixaEntregueId: p.caixaEntregueId,
       caixaRetiradaId: p.caixaRetiradaId, peso: p.resultado === 'Realizada' && (p.mtrs || []).length ? '' : p.peso, destinacao: p.destinacao, obs: p.obs,
       itens: (p.itens || []).filter(it => it._orig && it.destinadorId && it.destinadorId !== it._orig).map(it => ({ id: it.id, destinadorId: it.destinadorId, justificativa: it._just })) };
       if (!p.travada) x.mtrs = p.resultado === 'Realizada' ? (p.mtrs || []).filter(b => b.destinadorId || b.mtr || b.linhas.some(l => l.residuoId || l.kg)).map(b => ({ destinadorId: b.destinadorId, mtr: b.mtr, negocio: b.negocio,
