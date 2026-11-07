@@ -105,18 +105,24 @@ function ligarPeriodo() {
 const SIT = m => m.situacao === 'Pendente' ? 'A destinar' : m.cdfId ? 'Com CDF' : m.atrasado ? 'Sem CDF (atrasado)' : 'Sem CDF';
 const SIT_CLS = { 'A destinar': 'warn', 'Com CDF': 'ok', 'Sem CDF (atrasado)': 'crit', 'Sem CDF': '' };
 const COLS_MTR = [
-  { k: 'mtr', label: 'MTR', v: m => m.mtr },
-  { k: 'dst', label: 'Destinação', v: m => D(m.dataDestinacao), ord: m => m.dataDestinacao || '', vazio: '(a destinar)' },
+  { k: 'mtr', label: 'MTR', v: m => m.mtr, cls: 'mono', tdc: () => 'full', h: m => `<b>${esc(m.mtr)}</b>${m.divergencia ? ` <span class="pill warn" title="${esc(m.divergencia)}">divergência</span>` : ''}` },
+  { k: 'dst', label: 'Destinação', v: m => D(m.dataDestinacao), ord: m => m.dataDestinacao || '', vazio: '(a destinar)', cls: 'mono', h: m => esc(D(m.dataDestinacao) || '—') },
   { k: 'dest', label: 'Destinador', v: m => nome(m.destinadorId) },
   { k: 'ger', label: 'Gerador', v: m => m.gerador },
-  { k: 'sit', label: 'Situação', v: SIT },
-  { k: 'cdf', label: 'CDF', v: m => m.cdfId ? (cdfDe(m.cdfId) || {}).numero || '' : '', vazio: '(sem CDF)' },
-  { k: 'dias', label: 'Dias sem CDF', v: m => m.diasSemCdf === '' ? '' : String(m.diasSemCdf), ord: m => m.diasSemCdf === '' ? -1 : m.diasSemCdf, num: true },
-  { k: 'kg', label: 'kg ticket', v: m => N(m.kg), ord: m => +m.kg || 0, num: true, x: m => m.kg === '' ? '' : +m.kg, fmt: '#,##0.##' },
-  { k: 'kgm', label: 'kg MTR', v: m => N(m.kgMtr || ''), ord: m => +m.kgMtr || 0, num: true, x: m => m.kgMtr === '' ? '' : +m.kgMtr || '', fmt: '#,##0.##' },
-  { k: 'res', label: 'Resíduos', v: m => m.residuos },
-  { k: 'col', label: 'Coleta', v: m => D(m.dataColeta), ord: m => m.dataColeta || '' },
-  { k: 'fon', label: 'Descarte', v: m => m.fonte === 'Coleta de cliente' ? 'Coleta' : 'Interno' },
+  { k: 'sit', label: 'Situação', v: SIT, h: m => `<span class="pill st ${SIT_CLS[SIT(m)]}">${esc(SIT(m))}</span>` },
+  { k: 'cdf', label: 'CDF', v: m => m.cdfId ? (cdfDe(m.cdfId) || {}).numero || '' : '', vazio: '(sem CDF)', h: m => { const c = cdfDe(m.cdfId); return (c ? `<button type="button" class="cdf-link" data-cdf="${esc(c.id)}">${esc(c.numero)}</button> <span class="sub">${esc(D(c.data))}</span>` : '—') + (m.cdfParcial ? ' <span class="pill warn" title="Nem todos os lançamentos deste MTR estão no CDF">parcial</span>' : ''); } },
+  { k: 'dias', label: 'Dias sem CDF', v: m => m.diasSemCdf === '' ? '' : String(m.diasSemCdf), ord: m => m.diasSemCdf === '' ? -1 : m.diasSemCdf, num: true, tdc: m => m.atrasado ? 'atraso' : '' },
+  { k: 'kg', label: 'kg ticket', v: m => N(m.kg), ord: m => +m.kg || 0, num: true, x: m => m.kg === '' ? '' : +m.kg, fmt: '#,##0.##', h: m => N(m.kg) || '—' },
+  { k: 'kgm', label: 'kg MTR', v: m => N(m.kgMtr || ''), ord: m => +m.kgMtr || 0, num: true, x: m => m.kgMtr === '' ? '' : +m.kgMtr || '', fmt: '#,##0.##', h: m => N(m.kgMtr || '') || '—' },
+  { k: 'res', label: 'Resíduos', v: m => m.residuos, cls: 'wrap' },
+  { k: 'col', label: 'Coleta', v: m => D(m.dataColeta), ord: m => m.dataColeta || '', cls: 'mono' },
+  { k: 'fon', label: 'Descarte', v: m => m.fonte === 'Coleta de cliente' ? 'Coleta' : 'Interno', h: m => m.fonte === 'Coleta de cliente' ? '<span class="pill">Coleta</span>' : '<span class="pill int">Interno</span>' },
+  { k: 'uni', label: 'Unidade', v: m => uniNome(m.unidadeId), oculta: true },
+  { k: 'dcdf', label: 'Data do CDF', v: m => m.cdfId ? D((cdfDe(m.cdfId) || {}).data) : '', ord: m => m.cdfId ? (cdfDe(m.cdfId) || {}).data || '' : '', cls: 'mono', oculta: true },
+  { k: 'tick', label: 'Tickets', v: m => m.tickets.join(', '), oculta: true },
+  { k: 'placa', label: 'Placa', v: m => m.placa || '', cls: 'mono', oculta: true },
+  { k: 'neg', label: 'Negócio', v: m => m.negocio || '', oculta: true },
+  { k: 'div', label: 'Divergência', v: m => m.divergencia || '', oculta: true },
 ];
 const EXTRAS_MTR = [{ label: 'Unidade', x: m => uniNome(m.unidadeId) }, { label: 'Data do CDF', x: m => m.cdfId ? D((cdfDe(m.cdfId) || {}).data) : '' },
   { label: 'Tickets', x: m => m.tickets.join(', ') }, { label: 'Placa', x: m => m.placa }, { label: 'Negócio', x: m => m.negocio }, { label: 'Divergência', x: m => m.divergencia }];
@@ -152,20 +158,8 @@ function renderMtrs() {
     <div class="sel-bar" id="sel-bar" hidden></div>
     ${T.info(lista.length, listaTela.length)}
     ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('', S.ro ? '' : `<th class="sel"><input type="checkbox" id="sel-all" aria-label="Marcar os sem CDF da lista" title="Marcar os sem CDF da lista"></th>`)}</thead><tbody>
-      ${lista.slice(0, 600).map(m => { const c = cdfDe(m.cdfId); const sit = SIT(m);
-        return `<tr>${S.ro ? '' : `<td class="sel" data-label="">${podeSel(m) ? `<input type="checkbox" data-sel="${esc(m.chave)}" ${S.sel[m.chave] ? 'checked' : ''} aria-label="Marcar MTR ${esc(m.mtr)}">` : ''}</td>`}
-        <td data-label="MTR" class="mono full"><b>${esc(m.mtr)}</b>${m.divergencia ? ` <span class="pill warn" title="${esc(m.divergencia)}">divergência</span>` : ''}</td>
-        <td data-label="Destinação" class="mono">${esc(D(m.dataDestinacao) || '—')}</td>
-        <td data-label="Destinador">${esc(nome(m.destinadorId))}</td>
-        <td data-label="Gerador">${esc(m.gerador)}</td>
-        <td data-label="Situação"><span class="pill st ${SIT_CLS[sit]}">${esc(sit)}</span></td>
-        <td data-label="CDF">${c ? `<button type="button" class="cdf-link" data-cdf="${esc(c.id)}">${esc(c.numero)}</button> <span class="sub">${esc(D(c.data))}</span>` : '—'}${m.cdfParcial ? ' <span class="pill warn" title="Nem todos os lançamentos deste MTR estão no CDF">parcial</span>' : ''}</td>
-        <td data-label="Dias sem CDF" class="num ${m.atrasado ? 'atraso' : ''}">${m.diasSemCdf === '' ? '' : m.diasSemCdf}</td>
-        <td data-label="kg ticket" class="num">${N(m.kg) || '—'}</td>
-        <td data-label="kg MTR" class="num">${N(m.kgMtr || '') || '—'}</td>
-        <td data-label="Resíduos" class="wrap">${esc(m.residuos)}</td>
-        <td data-label="Coleta" class="mono">${esc(D(m.dataColeta))}</td>
-        <td data-label="Descarte">${m.fonte === 'Coleta de cliente' ? '<span class="pill">Coleta</span>' : '<span class="pill int">Interno</span>'}</td></tr>`; }).join('') || `<tr><td colspan="13" class="empty">Nenhum MTR com os filtros das colunas.</td></tr>`}
+      ${lista.slice(0, 600).map(m => `<tr>${S.ro ? '' : `<td class="sel" data-label="">${podeSel(m) ? `<input type="checkbox" data-sel="${esc(m.chave)}" ${S.sel[m.chave] ? 'checked' : ''} aria-label="Marcar MTR ${esc(m.mtr)}">` : ''}</td>`}
+        ${T.celulas(m)}</tr>`).join('') || `<tr><td colspan="${T.nVis() + (S.ro ? 0 : 1)}" class="empty">Nenhum MTR com os filtros das colunas.</td></tr>`}
       </tbody></table></div>${lista.length > 600 ? `<p class="hint">Mostrando os 600 primeiros de ${lista.length}. Use o período, a busca ou os filtros (a exportação leva todos).</p>` : ''}`
       : `<div class="empty">${base.length ? 'Nenhum MTR com estes filtros.' : 'Nenhum MTR no período.'}</div>`}
   </section>`;
@@ -232,22 +226,21 @@ function renderCdfs() {
   const listaTela = S.d.cdfs.filter(c => (!S.de || c.data.slice(0, 7) >= S.de) && (!S.ate || c.data.slice(0, 7) <= S.ate) && (!S.uni || S.d.mtrs.some(m => m.cdfId === c.id && passaUni(m))))
     .sort((a, b) => String(b.data).localeCompare(String(a.data)));
   const T = Portal.tabela('amb-cdfs', [
-    { k: 'num', label: 'Nº do CDF', v: c => c.numero },
-    { k: 'data', label: 'Emissão', v: c => D(c.data), ord: c => c.data },
+    { k: 'num', label: 'Nº do CDF', v: c => c.numero, cls: 'full', h: c => `<b>${esc(c.numero)}</b>${c.obs ? `<div class="sub">${esc(c.obs)}</div>` : ''}` },
+    { k: 'data', label: 'Emissão', v: c => D(c.data), ord: c => c.data, cls: 'mono' },
     { k: 'dest', label: 'Destinador', v: c => nome(c.destinadorId) },
     { k: 'n', label: 'MTRs', v: c => String(c.mtrs), ord: c => c.mtrs, num: true },
     { k: 'kg', label: 'kg', v: c => N(kgDe(c.id)), ord: c => kgDe(c.id), num: true, x: c => kgDe(c.id), fmt: '#,##0.##' },
     { k: 'por', label: 'Registrado por', v: c => String(c.criadoPor || '') },
+    { k: 'obs', label: 'Observação', v: c => c.obs || '', oculta: true },
+    { k: 'mtrs', label: 'MTRs (nº)', v: c => S.d.mtrs.filter(m => m.cdfId === c.id).map(m => m.mtr).join(', '), cls: 'wrap', oculta: true },
   ], { titulo: 'CDFs registrados', arquivo: 'ambiental-cdfs', unidade: 'CDFs', aoMudar: render, extrasExport: [{ label: 'Observação', x: c => c.obs }, { label: 'MTRs (nº)', x: c => S.d.mtrs.filter(m => m.cdfId === c.id).map(m => m.mtr).join(', ') }],
     subtitulo: () => 'Emissão: ' + (S.de ? mesCurto(S.de) : 'início') + ' a ' + (S.ate ? mesCurto(S.ate) : 'hoje'), totais: l => ({ 'MTRs': l.reduce((t, c) => t + c.mtrs, 0), 'kg': l.reduce((t, c) => t + kgDe(c.id), 0) }) });
   const lista = T.aplicar(listaTela);
   $('#main').innerHTML = `<section class="panel"><div class="panel-h"><div><h2>CDFs registrados</h2><p class="sub">Certificados de destinação final já recebidos dos destinadores. Para registrar um novo, marque os MTRs na aba MTRs.</p></div></div>
     <div class="toolbar">${periodoHTML()}<span style="margin-left:auto">${T.botao()}</span></div>
     ${T.info(lista.length, listaTela.length)}
-    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>')}</thead><tbody>${lista.map(c => `<tr>
-      <td data-label="Nº do CDF" class="full"><b>${esc(c.numero)}</b>${c.obs ? `<div class="sub">${esc(c.obs)}</div>` : ''}</td><td data-label="Emissão" class="mono">${esc(D(c.data))}</td>
-      <td data-label="Destinador">${esc(nome(c.destinadorId))}</td><td data-label="MTRs" class="num">${c.mtrs}</td><td data-label="kg" class="num">${N(kgDe(c.id))}</td>
-      <td data-label="Registrado por">${esc(c.criadoPor || '')}</td><td><button class="btn sm" data-cdf="${esc(c.id)}">${S.ro ? 'Ver' : 'Ver / editar'}</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nenhum CDF com os filtros das colunas.</td></tr>'}</tbody></table></div>`
+    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab('<th></th>')}</thead><tbody>${lista.map(c => `<tr>${T.celulas(c)}<td><button class="btn sm" data-cdf="${esc(c.id)}">${S.ro ? 'Ver' : 'Ver / editar'}</button></td></tr>`).join('') || `<tr><td colspan="${T.nVis() + 1}" class="empty">Nenhum CDF com os filtros das colunas.</td></tr>`}</tbody></table></div>`
       : '<div class="empty">Nenhum CDF registrado no período.</div>'}</section>`;
   T.ligar(); ligarPeriodo();
   $$('[data-cdf]').forEach(x => x.onclick = () => abrirCdf(x.dataset.cdf));
@@ -261,12 +254,12 @@ function renderDest() {
     x.n++; x.kg += +m.kg || 0; if (m.cdfId) x.com++; else { x.sem++; if (m.atrasado) x.atraso++; if (!x.antigo || m.dataDestinacao < x.antigo) x.antigo = m.dataDestinacao; } });
   const listaTela = Object.values(por).sort((a, b) => b.atraso - a.atraso || b.sem - a.sem);
   const T = Portal.tabela('amb-dest', [
-    { k: 'dest', label: 'Destinador', v: x => nome(x.id) },
+    { k: 'dest', label: 'Destinador', v: x => nome(x.id), cls: 'full', h: x => `<b>${esc(nome(x.id))}</b>` },
     { k: 'n', label: 'MTRs destinados', v: x => String(x.n), ord: x => x.n, num: true },
     { k: 'com', label: 'Com CDF', v: x => String(x.com), ord: x => x.com, num: true },
     { k: 'sem', label: 'Sem CDF', v: x => String(x.sem), ord: x => x.sem, num: true },
-    { k: 'atr', label: 'Atrasados', v: x => String(x.atraso), ord: x => x.atraso, num: true },
-    { k: 'ant', label: 'Mais antigo sem CDF', v: x => D(x.antigo), ord: x => x.antigo || '9' },
+    { k: 'atr', label: 'Atrasados', v: x => String(x.atraso), ord: x => x.atraso, num: true, tdc: x => x.atraso ? 'atraso' : '' },
+    { k: 'ant', label: 'Mais antigo sem CDF', v: x => D(x.antigo), ord: x => x.antigo || '9', cls: 'mono' },
     { k: 'kg', label: 'kg destinados', v: x => N(x.kg), ord: x => x.kg, num: true, x: x => x.kg, fmt: '#,##0.##' },
   ], { titulo: 'CDF por destinador', arquivo: 'ambiental-por-destinador', unidade: 'destinadores', aoMudar: render,
     subtitulo: () => 'Destinação: ' + (S.de ? mesCurto(S.de) : 'início') + ' a ' + (S.ate ? mesCurto(S.ate) : 'hoje'),
@@ -275,10 +268,7 @@ function renderDest() {
   $('#main').innerHTML = `<section class="panel"><div class="panel-h"><div><h2>Por destinador</h2><p class="sub">Quem está devendo CDF. Clique numa linha para ver os MTRs sem CDF desse destinador.</p></div></div>
     <div class="toolbar">${periodoHTML()}<span style="margin-left:auto">${T.botao()}</span></div>
     ${T.info(lista.length, listaTela.length)}
-    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${lista.map(x => `<tr class="click" data-dest="${esc(x.id)}" tabindex="0">
-      <td data-label="Destinador" class="full"><b>${esc(nome(x.id))}</b></td><td data-label="MTRs destinados" class="num">${x.n}</td><td data-label="Com CDF" class="num">${x.com}</td>
-      <td data-label="Sem CDF" class="num">${x.sem}</td><td data-label="Atrasados" class="num ${x.atraso ? 'atraso' : ''}">${x.atraso}</td><td data-label="Mais antigo sem CDF" class="mono">${esc(D(x.antigo))}</td>
-      <td data-label="kg destinados" class="num">${N(x.kg)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nada com os filtros das colunas.</td></tr>'}</tbody></table></div>`
+    ${listaTela.length ? `<div class="tbl-wrap rtw"><table class="rt"><thead>${T.cab()}</thead><tbody>${lista.map(x => `<tr class="click" data-dest="${esc(x.id)}" tabindex="0">${T.celulas(x)}</tr>`).join('') || `<tr><td colspan="${T.nVis()}" class="empty">Nada com os filtros das colunas.</td></tr>`}</tbody></table></div>`
       : '<div class="empty">Nenhum MTR destinado no período.</div>'}</section>`;
   T.ligar(); ligarPeriodo();
   $$('[data-dest]').forEach(tr => { const ir = () => { const t = tbMtr(); t.filtros = { dest: new Set([nome(tr.dataset.dest)]) }; S.ind = 'semcdf'; setTab('mtrs'); };
