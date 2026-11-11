@@ -259,7 +259,21 @@ tr.inativo td{opacity:.55}
           <div class="ico">${ICONES[k] || ''}</div>
           <h3>${esc(m.nome)}</h3>
           <p>${esc(m.desc)}</p>
-        </a>`).join('')}</div>` : ''}`;
+        </a>`).join('')}</div>` : ''}<div id="ct-alertas"></div>`;
+    if (usuario.alertaContratos) carregarAlertasContratos();
+  }
+  // contratos de clientes vencendo (30 dias) ou vencidos — só para quem recebe o alerta
+  async function carregarAlertasContratos() {
+    try {
+      const r = await Portal.api('contratos.alertas', {}); const box = document.getElementById('ct-alertas'); if (!box || !(r.itens || []).length) return;
+      const temMapa = !!(usuario.modulos || {}).mapa;
+      box.innerHTML = `<section class="panel" style="margin-top:18px"><h2 style="font-size:16px">📄 Contratos de clientes que pedem atenção</h2>
+        <p class="sub">Vencendo nos próximos ${r.diasAlerta || 30} dias ou já vencidos. Atualize a validade ou inclua o aditivo no cadastro do cliente${temMapa ? ', no Mapa Operacional' : ''}.</p>
+        <div class="tbl-wrap"><table><thead><tr><th>Cliente</th><th>Contrato</th><th>Validade</th><th>Situação</th></tr></thead><tbody>
+        ${r.itens.map(x => `<tr><td>${temMapa ? `<a href="mapa/?abrir=${encodeURIComponent(x.cadastroId)}">${esc(x.cliente)}</a>` : esc(x.cliente)}${x.codigoUplog ? ` <span class="mono sub">${esc(x.codigoUplog)}</span>` : ''}</td>
+          <td>${esc(x.numero || '—')}${x.renovacaoAutomatica ? ' <span class="sub">renovação automática</span>' : ''}</td><td class="mono">${esc(String(x.validade).split('-').reverse().join('/'))}</td>
+          <td><span class="pill ${x.situacao === 'Vencido' ? 'crit' : 'warn'}">${x.situacao === 'Vencido' ? 'Vencido' : 'vence em ' + x.dias + ' dia(s)'}</span></td></tr>`).join('')}</tbody></table></div></section>`;
+    } catch (e) { /* sem alerta */ }
   }
 
   /* ---------- usuários (admin do portal) ---------- */
@@ -287,6 +301,8 @@ tr.inativo td{opacity:.55}
       { k: 'uni', label: 'Unidades', v: u => (u.unidades || []).length ? u.unidades.map(nomeUni).join(', ') : 'Todas', h: u => `<div data-unis style="display:flex;flex-direction:column;gap:2px;min-width:120px">${chkUnidades('u-' + esc(u.email), u.unidades)}</div>` },
       { k: 'adm', label: 'Admin do portal', v: u => u.adminPortal ? 'Sim' : 'Não', h: u => `<select data-k="admin" aria-label="Admin do portal"><option value="1" ${u.adminPortal ? 'selected' : ''}>Sim</option><option value="0" ${u.adminPortal ? '' : 'selected'}>Não</option></select>` },
       { k: 'cob', label: 'Decide cobrança de frustrada', v: u => u.decideCobranca || u.adminPortal ? 'Sim' : 'Não', h: u => `<select data-k="cob" aria-label="Decide cobrança de viagem frustrada" title="Pode decidir se a viagem frustrada por culpa do cliente será cobrada (o admin do portal sempre pode)"><option value="1" ${u.decideCobranca ? 'selected' : ''}>Sim</option><option value="0" ${u.decideCobranca ? '' : 'selected'}>Não</option></select>` },
+      { k: 'vct', label: 'Vê os contratos dos clientes', v: u => u.veContratos || u.adminPortal ? 'Sim' : 'Não', h: u => `<select data-k="vct" aria-label="Vê os contratos dos clientes" title="Pode abrir o arquivo do contrato e dos aditivos no Mapa (o admin do portal sempre pode)"><option value="1" ${u.veContratos ? 'selected' : ''}>Sim</option><option value="0" ${u.veContratos ? '' : 'selected'}>Não</option></select>` },
+      { k: 'act', label: 'Recebe alerta de contrato', v: u => u.alertaContratos ? 'Sim' : 'Não', h: u => `<select data-k="act" aria-label="Recebe alerta de vencimento de contrato" title="E-mail e aviso na tela inicial quando um contrato de cliente entra nos 30 dias antes do vencimento ou vence"><option value="1" ${u.alertaContratos ? 'selected' : ''}>Sim</option><option value="0" ${u.alertaContratos ? '' : 'selected'}>Não</option></select>` },
       { k: 'at', label: 'Ativo', v: u => u.ativo ? 'Sim' : 'Não', h: u => `<select data-k="ativo" aria-label="Ativo"><option value="1" ${u.ativo ? 'selected' : ''}>Sim</option><option value="0" ${u.ativo ? '' : 'selected'}>Não</option></select>` },
       { k: 'sen', label: 'Senha', v: u => u.temSenha ? 'criada' : 'aguardando 1º acesso', h: u => u.temSenha ? '<span class="pill ok">criada</span>' : '<span class="pill warn">aguardando 1º acesso</span>' },
       { k: 'ult', label: 'Último acesso', v: u => u.ultimoAcesso || '—', ord: u => parseAcesso(u.ultimoAcesso) },
@@ -294,7 +310,7 @@ tr.inativo td{opacity:.55}
     const us = TU.aplicar(usTela);
     $('#main').innerHTML = `<section class="panel">
       <h2>Usuários e acessos</h2>
-      <p class="sub">Novos acessos são gerados na ficha da pessoa, no módulo <b>Pessoas</b> (botão "Gerar acesso"); nome e e-mail vêm de lá. Aqui você ajusta os níveis e as unidades. Para cada pessoa, escolha o nível em cada módulo: <b>Leitor</b> só vê, <b>Editor</b> lança e altera, <b>Administrador</b> também mexe nas configurações do módulo. <b>Admin do portal</b> cadastra usuários e vê o histórico geral. <b>Decide cobrança de frustrada</b>: pode decidir se a viagem frustrada por culpa do cliente será cobrada (e quanto) ou não; recebe o aviso por e-mail. Em <b>Unidades</b>, marque a unidade da pessoa (programadora, frota e equipe são por unidade); sem nenhuma marcada, ela vê todas. Mudanças valem na hora, inclusive para quem já está conectado.</p>
+      <p class="sub">Novos acessos são gerados na ficha da pessoa, no módulo <b>Pessoas</b> (botão "Gerar acesso"); nome e e-mail vêm de lá. Aqui você ajusta os níveis e as unidades. Para cada pessoa, escolha o nível em cada módulo: <b>Leitor</b> só vê, <b>Editor</b> lança e altera, <b>Administrador</b> também mexe nas configurações do módulo. <b>Admin do portal</b> cadastra usuários e vê o histórico geral. <b>Decide cobrança de frustrada</b>: pode decidir se a viagem frustrada por culpa do cliente será cobrada (e quanto) ou não; recebe o aviso por e-mail. <b>Vê os contratos dos clientes</b>: pode abrir o contrato escaneado e os aditivos no Mapa (os outros veem só número, datas e situação). <b>Recebe alerta de contrato</b>: e-mail e aviso na tela inicial quando um contrato entra nos 30 dias antes do vencimento ou vence. Em <b>Unidades</b>, marque a unidade da pessoa (programadora, frota e equipe são por unidade); sem nenhuma marcada, ela vê todas. Mudanças valem na hora, inclusive para quem já está conectado.</p>
       <div class="row" style="margin-top:10px"><a class="btn pri" href="pessoas/">Ir para Pessoas (cadastrar e gerar acesso)</a></div>
       <div class="row" style="justify-content:flex-end;margin:14px 0 8px">${TU.botao()}</div>
       ${TU.info(us.length, usTela.length)}
@@ -320,7 +336,7 @@ tr.inativo td{opacity:.55}
         const sel = (k, padrao) => { const el = tr.querySelector(`[data-k="${k}"]`); return el ? el.value === '1' : !!padrao; };
         try {
           await Portal.api('salvarUsuario', { usuario: { email, modulos,
-            adminPortal: sel('admin', atual.adminPortal), decideCobranca: sel('cob', atual.decideCobranca), ativo: sel('ativo', atual.ativo), unidades: tr.querySelector('[data-unis]') ? lerUnidades(tr) : (atual.unidades || []) } });
+            adminPortal: sel('admin', atual.adminPortal), decideCobranca: sel('cob', atual.decideCobranca), veContratos: sel('vct', atual.veContratos), alertaContratos: sel('act', atual.alertaContratos), ativo: sel('ativo', atual.ativo), unidades: tr.querySelector('[data-unis]') ? lerUnidades(tr) : (atual.unidades || []) } });
           toast('Usuário atualizado'); usuarios = null;
           if (email === usuario.email) { const j = await Portal.api('eu', {}); usuario = j.usuario; const s = Portal.sessao(); s.usuario = usuario; Portal.gravarSessao(s); }
           renderUsuarios();
