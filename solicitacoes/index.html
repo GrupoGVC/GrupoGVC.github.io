@@ -351,14 +351,20 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const R = v => v === '' || v == null ? '—' : (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const D = iso => iso ? iso.split('-').reverse().join('/') : '';
 /* ---------- cobrança por km rodado ---------- */
-function precoKmDe(clienteId, data) {
+// preços por km vigentes do cliente (o próprio antes da matriz), um por tipo de veículo
+function precosKmDe(clienteId, data) {
   const c = cliDe(clienteId) || {}; const ids = [clienteId, c.principalId].filter(Boolean); data = data || hojeISO();
+  const vistos = {};
   return (S.d.precosKm || []).filter(p => ids.includes(p.cadastroId) && (!p.vigenciaInicio || p.vigenciaInicio <= data) && (!p.vigenciaFim || p.vigenciaFim >= data))
-    .sort((a, b) => ids.indexOf(a.cadastroId) - ids.indexOf(b.cadastroId) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)))[0] || null;
+    .sort((a, b) => ids.indexOf(a.cadastroId) - ids.indexOf(b.cadastroId) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)))
+    .filter(p => { const k = p.tipoVeiculoId || '-'; if (vistos[k]) return false; vistos[k] = 1; return true; });
 }
 function kmEstimadoTxt(clienteId, km, data) {
-  const p = clienteId ? precoKmDe(clienteId, data) : null; if (!p) return '';
-  return +km > 0 ? `Transporte estimado (km rodado): ${esc(km)} km × ${R(p.valorKm)} = <b>${R(+km * p.valorKm)}</b>` : `O cliente paga o transporte por km rodado (${R(p.valorKm)}/km): informe a km prevista.`;
+  const ps = clienteId ? precosKmDe(clienteId, data) : []; if (!ps.length) return '';
+  if (ps.length === 1) { const p = ps[0]; const v = p.tipoVeiculo ? ' (' + esc(p.tipoVeiculo) + ')' : '';
+    return +km > 0 ? `Transporte estimado (km rodado${v}): ${esc(km)} km × ${R(p.valorKm)} = <b>${R(+km * p.valorKm)}</b>` : `O cliente paga o transporte por km rodado${v} (${R(p.valorKm)}/km): informe a km prevista.`; }
+  const lista = ps.map(p => esc(p.tipoVeiculo || 'outros veículos') + ' ' + R(p.valorKm) + '/km' + (+km > 0 ? ' = <b>' + R(+km * p.valorKm) + '</b>' : '')).join(' · ');
+  return (+km > 0 ? `Transporte estimado (km rodado, ${esc(km)} km) pelo veículo: ` : 'O cliente paga o transporte por km rodado conforme o veículo (informe a km prevista): ') + lista;
 }
 const kmPendente = s => !!(s.km && s.km.pendente);
 /* ---------- clientes, motivos e cobrança de viagem frustrada ---------- */
