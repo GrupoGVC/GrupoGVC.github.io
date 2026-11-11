@@ -92,7 +92,7 @@ function fatSalvar_(reg, u) {
       if (!c || !c.ativo) { erro = 'Item ' + (i + 1) + ': cobrança de viagem frustrada não encontrada.'; return; }
       if (c.decisao !== 'Cobrar') { erro = 'Item ' + (i + 1) + ': a cobrança da viagem frustrada ainda não foi decidida como "Cobrar".'; return; }
       if (!veUnidade_(u, c.unidadeId)) { erro = 'Você não tem acesso à unidade da cobrança.'; return; }
-      if (String(c.clienteId) !== cli.id && String(cli.cadastroPrincipalId) !== String(c.clienteId) && String((porId_('Cadastros', c.clienteId) || {}).cadastroPrincipalId) !== cli.id) { erro = 'Todas as cobranças do BM precisam ser do mesmo cliente.'; return; }
+      if (faturavelDe_(c.clienteId) !== cli.id) { erro = 'Todas as cobranças do BM precisam ser faturadas para o mesmo CNPJ (' + String(cli.nome) + ').'; return; }
       const outroC = cobNoBm[c.id]; if (outroC && outroC.id !== reg.id) { erro = 'A cobrança da viagem frustrada de ' + dataTexto_(c.data).split('-').reverse().join('/') + ' já está no BM ' + (outroC.bmNumero || outroC.id) + '.'; return; }
       it.solicitacaoId = ''; unidadeId = unidadeId || String(c.unidadeId || '');
     }
@@ -100,12 +100,11 @@ function fatSalvar_(reg, u) {
       const s = porId_('Solicitacoes', it.solicitacaoId);
       if (!s) { erro = 'Item ' + (i + 1) + ': solicitação não encontrada.'; return; }
       if (!veUnidade_(u, s.unidadeId)) { erro = 'Você não tem acesso à unidade da solicitação.'; return; }
-      if (String(s.clienteId) !== cli.id && String(cli.cadastroPrincipalId) !== String(s.clienteId) &&
-          String((porId_('Cadastros', s.clienteId) || {}).cadastroPrincipalId) !== cli.id) { erro = 'Todas as solicitações do BM precisam ser do mesmo cliente.'; return; }
+      if (faturavelDe_(s.clienteId) !== cli.id) { erro = 'Todas as solicitações do BM precisam ser faturadas para o mesmo CNPJ (' + String(cli.nome) + ').'; return; }
       const outro = jaNoBm[s.id];
       if (outro && outro.id !== reg.id) { erro = 'A solicitação de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' já está no BM ' + (outro.bmNumero || outro.id) + '.'; return; }
       if (!outro && !prontaParaBm_(s)) { erro = s.status === 'Realizada' ? 'A coleta de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' ainda aguarda a confirmação da destinação no Controle de Destinação.' : 'Só entram no BM solicitações com a destinação confirmada.'; return; }
-      if (!outro && !s.kmCobranca && precoKmVigente_(s.clienteId, dataRefKm_(s))) { erro = 'A coleta de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' aguarda o solicitante definir o km da cobrança (real ou previsto) em Solicitações.'; return; }
+      if (!outro && !s.kmCobranca && precoKmSol_(s)) { erro = 'A coleta de ' + dataTexto_(s.dataColeta).split('-').reverse().join('/') + ' aguarda o solicitante definir o km da cobrança (real ou previsto) em Solicitações.'; return; }
       unidadeId = unidadeId || String(s.unidadeId || '');
     }
     it.valor = arred2_(it.quantidade * it.valorUnitario);

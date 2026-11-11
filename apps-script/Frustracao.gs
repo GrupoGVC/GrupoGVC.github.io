@@ -184,7 +184,10 @@ function anularCobranca_(c, u, porque) {
 function sugestaoCobranca_(c) {
   const cli = porId_('Cadastros', c.clienteId); if (!cli) return { valor: '', base: '' };
   const ids = [String(cli.id)]; if (cli.cadastroPrincipalId) ids.push(String(cli.cadastroPrincipalId));
-  const data = dataTexto_(c.data) || hojeTxt_();
+  const solC = c.solicitacaoId ? porId_('Solicitacoes', c.solicitacaoId) : null;
+  // preço do contrato só para solicitação com perfil Contrato, vigente na data da solicitação
+  if (solC && !usaTabelaContrato_(solC)) return { valor: '', base: 'Solicitação de proposta: use o valor da proposta.' };
+  const data = solC ? dataRefPreco_(solC) : (dataTexto_(c.data) || hojeTxt_());
   const ps = ler_('PrecosCliente').filter(function (p) {
     if (!p.ativo || p.valorTransporte === '' || ids.indexOf(String(p.cadastroId)) < 0 || !modalidadeComTransporte_(p.modalidade)) return false;
     const ini = dataTexto_(p.vigenciaInicio), fim = dataTexto_(p.vigenciaFim);

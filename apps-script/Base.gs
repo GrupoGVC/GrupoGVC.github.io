@@ -16,11 +16,11 @@ const AUDITORIA = ['criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor'];
 // numero = colunas numéricas; data = só a data; ocultas = escondidas na planilha.
 const TABELAS = {
   Unidades:             { prefixo: 'UNI', colunas: ['id', 'nome', 'ativo', 'cadastroId'] },
-  Usuarios:             { prefixo: 'USU', colunas: ['id', 'email', 'nome', 'adminPortal', 'unidades', 'ativo', 'senhaHash', 'salt', 'ultimoAcesso', 'pessoaId', 'decideCobranca'],
+  Usuarios:             { prefixo: 'USU', colunas: ['id', 'email', 'nome', 'adminPortal', 'unidades', 'ativo', 'senhaHash', 'salt', 'ultimoAcesso', 'pessoaId', 'decideCobranca', 'veContratos', 'alertaContratos'],
                           texto: ['email', 'unidades', 'senhaHash', 'salt', 'pessoaId'], ocultas: ['senhaHash', 'salt'], momento: ['ultimoAcesso'] },
   UsuarioModulos:       { prefixo: 'UMO', colunas: ['id', 'usuarioId', 'modulo', 'nivel'] },
   Cadastros:            { prefixo: 'CAD', colunas: ['id', 'codigoUplog', 'tipos', 'nome', 'razaoSocial', 'categoria', 'cnpj', 'contatoNome',
-                                                      'telefones', 'emails', 'obs', 'cadastroPrincipalId', 'idOrigem', 'ativo'],
+                                                      'telefones', 'emails', 'obs', 'cadastroPrincipalId', 'idOrigem', 'ativo', 'faturaPara'],
                           texto: ['codigoUplog', 'cnpj', 'telefones', 'idOrigem'] },
   Locais:               { prefixo: 'LOC', colunas: ['id', 'cadastroId', 'nome', 'logradouro', 'numero', 'bairro', 'cidade', 'uf', 'cep', 'lat', 'lng', 'ativo'],
                           texto: ['numero', 'cep'], numero: ['lat', 'lng'] },
@@ -95,6 +95,12 @@ const TABELAS = {
                           texto: ['residuoIds'], numero: ['diaSemana', 'diaMes', 'valorPrevisto'], data: ['dataInicio', 'dataFim', 'geradaAte'] },
   // Motivos padrão de frustração e de cancelamento (responsável: Cliente / Interno / Externo / Na hora)
   // Preferências de cada usuário nas telas (ex.: colunas e ordenação das tabelas). valor = JSON
+  // Contrato do cliente (um por cliente) e aditivos; arquivos na pasta restrita do Drive
+  Contratos:            { prefixo: 'CTR', colunas: ['id', 'cadastroId', 'numero', 'objeto', 'inicio', 'validade', 'renovacaoAutomatica', 'encerrado', 'obs',
+                                                      'arquivoId', 'arquivoNome', 'alertaValidade', 'alertaVencidoValidade', 'ativo'],
+                          texto: ['numero', 'arquivoId', 'arquivoNome'], data: ['inicio', 'validade', 'alertaValidade', 'alertaVencidoValidade'] },
+  ContratoAditivos:     { prefixo: 'ADT', colunas: ['id', 'contratoId', 'numero', 'data', 'descricao', 'novaValidade', 'arquivoId', 'arquivoNome', 'ativo'],
+                          texto: ['numero', 'arquivoId', 'arquivoNome'], data: ['data', 'novaValidade'] },
   Preferencias:         { prefixo: 'PRF', colunas: ['id', 'usuarioId', 'chave', 'valor'], texto: ['chave', 'valor'] },
   Motivos:              { prefixo: 'MOT', colunas: ['id', 'tipo', 'nome', 'responsavel', 'ordem', 'ativo'], numero: ['ordem'] },
   // Cobrança de viagem frustrada (ou cancelada no dia com a equipe na rua) por culpa do cliente
@@ -123,7 +129,9 @@ const REFERENCIAS = {
                  ['Rotinas', 'clienteId', 'coleta(s) recorrente(s)'],
                  ['Unidades', 'cadastroId', 'unidade do grupo GVC'],
                  ['Cdfs', 'destinadorId', 'CDF(s) no módulo Ambiental'],
-                 ['CobrancasFrustracao', 'clienteId', 'cobrança(s) de viagem frustrada']],
+                 ['CobrancasFrustracao', 'clienteId', 'cobrança(s) de viagem frustrada'],
+                 ['Contratos', 'cadastroId', 'contrato do cliente']],
+  Contratos:    [['ContratoAditivos', 'contratoId', 'aditivo(s) do contrato']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['SolicitacaoItens', 'residuoId', 'resíduo(s) de solicitações'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
@@ -442,7 +450,9 @@ const ROTULOS_CAMPOS = {
   kmPrevista: 'Km prevista', diariasPrevistas: 'Diárias previstas', pesoEstimado: 'Peso estimado (kg)', destinadorPrevistoId: 'Destinador previsto',
   justificativaTroca: 'Justificativa da troca de destinador', kmInicial: 'Km inicial', kmFinal: 'Km na volta à base', fonte: 'Origem do descarte', pesoMtr: 'Peso no MTR (kg)',
   motivoDivergencia: 'Divergência', cdfId: 'CDF', itemId: 'Item da solicitação', emailsDesligados: 'E-mails desligados', kmCobranca: 'Km da cobrança', kmCobrado: 'Km cobrado', kmDefinidoPor: 'Km definido por', kmDefinidoEm: 'Km definido em', kmObs: 'Observação do km', dataDesejada: 'Data desejada pelo cliente', motivoId: 'Motivo', canceladaDaViagemId: 'Cancelada da viagem', cancelCiente: 'Cancelamento visto pela programadora',
-  responsavel: 'Responsável', equipeSaiu: 'A equipe já tinha saído', decisao: 'Decisão', justificativa: 'Justificativa', decididoPor: 'Decidido por', decididoEm: 'Decidido em', obsProgramacao: 'Observação da programação', cobrancaId: 'Cobrança de frustrada', decideCobranca: 'Decide cobrança de frustrada',
+  responsavel: 'Responsável', equipeSaiu: 'A equipe já tinha saído', decisao: 'Decisão', justificativa: 'Justificativa', decididoPor: 'Decidido por', decididoEm: 'Decidido em', obsProgramacao: 'Observação da programação', cobrancaId: 'Cobrança de frustrada', decideCobranca: 'Decide cobrança de frustrada', veContratos: 'Vê os contratos dos clientes', alertaContratos: 'Recebe alerta de vencimento de contrato',
+  faturaPara: 'Fatura para', objeto: 'Objeto', inicio: 'Início', validade: 'Validade', renovacaoAutomatica: 'Renovação automática', encerrado: 'Encerrado',
+  arquivoNome: 'Arquivo', novaValidade: 'Nova validade',
   apelido: 'Nome na programação', funcao: 'Função', funcoes: 'Funções', pessoaId: 'Pessoa', vinculo: 'Vínculo', cpf: 'CPF', cnhCategoria: 'Categoria da CNH', cnhValidade: 'Validade da CNH', fotoId: 'Foto',
   dataSaida: 'Data de saída', dataRetornoPrevisto: 'Retorno previsto', dataRetorno: 'Retorno à base', motoristaId: 'Motorista', transportadorId: 'Transportadora',
   custoTerceiro: 'Custo do terceiro (R$)', pernoitesPrevistos: 'Pernoites previstos', pernoitesRealizados: 'Pernoites realizados', valorNoite: 'Valor do pernoite (R$)',

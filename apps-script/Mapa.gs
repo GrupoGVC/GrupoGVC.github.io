@@ -31,7 +31,7 @@ function pontoDe_(c, nomesRes, nomesEq) {
     id: c.id, ativo: c.ativo, codigoUplog: String(c.codigoUplog || ''), tipos: separar_(c.tipos), nome: String(c.nome || ''),
     razaoSocial: String(c.razaoSocial || ''), cat: String(c.categoria || ''), cnpj: String(c.cnpj || ''), contatoNome: String(c.contatoNome || ''),
     telefones: String(c.telefones || '').split(/\s*;\s*/).filter(String), emails: String(c.emails || '').split(/\s*;\s*/).filter(String),
-    obs: String(c.obs || ''), cadastroPrincipalId: String(c.cadastroPrincipalId || ''), localId: loc.id || '',
+    obs: String(c.obs || ''), cadastroPrincipalId: String(c.cadastroPrincipalId || ''), faturaPara: String(c.faturaPara || ''), localId: loc.id || '',
     residuos: [], precos: {}, naturezas: {}, equipamentos: []
   };
   p.tipo = p.tipos[0] || '';

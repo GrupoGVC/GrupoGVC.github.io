@@ -24,10 +24,12 @@ function acharUsuario_(email) {
   return { id: r.id, linha: r._linha, email: email, nome: String(r.nome || email.split('@')[0]), ativo: r.ativo,
            adminPortal: simNao_(r.adminPortal), unidades: separar_(r.unidades), senhaHash: String(r.senhaHash || ''),
            salt: String(r.salt || ''), modulos: modulos, nivel: modulos.destinacao,
-           ultimoAcesso: r.ultimoAcesso, pessoaId: String(r.pessoaId || ''), decideCobranca: simNao_(r.decideCobranca) };
+           ultimoAcesso: r.ultimoAcesso, pessoaId: String(r.pessoaId || ''), decideCobranca: simNao_(r.decideCobranca),
+           veContratos: simNao_(r.veContratos), alertaContratos: simNao_(r.alertaContratos) };
 }
 function usuarioPublico_(u) {
-  return { email: u.email, nome: u.nome, adminPortal: u.adminPortal, modulos: u.modulos, unidades: u.unidades, decideCobranca: !!(u.decideCobranca || u.adminPortal) };
+  return { email: u.email, nome: u.nome, adminPortal: u.adminPortal, modulos: u.modulos, unidades: u.unidades, decideCobranca: !!(u.decideCobranca || u.adminPortal),
+           veContratos: !!(u.veContratos || u.adminPortal), alertaContratos: !!u.alertaContratos };
 }
 function hash_(senha, salt) {
   let h = salt + '|' + senha;
@@ -135,7 +137,7 @@ function listarUsuarios_() {
   return { ok: true, modulos: MODULOS, unidades: unidadesLista_(), usuarios: ler_('Usuarios').map(function (r) {
     const u = acharUsuario_(r.email);
     const p = u.pessoaId ? porId_('Pessoas', u.pessoaId) : null;
-    return { email: u.email, nome: p ? String(p.nome) : u.nome, modulos: u.modulos, adminPortal: u.adminPortal, decideCobranca: u.decideCobranca, ativo: u.ativo, temSenha: !!u.senhaHash,
+    return { email: u.email, nome: p ? String(p.nome) : u.nome, modulos: u.modulos, adminPortal: u.adminPortal, decideCobranca: u.decideCobranca, veContratos: u.veContratos, alertaContratos: u.alertaContratos, ativo: u.ativo, temSenha: !!u.senhaHash,
              pessoaId: u.pessoaId, funcoes: p ? separar_(p.funcoes) : [], pessoaAtiva: p ? p.ativo : true,
              unidades: u.unidades, ultimoAcesso: r.ultimoAcesso instanceof Date ? Utilities.formatDate(r.ultimoAcesso, tz_(), 'dd/MM/yyyy HH:mm') : '',
              auditoria: auditoria_(r) };
@@ -170,6 +172,8 @@ function salvarUsuario_(x, quem) {
   // decide cobrança de viagem frustrada: só muda quando vem no pedido (telas antigas não mandam)
   const decide = 'decideCobranca' in x ? x.decideCobranca === true : !!(u && u.decideCobranca);
   const campos = { email: email, nome: nome, adminPortal: adminPortal ? 'SIM' : 'NÃO', unidades: unidades.join('; '), ativo: ativo, pessoaId: pessoaId, decideCobranca: decide ? 'SIM' : 'NÃO' };
+  // contratos dos clientes: ver o arquivo / receber o alerta de vencimento (mesma regra: só muda quando vem no pedido)
+  ['veContratos', 'alertaContratos'].forEach(function (k) { campos[k] = (k in x ? x[k] === true : !!(u && u[k])) ? 'SIM' : 'NÃO'; });
   let id;
   if (u) { id = u.id; atualizar_('Usuarios', id, campos, quem, 'portal', { registroNome: nome }); }
   else { id = inserir_('Usuarios', campos, quem, 'portal', nome).id; }

@@ -37,9 +37,9 @@ const MESES_JANELA = 6;
 
 const ACOES_DESTINACAO_LEITURA = ['dados'];
 const ACOES_DESTINACAO_ESCRITA = ['salvarLancamento', 'excluirLancamento', 'definirNegocioLote', 'salvarLocacao', 'salvarDestinador', 'destinacao.confirmar'];
-const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista', 'mapa.precosVenda', 'mapa.geo'];
+const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista', 'mapa.precosVenda', 'mapa.geo', 'mapa.contrato', 'mapa.arquivoContrato'];
 const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa.reativar', 'mapa.listaAdd', 'mapa.listaDel', 'mapa.listaInativar', 'mapa.listaSet',
-                            'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda'];
+                            'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda', 'mapa.salvarVinculo', 'mapa.salvarContrato', 'mapa.salvarAditivo', 'mapa.excluirAditivo', 'mapa.anexarContrato'];
 const ACOES_SOL_LEITURA = ['sol.dados', 'sol.previstoReal'];
 const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.excluir', 'sol.salvarCadastro', 'sol.excluirCadastro', 'sol.ativoCadastro',
                            'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar', 'sol.definirKm'];
@@ -100,6 +100,7 @@ function rotear_(body) {
   if (!u) return { ok: false, erro: 'nao_autenticado' };
   if (acao === 'eu') return { ok: true, usuario: usuarioPublico_(u) };
   if (acao === 'pref.dados') return prefDados_(u);
+  if (acao === 'contratos.alertas') return contratosAlertas_(u);
 
   // leituras (sem trava)
   if (acao === 'dados') {
@@ -110,6 +111,8 @@ function rotear_(body) {
     if (!podeLer_(u, 'mapa')) return semPermissao_('Você não tem acesso ao Mapa Operacional.');
     if (acao === 'mapa.precosVenda') return precosVenda_(String(body.cadastroId || ''));
     if (acao === 'mapa.geo') return mapaGeo_(body);
+    if (acao === 'mapa.contrato') return contratoDados_(String(body.cadastroId || ''), u);
+    if (acao === 'mapa.arquivoContrato') return verArquivoContrato_(body, u);
     return acao === 'mapa.listar' ? MAPA.listar() : MAPA.lista(body.nome);
   }
   if (ACOES_SOL_LEITURA.indexOf(acao) >= 0) {
@@ -200,6 +203,11 @@ function rotear_(body) {
       case 'frota.salvarLocacao': return frotaSalvarLocacao_(body.mes, body.itens, u);
       case 'mapa.salvarPrecoVenda': return salvarPrecoVenda_(body.registro, u);
       case 'mapa.excluirPrecoVenda': return excluirPrecoVenda_(String(body.id), u);
+      case 'mapa.salvarVinculo': return salvarVinculo_(body, u);
+      case 'mapa.salvarContrato': return salvarContrato_(body.registro, u);
+      case 'mapa.salvarAditivo': return salvarAditivo_(body.registro, u);
+      case 'mapa.excluirAditivo': return excluirAditivo_(String(body.id || ''), u);
+      case 'mapa.anexarContrato': return anexarContrato_(body, u);
       case 'sol.salvar': return solSalvar_(body.registro, u);
       case 'sol.status': return solStatus_(String(body.id), String(body.status), body.dados, u);
       case 'sol.definirKm': return solDefinirKm_(body, u);

@@ -28,7 +28,8 @@ function precoKmVigente_(clienteId, data) {
   const p = ps[0];
   return p ? { id: p.id, modalidade: String(p.modalidade), valorKm: num_(p.valorTransporte), cadastroId: String(p.cadastroId) } : null;
 }
-function dataRefKm_(s) { return dataTexto_(s.dataColeta) || dataTexto_(s.dataPrevista) || dataTexto_(s.dataSolicitacao); }
+// preço vigente na data da solicitação (Contratos.gs)
+function dataRefKm_(s) { return dataRefPreco_(s); }
 
 /** Km real de cada solicitação pelas viagens (odômetro). {sid: {km|'' , motivo, viagens:[{id, placa, saida, kmViagem, parte}]}} */
 function kmRealSolicitacoes_(ids) {
@@ -70,7 +71,7 @@ function infoKm_(sols) {
   const alvo = [], preco = {};
   sols.forEach(function (s) {
     if (['Realizada', 'Destinação', 'BM enviado', 'NF emitida'].indexOf(String(s.status)) < 0 && !s.kmCobranca) return;
-    const p = precoKmVigente_(s.clienteId, dataRefKm_(s));
+    const p = precoKmSol_(s);
     if (!p && !s.kmCobranca) return;
     preco[s.id] = p; alvo.push(s.id);
   });
@@ -109,7 +110,7 @@ function solDefinirKm_(x, u) {
 
 /** Aviso ao solicitante (quem registrou) de que a coleta espera a escolha do km. */
 function avisarDefinirKm_(s) {
-  if (!s || s.kmCobranca || !precoKmVigente_(s.clienteId, dataRefKm_(s))) return;
+  if (!s || s.kmCobranca || !precoKmSol_(s)) return;
   const email = String(s.criadoPor || '').indexOf('@') > 0 ? normEmail_(s.criadoPor) : '';
   if (!email || !aceitaEmail_(email, 'km')) return;
   const info = infoKm_([s])[s.id] || {};

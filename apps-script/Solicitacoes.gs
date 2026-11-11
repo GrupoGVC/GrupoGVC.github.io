@@ -51,7 +51,7 @@ function clienteDeSolicitacao_(c) { const t = separar_(c && c.tipos); return t.i
 function clientesLista_() {
   return ler_('Cadastros').map(function (c) {
     return { id: c.id, nome: String(c.nome || c.razaoSocial || c.id), codigoUplog: String(c.codigoUplog || ''), tipos: separar_(c.tipos),
-             cnpj: String(c.cnpj || ''), principalId: String(c.cadastroPrincipalId || ''), ativo: c.ativo };
+             cnpj: String(c.cnpj || ''), principalId: String(c.cadastroPrincipalId || ''), faturaPara: String(c.faturaPara || ''), ativo: c.ativo };
   }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
 }
 function solPublica_(r) {
@@ -114,6 +114,7 @@ function solDados_(u) {
     motivos: motivosTodos_(), cobrancas: cobrancasVisiveis_(u), podeDecidirCobranca: !!(u.adminPortal || u.decideCobranca),
     podeCadastrarMotivos: podeCadastrarMotivos_(u), hoje: dataTexto_(new Date()),
     frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,
+    contratos: situacaoContratosPorCliente_(),
     podeImportar: !!u.adminPortal };
 }
 

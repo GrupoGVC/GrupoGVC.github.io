@@ -16,7 +16,8 @@ const FONTE_COLETA = 'Coleta de cliente', FONTE_INTERNA = 'Operação interna';
 const SIT_PENDENTE = 'Pendente', SIT_DESTINADO = 'Destinado';
 const LIMITE_DIVERGENCIA = 0.2; // 20% de diferença de peso ou km acende o alerta
 const TIPOS_EMAIL = { programacao: 'Programação confirmada ou alterada', dp: 'Pernoite a pagar (DP)', km: 'Definir o km da cobrança',
-  cobranca: 'Cobrança de viagem frustrada a decidir', cancelamento: 'Coleta programada cancelada pelo solicitante' };
+  cobranca: 'Cobrança de viagem frustrada a decidir', cancelamento: 'Coleta programada cancelada pelo solicitante',
+  contrato: 'Contrato de cliente perto do vencimento ou vencido' };
 
 /* ---------------- utilidades ---------------- */
 function exigeDestinacao_(s) { return !!s && listaValores_('servicoSemDestinacao').indexOf(String(s.servico || '')) < 0; }
