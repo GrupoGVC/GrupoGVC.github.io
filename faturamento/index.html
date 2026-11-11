@@ -389,14 +389,23 @@ const cobDe = id => (S.d.cobrancas || []).find(c => c.id === id) || {};
 const cobLivres = () => (S.d.cobrancas || []).filter(c => c.decisao === 'Cobrar' && !c.noBm && passaUni(c));
 const cobTxt = c => 'Viagem ' + (c.tipo === 'Frustrada' ? 'frustrada' : 'cancelada no dia') + ' em ' + D(c.data) + ' — ' + c.motivo;
 const itemCob = c => ({ solicitacaoId: '', cobrancaId: c.id, precoClienteId: '', descricao: cobTxt(c), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: +c.valor || 0, sentido: 'Cobrança' });
-const porKm = m => /^Km rodado/.test(m || '');
-const valoriza = m => /valoriza/i.test(m || '');
+// itens do contrato (Mapa): transporte por viagem/km (por tipo de veículo), destinação/valorização (por resíduo), caixas
+const TRANSP = ['Transporte por viagem', 'Transporte por km'];
+const ehCaixa = p => /caixa/i.test(p.tipo || '');
+const veiNome = id => ((S.d.tiposVeiculo || []).find(t => t.id === id) || {}).nome || '';
+const veiSol = sid => (S.d.veiculoSol || {})[sid] || '';
+// mesma regra do servidor: o do veículo, senão o de "qualquer veículo", senão o único; sem veículo e vários: só se forem do mesmo tipo
+function transporteDaSol(s, precosS) {
+  const ts = precosS.filter(p => TRANSP.includes(p.tipo)); if (!ts.length) return null;
+  const v = veiSol(s.id);
+  return (v && ts.find(p => p.tipoVeiculoId === v)) || ts.find(p => !p.tipoVeiculoId) || (ts.length === 1 ? ts[0] : null) || (!v && ts.every(p => p.tipo === ts[0].tipo) ? ts[0] : null);
+}
 // filial ligada à matriz com "fatura para a matriz": o BM/NF sai no CNPJ da matriz
 const fatDe = id => { const c = cliDe(id); return c.principalId && c.faturaPara === 'principal' && cliDe(c.principalId).id ? c.principalId : id; };
 // preço do contrato: só solicitação com perfil Contrato, vigente na data da solicitação; o do próprio cliente vem antes do da matriz
 const usaContrato = s => !!s && s.perfil === 'Contrato';
 const dataRefSol = s => s.dataSolicitacao || s.dataDesejada || s.dataColeta || hojeISO();
-const chavePreco = p => (p.residuoId || '-') + '|' + (p.valorTransporte !== '' ? (porKm(p.modalidade) ? 'km' : 'tr') : '') + '|' + (p.precoKg !== '' ? 'kg' : '');
+const chavePreco = p => [p.tipo, p.tipoVeiculoId || '', p.residuoId || '', p.capacidade === '' || p.capacidade == null ? '' : +p.capacidade].join('|');
 function precosDaSol(s) {
   if (!usaContrato(s)) return [];
   const c = cliDe(s.clienteId); const ids = [s.clienteId, c.principalId].filter(Boolean); const d = dataRefSol(s);
@@ -505,11 +514,13 @@ function editarBM(f) {
 }
 
 /* ---------- formulário do BM ---------- */
+function itemDesc(p) {
+  return [p.tipo, TRANSP.includes(p.tipo) ? (p.tipoVeiculoId ? veiNome(p.tipoVeiculoId) : '') : '', p.residuoId ? resNome(p.residuoId) : '',
+    ehCaixa(p) && p.capacidade !== '' ? p.capacidade + ' m³' : ''].filter(Boolean).join(' — ');
+}
 function precoRot(p) {
-  const partes = [p.modalidade, p.residuoId ? resNome(p.residuoId) : 'transporte'];
-  if (p.valorTransporte !== '') partes.push('transporte ' + R(p.valorTransporte) + (porKm(p.modalidade) ? '/km' : ''));
-  if (p.precoKg !== '') partes.push(R(p.precoKg) + '/kg');
-  return partes.join(' · ');
+  return [itemDesc(p), TRANSP.includes(p.tipo) && !p.tipoVeiculoId ? 'qualquer veículo' : '', p.tipo === 'Troca de caixa' ? (p.destinacaoInclusa ? 'destinação inclusa' : 'destinação à parte') : '',
+    p.tipo === 'Aluguel de caixa' ? (p.cobrancaAluguel || '').toLowerCase() : '', R(p.valor) + '/' + p.un].filter(Boolean).join(' · ');
 }
 function kmAviso(it) {
   if (it.unidadeMedida !== 'km' || !it.solicitacaoId) return '';
@@ -556,7 +567,7 @@ function renderBM() {
       <button class="btn sm" id="it-livre">+ Item livre</button>
       ${precos.length ? '<button class="btn sm pri" id="it-sugerir" title="Usa a tabela de preço do contrato (vigente na data de cada solicitação) e o peso confirmado na destinação">Sugerir itens</button>' : ''}
       ${precos.length ? `<select id="it-preco" style="width:auto;max-width:100%">${opts(precos.map(p => [p.id, precoRot(p)]), '', 'Item da tabela de preço do cliente…')}</select><button class="btn sm" id="it-preco-add">Incluir</button>`
-        : `<span class="sub">${temCliPreco && b.solIds.length ? 'Nenhuma coleta deste BM usa a tabela do contrato (perfil Proposta ou preço fora da vigência na data da solicitação).' : 'Cliente sem tabela de preço de venda.'} <a="../mapa/?abrir=${encodeURIComponent(b.clienteId)}" target="_blank" rel="noopener">Cadastrar no Mapa ↗</a></span>`}
+        : `<span class="sub">${temCliPreco && b.solIds.length ? 'Nenhuma coleta deste BM usa a tabela do contrato (perfil Proposta ou preço fora da vigência na data da solicitação).' : 'Cliente sem tabela de preço de venda.'} <a href="../mapa/?abrir=${encodeURIComponent(b.clienteId)}" target="_blank" rel="noopener">Cadastrar no Mapa ↗</a></span>`}
     </div>
     ${b.criadoEm ? `<div class="gvc-audit" style="margin-top:12px">${Portal.auditoriaHTML(b)}</div>` : ''}
     <div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px">${b.id ? '<button class="btn" id="bm-hist">Histórico</button>' : ''}<button class="btn pri" id="bm-salvar">${b.id ? 'Salvar BM' : 'Registrar BM enviado'}</button></div>
@@ -595,36 +606,41 @@ function renderBM() {
   const sg = $('#it-sugerir'); if (sg) sg.onclick = () => {
     const dest = S.d.destinacao || {};
     const novos = [];
-    let nProp = 0;
+    let nProp = 0, semVei = 0;
     b.solIds.forEach(sid => {
       const d = dest[sid] || { viagens: 0, kg: {} }; const dc = D(solDe(sid).dataColeta);
       const sk = solDe(sid).km;
       const precosS = precosDaSol(solDe(sid)); if (!usaContrato(solDe(sid))) nProp++;
-      precosS.forEach(p => {
-        const valoriza2 = valoriza(p.modalidade);
-        if (porKm(p.modalidade)) {
-          if (p.valorTransporte !== '' && sk && sk.escolha && (!sk.precoId || sk.precoId === p.id || !precosS.some(q => q.id === sk.precoId)) && !novos.some(n => n.solicitacaoId === sid && n.unidadeMedida === 'km'))
-            novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte — ' + kmTxt(sk) + (dc ? ' (' + dc + ')' : ''), quantidade: +sk.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
-        } else if (p.valorTransporte !== '') novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : '') + (dc ? ' (' + dc + ')' : ''), quantidade: d.viagens || 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
-        const kg = p.residuoId ? +(d.kg[p.residuoId] || 0) : 0;
-        if (p.precoKg !== '' && kg > 0) novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: (valoriza2 ? 'Valorização — ' : '') + resNome(p.residuoId) + (dc ? ' (' + dc + ')' : ''), quantidade: Math.round(kg * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza2 ? 'Desconto' : 'Cobrança' });
+      const tr = transporteDaSol(solDe(sid), precosS);
+      if (tr && tr.tipo === 'Transporte por km') {
+        if (sk && sk.escolha) novos.push({ solicitacaoId: sid, precoClienteId: tr.id, descricao: itemDesc(tr) + ' · ' + kmTxt(sk) + (dc ? ' (' + dc + ')' : ''), quantidade: +sk.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: tr.valor, sentido: 'Cobrança' });
+      } else if (tr) novos.push({ solicitacaoId: sid, precoClienteId: tr.id, descricao: itemDesc(tr) + (dc ? ' (' + dc + ')' : ''), quantidade: d.viagens || 1, unidadeMedida: 'viagem', valorUnitario: tr.valor, sentido: 'Cobrança' });
+      else if (precosS.some(p => TRANSP.includes(p.tipo))) semVei++;
+      precosS.filter(p => p.tipo === 'Destinação' || p.tipo === 'Valorização').forEach(p => {
+        const kg = +(d.kg[p.residuoId] || 0);
+        if (kg > 0) novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: itemDesc(p) + (dc ? ' (' + dc + ')' : ''), quantidade: Math.round(kg * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.valor, sentido: p.tipo === 'Valorização' ? 'Desconto' : 'Cobrança' });
       });
     });
     if (!novos.length) { toast(nProp === b.solIds.length ? 'As coletas deste BM são de proposta: informe os valores da proposta.' : 'Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
     const deCob = b.itens.filter(it => it.cobrancaId), outros = b.itens.filter(it => !it.cobrancaId);
     if (outros.length && !confirm('Trocar os ' + outros.length + ' item(ns) atuais pelos ' + novos.length + ' sugeridos? (as viagens frustradas ficam)')) return;
-    b.itens = novos.concat(deCob); marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s)' + (nProp ? ' · ' + nProp + ' coleta(s) de proposta ficaram de fora' : '') + '. Confira e salve.');
+    b.itens = novos.concat(deCob); marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s)' + (nProp ? ' · ' + nProp + ' coleta(s) de proposta ficaram de fora' : '') + (semVei ? ' · ' + semVei + ' coleta(s) sem transporte: o veículo não tem preço no contrato' : '') + '. Caixas: inclua pelo item da tabela. Confira e salve.');
   };
   const pa = $('#it-preco-add'); if (pa) pa.onclick = () => {
     const p = precos.find(x => x.id === $('#it-preco').value); if (!p) return;
     const sol = b.solIds[0] || '';
-    const valoriza2 = valoriza(p.modalidade);
-    if (porKm(p.modalidade) && p.valorTransporte !== '') {
-      b.solIds.forEach(sid => { const k = solDe(sid).km || {}; b.itens.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte — ' + (k.escolha ? kmTxt(k) : 'km rodado') + (solDe(sid).dataColeta ? ' (' + D(solDe(sid).dataColeta) + ')' : ''), quantidade: +k.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: p.valorTransporte, sentido: 'Cobrança' }); });
-    } else if (p.valorTransporte !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : ''), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
-    const kgLanc = p.residuoId ? b.solIds.reduce((t, sid) => t + +(((S.d.destinacao || {})[sid] || { kg: {} }).kg[p.residuoId] || 0), 0) : 0;
-    if (p.precoKg !== '') b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: (valoriza2 ? 'Valorização — ' : '') + (resNome(p.residuoId) || 'Resíduo'), quantidade: Math.round(kgLanc * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza2 ? 'Desconto' : 'Cobrança' });
-    marcar(); renderBM(); toast(p.precoKg !== '' ? 'Item incluído: informe a quantidade em kg.' : 'Item incluído.');
+    let msg = 'Item incluído.';
+    if (p.tipo === 'Transporte por km') {
+      (b.solIds.length ? b.solIds : ['']).forEach(sid => { const k = (sid && solDe(sid).km) || {}; b.itens.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: itemDesc(p) + ' · ' + (k.escolha ? kmTxt(k) : 'km rodado') + (sid && solDe(sid).dataColeta ? ' (' + D(solDe(sid).dataColeta) + ')' : ''), quantidade: +k.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: p.valor, sentido: 'Cobrança' }); });
+    } else if (p.tipo === 'Destinação' || p.tipo === 'Valorização') {
+      const kgLanc = b.solIds.reduce((t, sid) => t + +(((S.d.destinacao || {})[sid] || { kg: {} }).kg[p.residuoId] || 0), 0);
+      b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: itemDesc(p), quantidade: Math.round(kgLanc * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.valor, sentido: p.tipo === 'Valorização' ? 'Desconto' : 'Cobrança' });
+      if (!kgLanc) msg = 'Item incluído: informe a quantidade em kg.';
+    } else {
+      b.itens.push({ solicitacaoId: sol, precoClienteId: p.id, descricao: itemDesc(p), quantidade: 1, unidadeMedida: p.un || 'un', valorUnitario: p.valor, sentido: 'Cobrança' });
+      if (ehCaixa(p)) msg = 'Item incluído: confira a quantidade (' + p.un + ').';
+    }
+    marcar(); renderBM(); toast(msg);
   };
   $('#bm-fechar').onclick = () => { if (b.sujo && !confirm('Fechar sem salvar o BM?')) return; S.bm = null; render(); };
   const h = $('#bm-hist'); if (h) h.onclick = () => Portal.mostrarHistorico('Faturamentos', b.id, 'BM ' + (b.bmNumero || 's/nº') + ' · ' + cliNome(b.clienteId));
