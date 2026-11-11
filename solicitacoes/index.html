@@ -567,7 +567,7 @@ function formSol() {
       <div class="fld"><label for="f-con">Consultor</label><select id="f-con">${opts(S.d.consultores.filter(c => c.ativo || c.id === e.consultorId).map(c => [c.id, c.nome]), e.consultorId, 'Sem consultor')}</select></div>
       <div class="fld"><label for="f-serv">Serviço</label><select id="f-serv">${opts(L.servico.concat(e.servico && !L.servico.includes(e.servico) ? [e.servico] : []), e.servico, '—')}</select></div>
       <div class="fld"><label for="f-dem">Demanda</label><select id="f-dem">${opts(L.demanda, e.demanda, '—')}</select></div>
-      <div class="fld"><label for="f-perf">Perfil</label><select id="f-perf">${opts(L.perfil, e.perfil, '—')}</select></div>
+      <div class="fld"><label for="f-perf">Perfil</label><select id="f-perf" ${e.id ? '' : 'required'}>${opts(L.perfil, e.perfil, e.id ? '—' : 'Escolha…')}</select><div class="hint" id="h-perf"></div></div>
       <div class="fld"><label for="f-exec">Execução</label><select id="f-exec">${opts(L.execucao, e.execucao, '—')}</select></div>
       <div class="fld"><label for="f-dsc">Data da solicitação do consultor</label><input id="f-dsc" type="date" value="${esc(e.dataSolicitacaoConsultor)}"></div>
       <div class="fld"><label>Data da solicitação</label><div class="ro-v">${e.id ? esc(D(e.dataSolicitacao)) + (e.criadoPor ? ' <span class="sub">· ' + esc(String(e.criadoPor).split('@')[0]) + '</span>' : '') : 'Hoje, ao registrar'}</div></div>
@@ -722,9 +722,17 @@ function ligarForm() {
   };
   if (box) ligarItens();
   const ia = $('#f-it-add'); if (ia) ia.onclick = () => { e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' }); redesenharItens(); const l = $$('#f-itens [data-itr]'); l[l.length - 1].focus(); };
-  const kmv = () => { const h = $('#h-kmv'); if (h) h.innerHTML = kmEstimadoTxt(resolver(), $('#f-km').value, e.dataColeta || $('#f-dd').value); };
+  // tabela de preço do contrato: só perfil Contrato, vigente na data da solicitação
+  const kmv = () => { const h = $('#h-kmv'); if (h) h.innerHTML = $('#f-perf').value === 'Contrato' ? kmEstimadoTxt(resolver(), $('#f-km').value, e.dataSolicitacao || hojeISO()) : ''; };
+  const perfInfo = () => { const h = $('#h-perf'); if (!h) return; const pf = $('#f-perf').value, cid = resolver();
+    if (pf === 'Proposta') { h.innerHTML = 'Serviço avulso: valores da proposta (a tabela do contrato não é usada).'; return; }
+    if (pf !== 'Contrato' || !cid) { h.innerHTML = ''; return; }
+    const c = cliDe(cid) || {}; const ct = (S.d.contratos || {})[cid] || (S.d.contratos || {})[c.principalId];
+    h.innerHTML = !ct ? '<span class="warn">Cliente sem contrato cadastrado no Mapa.</span>' : ct.situacao === 'Vencido' ? `<span class="warn">Contrato ${esc(ct.numero || '')} vencido em ${esc(D(ct.validade))}.</span>`
+      : ct.situacao === 'Vencendo' ? `Contrato ${esc(ct.numero || '')} vence em ${esc(D(ct.validade))}.` : ct.situacao === 'Encerrado' ? '<span class="warn">Contrato encerrado.</span>' : ''; };
   const fkm = $('#f-km'); if (fkm) fkm.addEventListener('input', kmv);
-  if (ic) ic.addEventListener('change', kmv);
+  if (ic) { ic.addEventListener('change', kmv); ic.addEventListener('change', perfInfo); }
+  const fpf = $('#f-perf'); if (fpf) { fpf.addEventListener('change', kmv); fpf.addEventListener('change', perfInfo); perfInfo(); kmv(); }
   ligarKm(e); ligarCobrancas(e);
   const kr = $('#f-km-rota'); if (kr) kr.onclick = async () => {
     const cliId = resolver(); const uniId = $('#f-uni').value;
