@@ -391,6 +391,19 @@ const cobTxt = c => 'Viagem ' + (c.tipo === 'Frustrada' ? 'frustrada' : 'cancela
 const itemCob = c => ({ solicitacaoId: '', cobrancaId: c.id, precoClienteId: '', descricao: cobTxt(c), quantidade: 1, unidadeMedida: 'viagem', valorUnitario: +c.valor || 0, sentido: 'Cobrança' });
 const porKm = m => /^Km rodado/.test(m || '');
 const valoriza = m => /valoriza/i.test(m || '');
+// filial ligada à matriz com "fatura para a matriz": o BM/NF sai no CNPJ da matriz
+const fatDe = id => { const c = cliDe(id); return c.principalId && c.faturaPara === 'principal' && cliDe(c.principalId).id ? c.principalId : id; };
+// preço do contrato: só solicitação com perfil Contrato, vigente na data da solicitação; o do próprio cliente vem antes do da matriz
+const usaContrato = s => !!s && s.perfil === 'Contrato';
+const dataRefSol = s => s.dataSolicitacao || s.dataDesejada || s.dataColeta || hojeISO();
+const chavePreco = p => (p.residuoId || '-') + '|' + (p.valorTransporte !== '' ? (porKm(p.modalidade) ? 'km' : 'tr') : '') + '|' + (p.precoKg !== '' ? 'kg' : '');
+function precosDaSol(s) {
+  if (!usaContrato(s)) return [];
+  const c = cliDe(s.clienteId); const ids = [s.clienteId, c.principalId].filter(Boolean); const d = dataRefSol(s);
+  const vig = S.d.precos.filter(p => ids.includes(p.cadastroId) && (!p.vigenciaInicio || p.vigenciaInicio <= d) && (!p.vigenciaFim || p.vigenciaFim >= d))
+    .sort((a, b) => ids.indexOf(a.cadastroId) - ids.indexOf(b.cadastroId) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)));
+  const vistos = {}; return vig.filter(p => { const k = chavePreco(p); if (vistos[k]) return false; vistos[k] = 1; return true; });
+}
 const kmTxt = k => 'km ' + (k.escolha === 'Real' ? 'real' : 'previsto') + (k.definidoPor ? ', definido por ' + k.definidoPor + (k.definidoEm ? ' em ' + D(k.definidoEm) : '') : '');
 function render() {
   if (!S.d) return;
@@ -431,7 +444,7 @@ function renderAFaturar() {
     { k: 'col', label: 'Coleta', v: s => D(s.dataColeta), ord: s => s.dataColeta || '', cls: 'mono' },
     { k: 'uni', label: 'Unidade', v: s => uniNome(s.unidadeId) },
     { k: 'con', label: 'Consultor', v: s => conNome(s.consultorId) || '—' },
-    { k: 'desc', label: 'Descrição', v: s => s.descricao, cls: 'wrap', h: s => esc(s.descricao || '') + (kmPend(s) ? ' <span class="pill warn" title="O solicitante escolhe o km real ou o previsto em Solicitações">aguardando km</span>' : s.km && s.km.escolha ? ` <span class="sub">· ${esc(s.km.kmCobrado)} km (${esc(s.km.escolha.toLowerCase())})</span>` : '') },
+    { k: 'desc', label: 'Descrição', v: s => s.descricao, cls: 'wrap', h: s => (fatDe(s.clienteId) !== s.clienteId ? `<span class="pill" title="Filial faturada no CNPJ da matriz">${esc(cliNome(s.clienteId))}</span> ` : '') + (s.perfil === 'Proposta' ? '<span class="pill" title="Serviço por proposta: valores da proposta">proposta</span> ' : '') + esc(s.descricao || '') + (kmPend(s) ? ' <span class="pill warn" title="O solicitante escolhe o km real ou o previsto em Solicitações">aguardando km</span>' : s.km && s.km.escolha ? ` <span class="sub">· ${esc(s.km.kmCobrado)} km (${esc(s.km.escolha.toLowerCase())})</span>` : '') },
     { k: 'val', label: 'Valor previsto', v: s => R(s.valorPrevisto), ord: s => +s.valorPrevisto || 0, num: true, x: s => s.valorPrevisto === '' ? '' : +s.valorPrevisto, fmt: FMT_R },
     { k: 'cli', label: 'Cliente', v: s => cliNome(s.clienteId), oculta: true },
     { k: 'upl', label: 'Código UPLOG', v: s => cliDe(s.clienteId).codigoUplog || '', oculta: true },
@@ -444,8 +457,8 @@ function renderAFaturar() {
     totais: l => ({ 'Valor previsto': l.reduce((t, s) => t + (+s.valorPrevisto || 0), 0) }) });
   const sols = T.aplicar(solsTela);
   const grupos = {}, cobs = {};
-  sols.forEach(s => { (grupos[s.clienteId] = grupos[s.clienteId] || []).push(s); });
-  cobLivres().filter(c => passaBusca([cliNome(c.clienteId), cliDe(c.clienteId).codigoUplog].join(' '))).forEach(c => { (cobs[c.clienteId] = cobs[c.clienteId] || []).push(c); grupos[c.clienteId] = grupos[c.clienteId] || []; });
+  sols.forEach(s => { const f = fatDe(s.clienteId); (grupos[f] = grupos[f] || []).push(s); });
+  cobLivres().filter(c => passaBusca([cliNome(c.clienteId), cliDe(c.clienteId).codigoUplog].join(' '))).forEach(c => { const f = fatDe(c.clienteId); (cobs[f] = cobs[f] || []).push(c); grupos[f] = grupos[f] || []; });
   const ids = Object.keys(grupos).sort((a, b) => cliNome(a).localeCompare(cliNome(b), 'pt-BR'));
   $('#main').innerHTML = `<section class="panel">
     <div class="panel-h"><div><h2>Destinadas — falta BM</h2><p class="sub">Coletas com a destinação confirmada no Controle (ou de serviço sem destinação) que ainda não entraram num BM. Marque as do mesmo cliente que vão no mesmo BM e clique em "Montar BM".</p></div></div>
@@ -506,12 +519,14 @@ function kmAviso(it) {
 function renderBM() {
   const b = S.bm; const c = cliDe(b.clienteId);
   const hoje = hojeISO();
-  const precos = S.d.precos.filter(p => p.cadastroId === b.clienteId || (c.principalId && p.cadastroId === c.principalId))
-    .filter(p => (!p.vigenciaInicio || p.vigenciaInicio <= hoje) && (!p.vigenciaFim || p.vigenciaFim >= hoje));
+  // preços do contrato das coletas do BM (vigentes na data de cada solicitação); sem coleta: os vigentes hoje do cliente
+  const precos = []; const vistosP = {};
+  (b.solIds.length ? b.solIds.map(solDe) : [{ clienteId: b.clienteId, perfil: 'Contrato', dataSolicitacao: hoje }]).forEach(s => precosDaSol(s).forEach(p => { if (!vistosP[p.id]) { vistosP[p.id] = 1; precos.push(p); } }));
+  const temCliPreco = S.d.precos.some(p => p.cadastroId === b.clienteId || (c.principalId && p.cadastroId === c.principalId));
   // solicitações que podem entrar: realizadas do mesmo cliente + as que já estão no BM
-  const disponiveis = S.d.solicitacoes.filter(s => s.clienteId === b.clienteId && ((prontaBm(s) && !kmPend(s)) || b.solIds.includes(s.id)));
+  const disponiveis = S.d.solicitacoes.filter(s => fatDe(s.clienteId) === b.clienteId && ((prontaBm(s) && !kmPend(s)) || b.solIds.includes(s.id)));
   b.cobIds = b.cobIds || [];
-  const cobsDisp = (S.d.cobrancas || []).filter(c => (c.clienteId === b.clienteId || cliDe(c.clienteId).principalId === b.clienteId) && ((c.decisao === 'Cobrar' && (!c.noBm || (b.id && c.noBm.id === b.id))) || b.cobIds.includes(c.id)));
+  const cobsDisp = (S.d.cobrancas || []).filter(c => fatDe(c.clienteId) === b.clienteId && ((c.decisao === 'Cobrar' && (!c.noBm || (b.id && c.noBm.id === b.id))) || b.cobIds.includes(c.id)));
   const total = totalItens(b.itens);
   const um = S.d.listas.unidadeMedida;
   $('#main').innerHTML = `<section class="panel form-panel" id="form-panel">
@@ -523,7 +538,7 @@ function renderBM() {
       <div class="fld full"><label for="bm-obs">Observações</label><input id="bm-obs" value="${esc(b.obs)}"></div>
     </div>
     <h3 class="sec">Coletas neste BM</h3>
-    <div class="chips">${disponiveis.map(s => `<label class="chip"><input type="checkbox" data-bsol="${esc(s.id)}" ${b.solIds.includes(s.id) ? 'checked' : ''}> ${esc(D(s.dataColeta) || D(s.dataSolicitacao))} · ${esc(uniNome(s.unidadeId))}${s.valorPrevisto !== '' ? ' · ' + R(s.valorPrevisto) : ''}</label>`).join('')}</div>
+    <div class="chips">${disponiveis.map(s => `<label class="chip"><input type="checkbox" data-bsol="${esc(s.id)}" ${b.solIds.includes(s.id) ? 'checked' : ''}> ${esc(D(s.dataColeta) || D(s.dataSolicitacao))}${s.clienteId !== b.clienteId ? ' · ' + esc(cliNome(s.clienteId)) : ''} · ${esc(uniNome(s.unidadeId))}${s.perfil === 'Proposta' ? ' · proposta' : ''}${s.valorPrevisto !== '' ? ' · ' + R(s.valorPrevisto) : ''}</label>`).join('')}</div>
     ${cobsDisp.length ? `<h3 class="sec">Viagens frustradas a cobrar</h3><div class="chips">${cobsDisp.map(c => `<label class="chip"><input type="checkbox" data-bcob="${esc(c.id)}" ${b.cobIds.includes(c.id) ? 'checked' : ''}> ${esc(cobTxt(c))} · ${R(c.valor)}</label>`).join('')}</div>` : ''}
     <h3 class="sec">Itens</h3>
     <div class="tbl-wrap"><table class="itens"><thead><tr><th>Coleta</th><th>Descrição</th><th class="num">Qtd</th><th>Un.</th><th class="num">Valor unit. (R$)</th><th>Sentido</th><th class="num">Valor</th><th></th></tr></thead><tbody>
@@ -539,9 +554,9 @@ function renderBM() {
     </tbody><tfoot><tr><td colspan="6">Total do BM</td><td class="num" id="bm-total"><b>${R(total)}</b></td><td></td></tr></tfoot></table></div>
     <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
       <button class="btn sm" id="it-livre">+ Item livre</button>
-      ${precos.length ? '<button class="btn sm pri" id="it-sugerir" title="Usa a tabela de preço do cliente e o peso lançado na Programação">Sugerir itens</button>' : ''}
+      ${precos.length ? '<button class="btn sm pri" id="it-sugerir" title="Usa a tabela de preço do contrato (vigente na data de cada solicitação) e o peso confirmado na destinação">Sugerir itens</button>' : ''}
       ${precos.length ? `<select id="it-preco" style="width:auto;max-width:100%">${opts(precos.map(p => [p.id, precoRot(p)]), '', 'Item da tabela de preço do cliente…')}</select><button class="btn sm" id="it-preco-add">Incluir</button>`
-        : `<span class="sub">Cliente sem tabela de preço de venda. <a href="../mapa/?abrir=${encodeURIComponent(b.clienteId)}" target="_blank" rel="noopener">Cadastrar no Mapa ↗</a></span>`}
+        : `<span class="sub">${temCliPreco && b.solIds.length ? 'Nenhuma coleta deste BM usa a tabela do contrato (perfil Proposta ou preço fora da vigência na data da solicitação).' : 'Cliente sem tabela de preço de venda.'} <a="../mapa/?abrir=${encodeURIComponent(b.clienteId)}" target="_blank" rel="noopener">Cadastrar no Mapa ↗</a></span>`}
     </div>
     ${b.criadoEm ? `<div class="gvc-audit" style="margin-top:12px">${Portal.auditoriaHTML(b)}</div>` : ''}
     <div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px">${b.id ? '<button class="btn" id="bm-hist">Histórico</button>' : ''}<button class="btn pri" id="bm-salvar">${b.id ? 'Salvar BM' : 'Registrar BM enviado'}</button></div>
@@ -580,26 +595,28 @@ function renderBM() {
   const sg = $('#it-sugerir'); if (sg) sg.onclick = () => {
     const dest = S.d.destinacao || {};
     const novos = [];
+    let nProp = 0;
     b.solIds.forEach(sid => {
       const d = dest[sid] || { viagens: 0, kg: {} }; const dc = D(solDe(sid).dataColeta);
       const sk = solDe(sid).km;
-      precos.forEach(p => {
+      const precosS = precosDaSol(solDe(sid)); if (!usaContrato(solDe(sid))) nProp++;
+      precosS.forEach(p => {
         const valoriza2 = valoriza(p.modalidade);
         if (porKm(p.modalidade)) {
-          if (p.valorTransporte !== '' && sk && sk.escolha && (!sk.precoId || sk.precoId === p.id || !precos.some(q => q.id === sk.precoId)) && !novos.some(n => n.solicitacaoId === sid && n.unidadeMedida === 'km'))
+          if (p.valorTransporte !== '' && sk && sk.escolha && (!sk.precoId || sk.precoId === p.id || !precosS.some(q => q.id === sk.precoId)) && !novos.some(n => n.solicitacaoId === sid && n.unidadeMedida === 'km'))
             novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte — ' + kmTxt(sk) + (dc ? ' (' + dc + ')' : ''), quantidade: +sk.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
         } else if (p.valorTransporte !== '') novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: 'Transporte' + (p.residuoId ? ' — ' + resNome(p.residuoId) : '') + (dc ? ' (' + dc + ')' : ''), quantidade: d.viagens || 1, unidadeMedida: 'viagem', valorUnitario: p.valorTransporte, sentido: 'Cobrança' });
         const kg = p.residuoId ? +(d.kg[p.residuoId] || 0) : 0;
         if (p.precoKg !== '' && kg > 0) novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: (valoriza2 ? 'Valorização — ' : '') + resNome(p.residuoId) + (dc ? ' (' + dc + ')' : ''), quantidade: Math.round(kg * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.precoKg, sentido: valoriza2 ? 'Desconto' : 'Cobrança' });
       });
     });
-    if (!novos.length) { toast('Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
+    if (!novos.length) { toast(nProp === b.solIds.length ? 'As coletas deste BM são de proposta: informe os valores da proposta.' : 'Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
     const deCob = b.itens.filter(it => it.cobrancaId), outros = b.itens.filter(it => !it.cobrancaId);
     if (outros.length && !confirm('Trocar os ' + outros.length + ' item(ns) atuais pelos ' + novos.length + ' sugeridos? (as viagens frustradas ficam)')) return;
-    b.itens = novos.concat(deCob); marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s). Confira e salve.');
+    b.itens = novos.concat(deCob); marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s)' + (nProp ? ' · ' + nProp + ' coleta(s) de proposta ficaram de fora' : '') + '. Confira e salve.');
   };
   const pa = $('#it-preco-add'); if (pa) pa.onclick = () => {
-    const p = S.d.precos.find(x => x.id === $('#it-preco').value); if (!p) return;
+    const p = precos.find(x => x.id === $('#it-preco').value); if (!p) return;
     const sol = b.solIds[0] || '';
     const valoriza2 = valoriza(p.modalidade);
     if (porKm(p.modalidade) && p.valorTransporte !== '') {
