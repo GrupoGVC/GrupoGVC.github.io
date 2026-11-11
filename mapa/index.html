@@ -1529,6 +1529,10 @@ tr.cad-inativo td:last-child { opacity: 1; }
 .pv-form label { font-size: 0.66rem; margin-bottom: 3px; display: block; }
 .pv-form input, .pv-form select { width: 100%; }
 .pv-hint { font-size: 0.7rem; color: var(--text-muted); }
+.pv-grupo { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-top: 10px; padding-bottom: 2px; text-transform: uppercase; letter-spacing: .03em; }
+.pv-grupo + .pv-row { border-top: none; }
+.pv-check { display: flex !important; gap: 6px; align-items: center; font-size: 0.72rem !important; text-transform: none !important; letter-spacing: normal !important; font-family: var(--font-main) !important; color: var(--text) !important; }
+.pv-check input { width: auto !important; }
 /* Matriz/filiais e contrato do cliente */
 .ct-sit { display: inline-block; font-size: 0.66rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border-radius: 10px; padding: 1px 8px; margin-left: 6px; }
 .ct-sit.Vigente { background: #dcefe6; color: #1d6b52; } .ct-sit.Vencendo { background: #fff3dc; color: #a86400; }
@@ -5506,7 +5510,7 @@ function showRouteError(msg) {
     <div class="fg equip-wrap" id="pv-wrap" style="display:none">
       <button type="button" class="collapse-head" id="pv-head" onclick="pvToggle()" aria-expanded="false" aria-controls="pv-body">
         <span class="collapse-arrow" id="pv-arrow">▸</span>
-        <span class="collapse-title">💰 Preço de venda</span>
+        <span class="collapse-title">💰 Itens do contrato (preço de venda)</span>
         <span class="collapse-count" id="pv-count">…</span>
       </button>
       <div class="collapse-body" id="pv-body" style="display:none"></div>
@@ -6390,27 +6394,30 @@ function openModal(id, draft) {
 }
 
 
-// ─── PREÇO DE VENDA DO CLIENTE (tabela PrecosCliente; o Faturamento usa para montar o BM) ───
-const PV = { id: null, precos: [], residuos: [], modalidades: [], edit: null, aberto: false };
+// ─── ITENS DO CONTRATO = PREÇO DE VENDA (tabela ContratoItens; Solicitações, Programação e Faturamento usam) ───
+const PV = { id: null, itens: [], residuos: [], tipos: [], tiposVeiculo: [], capacidades: [], cobrancasAluguel: [], contrato: null, edit: null, aberto: false };
 const pvEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pvR = v => v === '' || v == null ? '' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 const pvD = iso => iso ? iso.split('-').reverse().join('/') : '';
+const PV_GRUPOS = [['🚚 Transporte', ['Transporte por viagem', 'Transporte por km']], ['♻️ Destinação e valorização', ['Destinação', 'Valorização']],
+  ['📦 Caixas', ['Entrega de caixa', 'Retirada de caixa', 'Troca de caixa', 'Aluguel de caixa']]];
 function pvAbrirCadastro(id, tipos) {
   const wrap = document.getElementById('pv-wrap'); if (!wrap) return;
   PV.id = id && /^CAD-/.test(id) && (tipos || []).includes('cliente') ? id : null;
-  PV.edit = null; PV.precos = [];
+  PV.edit = null; PV.itens = [];
   wrap.style.display = PV.id ? '' : 'none';
   pvSetAberto(false);
   if (PV.id) pvCarregar();
 }
 async function pvCarregar() {
-  const alvo = PV.id; document.getElementById('pv-count').textContent = '…';
+  const alvo = PV.id; if (!alvo) return; document.getElementById('pv-count').textContent = '…';
   try {
     const r = await Portal.api('mapa.precosVenda', { cadastroId: alvo });
     if (alvo !== PV.id) return;
-    PV.precos = r.precos; PV.residuos = r.residuos || []; PV.modalidades = r.modalidades;
-    const n = PV.precos.filter(p => p.ativo).length;
-    const c = document.getElementById('pv-count'); c.textContent = n ? n + ' preço(s)' : 'nenhum'; c.classList.toggle('has', n > 0);
+    Object.assign(PV, { itens: r.itens || [], residuos: r.residuos || [], tipos: r.tipos || [], tiposVeiculo: r.tiposVeiculo || [], capacidades: r.capacidades || [],
+      cobrancasAluguel: r.cobrancasAluguel || [], contrato: r.contrato || null });
+    const n = PV.itens.filter(p => p.ativo).length;
+    const c = document.getElementById('pv-count'); c.textContent = n ? n + ' item(ns)' : 'nenhum'; c.classList.toggle('has', n > 0);
     pvRender();
   } catch (e) { document.getElementById('pv-count').textContent = 'erro ao carregar'; }
 }
@@ -6422,38 +6429,62 @@ function pvSetAberto(a) {
 }
 function pvToggle() { pvSetAberto(!PV.aberto); }
 const pvResNome = id => (PV.residuos.find(r => r.id === id) || {}).nome || '';
+const pvVeiNome = id => (PV.tiposVeiculo.find(t => t.id === id) || {}).nome || '';
+const pvTipo = t => PV.tipos.find(x => x.nome === t) || {};
+function pvOrigem(p) {
+  if (!p.aditivoId) return 'contrato';
+  const a = PV.contrato && PV.contrato.aditivos.find(x => x.id === p.aditivoId);
+  return a ? 'aditivo' + (a.numero ? ' nº ' + a.numero : '') + ' de ' + pvD(a.data) : 'aditivo';
+}
+function pvDetalhe(p) {
+  const t = pvTipo(p.tipo);
+  return [t.veiculo ? (p.tipoVeiculoId ? pvVeiNome(p.tipoVeiculoId) : 'qualquer veículo') : '', t.residuo ? pvResNome(p.residuoId) : '',
+    t.caixa ? 'caixa ' + p.capacidade + ' m³' : '', t.inclusa ? (p.destinacaoInclusa ? 'destinação inclusa' : 'destinação cobrada à parte (por kg)') : '',
+    t.aluguel ? (p.cobrancaAluguel || '').toLowerCase() : ''].filter(Boolean).join(' · ');
+}
 function pvRender() {
   const b = document.getElementById('pv-body'); if (!b) return;
-  const e = PV.edit;
-  const porKm = m => /^Km rodado/.test(m || '');
-  const comTransp = m => m === 'Transporte + kg' || m === 'Valorização com transporte' || porKm(m);
+  const e = PV.edit; const t = e ? pvTipo(e.tipo) : {};
   const pvMat = (points.find(x => x.id === PV.id) || {}).cadastroPrincipalId; const pvMatP = pvMat ? points.find(x => x.id === pvMat) : null;
-  b.innerHTML = `<div class="pv-hint">Preço cobrado do cliente, usado nas solicitações com perfil Contrato (vigente na data da solicitação). Valorização = o kg é pago ao cliente e entra como desconto no BM. Km rodado = transporte em R$ por km; o solicitante escolhe o km real ou o previsto antes do BM.</div>
-    ${pvMatP ? `<div class="pv-hint" style="margin-top:4px">Filial de <b>${pvEsc(pvMatP.nome)}</b>: os preços da matriz também valem; um preço próprio da filial vem antes do da matriz.</div>` : ''}
-    ${PV.precos.length ? PV.precos.map(p => `<div class="pv-row ${p.ativo ? '' : 'inativo'}"><div><b>${pvEsc(p.residuoId ? pvResNome(p.residuoId) : 'Transporte')}</b> · ${pvEsc(p.modalidade)}
-        <div class="pv-sub">${[p.valorTransporte !== '' ? 'transporte ' + pvR(p.valorTransporte) + (porKm(p.modalidade) ? '/km' : '') : '', p.precoKg !== '' ? pvR(p.precoKg) + '/kg' : ''].filter(Boolean).join(' + ')} · desde ${pvD(p.vigenciaInicio)}${p.vigenciaFim ? ' até ' + pvD(p.vigenciaFim) : ''}${p.ativo ? '' : ' · inativo'}${p.obs ? ' · ' + pvEsc(p.obs) : ''}</div></div>
-        <div class="pv-acts">${somenteLeitura || !p.ativo ? '' : `<button type="button" class="pv-mini" onclick="pvEditar('${p.id}')">Editar</button><button type="button" class="pv-mini del" onclick="pvExcluir('${p.id}')">Excluir</button>`}</div></div>`).join('')
-      : '<div class="pv-hint" style="margin-top:6px">Nenhum preço de venda cadastrado.</div>'}
-    ${somenteLeitura ? '' : e ? `<div class="pv-form">
-      <div><label for="pv-mod">Modalidade</label><select id="pv-mod" onchange="pvCampo('modalidade', this.value); pvRender()">${['', ...PV.modalidades].map(m => `<option value="${pvEsc(m)}" ${m === e.modalidade ? 'selected' : ''}>${pvEsc(m || 'Escolha…')}</option>`).join('')}</select></div>
-      <div><label for="pv-res">Resíduo</label><select id="pv-res" onchange="pvCampo('residuoId', this.value)"><option value="">${comTransp(e.modalidade) ? 'Só transporte' : 'Escolha…'}</option>${PV.residuos.map(r => `<option value="${r.id}" ${r.id === e.residuoId ? 'selected' : ''}>${pvEsc(r.nome)}</option>`).join('')}</select></div>
-      ${comTransp(e.modalidade) ? `<div><label for="pv-tr">Transporte (R$ por ${porKm(e.modalidade) ? 'km rodado' : 'viagem'})</label><input id="pv-tr" type="number" step="any" min="0" value="${pvEsc(e.valorTransporte)}" oninput="pvCampo('valorTransporte', this.value)"></div>` : ''}
-      <div><label for="pv-kg">${/valoriza/i.test(e.modalidade) ? 'Pago ao cliente (R$/kg)' : 'Preço (R$/kg)'}</label><input id="pv-kg" type="number" step="any" min="0" value="${pvEsc(e.precoKg)}" oninput="pvCampo('precoKg', this.value)"></div>
+  const linha = p => `<div class="pv-row ${p.ativo ? '' : 'inativo'}" data-item="${p.id}"><div><b>${pvEsc(p.tipo)}</b>${pvDetalhe(p) ? ' · ' + pvEsc(pvDetalhe(p)) : ''}
+      <div class="pv-sub">${pvR(p.valor)} por ${pvEsc(p.un)}${pvTipo(p.tipo).desconto ? ' (pago ao cliente: desconto no BM)' : ''} · desde ${pvD(p.vigenciaInicio)}${p.vigenciaFim ? ' até ' + pvD(p.vigenciaFim) : ''} · ${pvEsc(pvOrigem(p))}${p.ativo ? '' : ' · inativo'}${p.obs ? ' · ' + pvEsc(p.obs) : ''}</div></div>
+      <div class="pv-acts">${somenteLeitura || !p.ativo ? '' : `<button type="button" class="pv-mini" onclick="pvEditar('${p.id}')">Editar</button><button type="button" class="pv-mini del" onclick="pvExcluir('${p.id}')">Excluir</button>`}</div></div>`;
+  const grupos = PV_GRUPOS.map(([tit, tipos]) => { const l = PV.itens.filter(p => tipos.includes(p.tipo)); return l.length ? `<div class="pv-grupo">${tit}</div>` + l.map(linha).join('') : ''; }).join('');
+  const opt = (lista, val, vazio) => (vazio != null ? `<option value="">${pvEsc(vazio)}</option>` : '') + lista.map(o => `<option value="${pvEsc(o.id)}" ${String(o.id) === String(val ?? '') ? 'selected' : ''}>${pvEsc(o.nome)}</option>`).join('');
+  b.innerHTML = `<div class="pv-hint">Cada coisa cobrada do cliente é um item, com o valor e a vigência. Vale nas solicitações com perfil <b>Contrato</b>, pelo preço vigente na data da solicitação. O transporte é escolhido pelo tipo de veículo da coleta (o item "qualquer veículo" vale quando o veículo não tem preço próprio). Valorização = o kg é pago ao cliente (desconto no BM). Transporte por km: o solicitante escolhe o km real ou o previsto antes do BM.</div>
+    ${pvMatP ? `<div class="pv-hint" style="margin-top:4px">Filial de <b>${pvEsc(pvMatP.nome)}</b>: os itens da matriz também valem; um item próprio da filial vem antes do da matriz.</div>` : ''}
+    ${PV.itens.length ? grupos : '<div class="pv-hint" style="margin-top:6px">Nenhum item de preço cadastrado.</div>'}
+    ${somenteLeitura ? '' : e ? `<div class="pv-form" id="pv-form">
+      <div class="pv-full"><label for="pv-tipo">Item</label><select id="pv-tipo" onchange="pvCampo('tipo', this.value); pvRender()">${opt(PV.tipos.map(x => ({ id: x.nome, nome: x.nome + ' (por ' + x.un + ')' })), e.tipo, 'Escolha o tipo…')}</select></div>
+      ${t.veiculo ? `<div class="pv-full"><label for="pv-vei">Tipo de veículo</label><select id="pv-vei" onchange="pvCampo('tipoVeiculoId', this.value)">${opt(PV.tiposVeiculo, e.tipoVeiculoId, 'Qualquer veículo')}</select></div>` : ''}
+      ${t.residuo ? `<div class="pv-full"><label for="pv-res">Resíduo</label><select id="pv-res" onchange="pvCampo('residuoId', this.value)">${opt(PV.residuos, e.residuoId, 'Escolha…')}</select></div>` : ''}
+      ${t.caixa ? `<div><label for="pv-cap">Caixa (m³)</label><input id="pv-cap" type="number" step="any" min="0" list="pv-caps" value="${pvEsc(e.capacidade)}" oninput="pvCampo('capacidade', this.value)"><datalist id="pv-caps">${PV.capacidades.map(c => `<option value="${c}">`).join('')}</datalist></div>` : ''}
+      ${t.aluguel ? `<div><label for="pv-alu">Cobrança do aluguel</label><select id="pv-alu" onchange="pvCampo('cobrancaAluguel', this.value)">${opt(PV.cobrancasAluguel.map(x => ({ id: x, nome: x })), e.cobrancaAluguel, 'Escolha…')}</select></div>` : ''}
+      ${t.inclusa ? `<div class="pv-full"><label class="pv-check"><input id="pv-inc" type="checkbox" ${e.destinacaoInclusa ? 'checked' : ''} onchange="pvCampo('destinacaoInclusa', this.checked)"> Destinação inclusa no valor da troca (sem isso, a destinação é cobrada por kg)</label></div>` : ''}
+      ${e.tipo ? `<div><label for="pv-val">${t.desconto ? 'Pago ao cliente (R$/kg)' : 'Valor (R$ por ' + pvEsc(t.un) + ')'}</label><input id="pv-val" type="number" step="any" min="0" value="${pvEsc(e.valor)}" oninput="pvCampo('valor', this.value)"></div>
+      <div><label for="pv-ori">Origem</label><select id="pv-ori" onchange="pvCampo('aditivoId', this.value)">${opt(((PV.contrato || {}).aditivos || []).map(a => ({ id: a.id, nome: 'Aditivo' + (a.numero ? ' nº ' + a.numero : '') + ' de ' + pvD(a.data) })), e.aditivoId, 'Contrato')}</select></div>
       <div><label for="pv-ini">Vigência a partir de</label><input id="pv-ini" type="date" value="${pvEsc(e.vigenciaInicio)}" oninput="pvCampo('vigenciaInicio', this.value)"></div>
       <div><label for="pv-fim">Até (opcional)</label><input id="pv-fim" type="date" value="${pvEsc(e.vigenciaFim)}" oninput="pvCampo('vigenciaFim', this.value)"></div>
       <div class="pv-full"><label for="pv-obs">Observação</label><input id="pv-obs" value="${pvEsc(e.obs)}" oninput="pvCampo('obs', this.value)"></div>
-      <div class="pv-full" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="pv-mini" onclick="PV.edit=null;pvRender()">Cancelar</button><button type="button" class="residuo-add-btn" style="padding:7px 14px" onclick="pvSalvar()">${e.id ? 'Salvar preço' : 'Incluir preço'}</button></div>
-    </div>` : `<button type="button" class="multi-add" onclick="pvNovo()">+ Incluir preço de venda</button>`}`;
+      ${!PV.contrato ? `<div class="pv-full pv-hint">O cliente ainda não tem contrato: ao incluir o item, um contrato "a completar" é criado (informe número, validade e o arquivo na seção Contrato).</div>` : ''}` : ''}
+      <div class="pv-full pv-hint">Reajuste: informe o "Até" no item atual e inclua o novo a partir do dia seguinte (o histórico de preços fica guardado).</div>
+      <div class="pv-full" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="pv-mini" onclick="PV.edit=null;pvRender()">Cancelar</button><button type="button" class="residuo-add-btn" style="padding:7px 14px" onclick="pvSalvar()" ${e.tipo ? '' : 'disabled'}>${e.id ? 'Salvar item' : 'Incluir item'}</button></div>
+    </div>` : `<button type="button" class="multi-add" onclick="pvNovo()">+ Incluir item de preço</button>`}`;
 }
 function pvCampo(k, v) { if (PV.edit) PV.edit[k] = v; }
-function pvNovo() { const d = new Date(); PV.edit = { modalidade: '', residuoId: '', valorTransporte: '', precoKg: '', vigenciaInicio: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01', vigenciaFim: '', obs: '' }; pvRender(); }
-function pvEditar(id) { PV.edit = { ...PV.precos.find(p => p.id === id) }; pvRender(); }
+function pvNovo() { const d = new Date(); PV.edit = { tipo: '', tipoVeiculoId: '', residuoId: '', capacidade: '', destinacaoInclusa: false, cobrancaAluguel: '', valor: '', aditivoId: '',
+  vigenciaInicio: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01', vigenciaFim: '', obs: '' }; pvRender(); }
+function pvEditar(id) { PV.edit = { ...PV.itens.find(p => p.id === id) }; pvRender(); document.getElementById('pv-form')?.scrollIntoView?.({ block: 'nearest' }); }
 async function pvSalvar() {
-  try { await Portal.api('mapa.salvarPrecoVenda', { registro: Object.assign({ cadastroId: PV.id }, PV.edit) }); PV.edit = null; await pvCarregar(); }
-  catch (e) { alert((e && e.mensagem) || 'Não foi possível salvar o preço.'); }
+  const e = PV.edit; if (!e) return;
+  const reg = { id: e.id, cadastroId: PV.id, tipo: e.tipo, tipoVeiculoId: e.tipoVeiculoId || '', residuoId: e.residuoId || '', capacidade: e.capacidade, destinacaoInclusa: e.destinacaoInclusa === true,
+    cobrancaAluguel: e.cobrancaAluguel || '', valor: e.valor, aditivoId: e.aditivoId || '', vigenciaInicio: e.vigenciaInicio, vigenciaFim: e.vigenciaFim || '', obs: e.obs || '' };
+  const semContrato = !PV.contrato;
+  try { await Portal.api('mapa.salvarPrecoVenda', { registro: reg }); PV.edit = null; await pvCarregar(); if (semContrato && typeof ctCarregar === 'function') ctCarregar(); }
+  catch (err) { alert((err && err.mensagem) || 'Não foi possível salvar o item.'); }
 }
 async function pvExcluir(id) {
-  if (!confirm('Excluir este preço de venda?')) return;
+  if (!confirm('Excluir este item de preço?')) return;
   try { const r = await Portal.api('mapa.excluirPrecoVenda', { id }); if (r.mensagem) alert(r.mensagem); await pvCarregar(); }
   catch (e) { alert((e && e.mensagem) || 'Não foi possível excluir.'); }
 }
@@ -6568,10 +6599,10 @@ function ctRender() {
   if (c && !e) {
     h += `<div class="ct-box"><b>Contrato ${pvEsc(c.numero || 's/nº')}</b><span class="ct-sit ${ctSitCls(c.situacao)}">${pvEsc(c.situacao)}</span>
       ${c.objeto ? `<div>${pvEsc(c.objeto)}</div>` : ''}
-      <div class="pv-sub">Vigência ${pvD(c.inicio)} a ${pvD(c.validadeEfetiva)}${c.validadeEfetiva !== c.validade ? ' (prorrogado por aditivo; original ' + pvD(c.validade) + ')' : ''}${c.situacao === 'Vencendo' ? ' · vence em ' + c.diasParaVencer + ' dia(s)' : ''}${c.renovacaoAutomatica ? ' · renovação automática' : ''}${c.encerrado ? ' · encerrado' : ''}</div>
+      <div class="pv-sub">Vigência ${pvD(c.inicio)} a ${c.validadeEfetiva ? pvD(c.validadeEfetiva) : '(validade não informada)'}${c.validadeEfetiva !== c.validade ? ' (prorrogado por aditivo; original ' + pvD(c.validade) + ')' : ''}${c.situacao === 'Vencendo' ? ' · vence em ' + c.diasParaVencer + ' dia(s)' : ''}${c.renovacaoAutomatica ? ' · renovação automática' : ''}${c.encerrado ? ' · encerrado' : ''}</div>
       ${c.obs ? `<div class="pv-sub">${pvEsc(c.obs)}</div>` : ''}
       ${ctLinhaArq('contrato', c)}
-      ${somenteLeitura ? '' : `<div style="display:flex;justify-content:flex-end;margin-top:6px"><button type="button" class="pv-mini" onclick="ctEditar()">Editar dados</button></div>`}</div>`;
+      ${somenteLeitura ? '' : `<div style="display:flex;justify-content:flex-end;margin-top:6px"><button type="button" class="pv-mini" onclick="ctEditar()">${c.situacao === 'A completar' ? 'Completar o contrato' : 'Editar dados'}</button></div>`}</div>`;
     h += `<div style="margin-top:10px;font-size:.74rem;font-weight:600">Aditivos</div>`;
     h += c.aditivos.length ? c.aditivos.map(a => `<div class="pv-row"><div><b>${pvEsc(a.numero ? 'Aditivo ' + a.numero : 'Aditivo')}</b> · ${pvD(a.data)}${a.novaValidade ? ' · nova validade ' + pvD(a.novaValidade) : ''}
         <div class="pv-sub">${pvEsc(a.descricao)}</div>${ctLinhaArq('aditivo', a)}</div>
@@ -6602,18 +6633,18 @@ function ctRender() {
 }
 function ctEditar() { const c = CT.d && CT.d.contrato; CT.edit = c ? { id: c.id, numero: c.numero, objeto: c.objeto, inicio: c.inicio, validade: c.validade, renovacaoAutomatica: c.renovacaoAutomatica, encerrado: c.encerrado, obs: c.obs } : { numero: '', objeto: '', inicio: '', validade: '', renovacaoAutomatica: false, encerrado: false, obs: '' }; ctRender(); }
 async function ctSalvar() {
-  try { await Portal.api('mapa.salvarContrato', { registro: Object.assign({ cadastroId: CT.id }, CT.edit) }); CT.edit = null; await ctCarregar(); }
+  try { await Portal.api('mapa.salvarContrato', { registro: Object.assign({ cadastroId: CT.id }, CT.edit) }); CT.edit = null; await ctCarregar(); pvCarregar(); }
   catch (e) { alert((e && e.mensagem) || 'Não foi possível salvar o contrato.'); }
 }
 function ctNovoAd() { const d = new Date(); CT.editAd = { numero: '', data: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'), descricao: '', novaValidade: '' }; ctRender(); }
 function ctEditarAd(id) { const a = CT.d.contrato.aditivos.find(x => x.id === id); CT.editAd = { id: a.id, numero: a.numero, data: a.data, descricao: a.descricao, novaValidade: a.novaValidade }; ctRender(); }
 async function ctSalvarAd() {
-  try { await Portal.api('mapa.salvarAditivo', { registro: Object.assign({ contratoId: CT.d.contrato.id }, CT.editAd) }); CT.editAd = null; await ctCarregar(); }
+  try { await Portal.api('mapa.salvarAditivo', { registro: Object.assign({ contratoId: CT.d.contrato.id }, CT.editAd) }); CT.editAd = null; await ctCarregar(); pvCarregar(); }
   catch (e) { alert((e && e.mensagem) || 'Não foi possível salvar o aditivo.'); }
 }
 async function ctExcluirAd(id) {
   if (!confirm('Excluir este aditivo?')) return;
-  try { await Portal.api('mapa.excluirAditivo', { id }); await ctCarregar(); } catch (e) { alert((e && e.mensagem) || 'Não foi possível excluir.'); }
+  try { await Portal.api('mapa.excluirAditivo', { id }); await ctCarregar(); pvCarregar(); } catch (e) { alert((e && e.mensagem) || 'Não foi possível excluir.'); }
 }
 function ctAnexar(tipo, id, input) {
   const f = input.files && input.files[0]; if (!f) return;
