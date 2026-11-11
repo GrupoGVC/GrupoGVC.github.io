@@ -18,7 +18,7 @@ const SOL_LISTAS = {
   servico: ['Coleta e destinação'],
   situacaoDocumento: ['Pendente', 'Recebido', 'Dispensado'],
   modalidadePreco: ['Por kg', 'Transporte + kg', 'Valorização com transporte', 'Valorização sem transporte', 'Km rodado + kg', 'Km rodado + valorização'],
-  unidadeMedida: ['kg', 't', 'un', 'viagem', 'km', 'm³', 'diária', 'mês'],
+  unidadeMedida: ['kg', 't', 'un', 'viagem', 'km', 'm³', 'diária', 'mês', 'caixa', 'troca'],
 };
 // Sugestões iniciais; a lista é editável na aba Configurações das Solicitações.
 const TIPOS_DOCUMENTO_INICIAIS = ['Pedido / ordem de compra', 'Integração de segurança', 'Documentação da equipe (ASO, NRs)', 'Autorização de acesso', 'Ficha / FISPQ do resíduo'];
@@ -33,7 +33,7 @@ function migrarFase2_() {
     });
   });
   TIPOS_DOCUMENTO_INICIAIS.forEach(function (n) { if (!idPorNome_('TiposDocumento', n)) inserir_('TiposDocumento', { nome: n, ativo: true }, null, null); });
-  ['Solicitacoes', 'Consultores', 'DocumentosPadrao', 'SolicitacaoDocumentos', 'PrecosCliente', 'Faturamentos', 'FaturamentoItens'].forEach(function (t) { aba_(t); });
+  ['Solicitacoes', 'Consultores', 'DocumentosPadrao', 'SolicitacaoDocumentos', 'PrecosCliente', 'ContratoItens', 'Faturamentos', 'FaturamentoItens'].forEach(function (t) { aba_(t); });
   // acesso: administradores do portal recebem os dois módulos novos; os demais, o admin libera na tela Usuários
   ler_('Usuarios').forEach(function (us) {
     if (!simNao_(us.adminPortal)) return;
@@ -109,8 +109,9 @@ function solDados_(u) {
     destinadores: destinadoresProgramacao_(),
     coords: coordenadasCadastros_(),
     rotinas: ler_('Rotinas').filter(function (r) { return veUnidade_(u, r.unidadeId); }).map(rotPublica_),
-    precosKm: ler_('PrecosCliente').filter(function (p) { return p.ativo && modalidadeKm_(p.modalidade) && p.valorTransporte !== ''; })
-      .map(function (p) { return { cadastroId: String(p.cadastroId), valorKm: num_(p.valorTransporte), modalidade: String(p.modalidade), vigenciaInicio: dataTexto_(p.vigenciaInicio), vigenciaFim: dataTexto_(p.vigenciaFim) }; }),
+    precosKm: ler_('ContratoItens').filter(function (p) { return p.ativo && p.tipo === 'Transporte por km'; })
+      .map(function (p) { return { cadastroId: String(p.cadastroId), valorKm: num_(p.valor), tipoVeiculoId: String(p.tipoVeiculoId || ''), tipoVeiculo: nomeTipoVeiculo_(p.tipoVeiculoId),
+        vigenciaInicio: dataTexto_(p.vigenciaInicio), vigenciaFim: dataTexto_(p.vigenciaFim) }; }),
     motivos: motivosTodos_(), cobrancas: cobrancasVisiveis_(u), podeDecidirCobranca: !!(u.adminPortal || u.decideCobranca),
     podeCadastrarMotivos: podeCadastrarMotivos_(u), hoje: dataTexto_(new Date()),
     frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,

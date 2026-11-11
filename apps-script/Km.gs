@@ -13,21 +13,7 @@ function modalidadeKm_(m) { return MODALIDADES_KM.indexOf(String(m || '')) >= 0;
 function modalidadeValorizacao_(m) { return /valoriza/i.test(String(m || '')); }
 function modalidadeComTransporte_(m) { return m === 'Transporte + kg' || m === 'Valorização com transporte' || modalidadeKm_(m); }
 
-/** Preço por km vigente do cliente (ou do cadastro principal dele) na data. */
-function precoKmVigente_(clienteId, data) {
-  const cli = porId_('Cadastros', clienteId); if (!cli) return null;
-  const ids = [String(cli.id)]; if (cli.cadastroPrincipalId) ids.push(String(cli.cadastroPrincipalId));
-  data = data || dataTexto_(new Date());
-  const ps = ler_('PrecosCliente').filter(function (p) {
-    if (!p.ativo || !modalidadeKm_(p.modalidade) || p.valorTransporte === '' || ids.indexOf(String(p.cadastroId)) < 0) return false;
-    const ini = dataTexto_(p.vigenciaInicio), fim = dataTexto_(p.vigenciaFim);
-    return (!ini || ini <= data) && (!fim || fim >= data);
-  }).sort(function (a, b) {
-    return ids.indexOf(String(a.cadastroId)) - ids.indexOf(String(b.cadastroId)) || String(dataTexto_(b.vigenciaInicio)).localeCompare(String(dataTexto_(a.vigenciaInicio)));
-  });
-  const p = ps[0];
-  return p ? { id: p.id, modalidade: String(p.modalidade), valorKm: num_(p.valorTransporte), cadastroId: String(p.cadastroId) } : null;
-}
+// precoKmVigente_(clienteId, data, tipoVeiculoId): itens do contrato (ItensContrato.gs)
 // preço vigente na data da solicitação (Contratos.gs)
 function dataRefKm_(s) { return dataRefPreco_(s); }
 

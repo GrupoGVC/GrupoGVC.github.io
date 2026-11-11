@@ -183,24 +183,22 @@ function anularCobranca_(c, u, porque) {
 /** Valor sugerido pelo preço de transporte do cliente: por viagem, ou km × R$/km. */
 function sugestaoCobranca_(c) {
   const cli = porId_('Cadastros', c.clienteId); if (!cli) return { valor: '', base: '' };
-  const ids = [String(cli.id)]; if (cli.cadastroPrincipalId) ids.push(String(cli.cadastroPrincipalId));
   const solC = c.solicitacaoId ? porId_('Solicitacoes', c.solicitacaoId) : null;
   // preço do contrato só para solicitação com perfil Contrato, vigente na data da solicitação
   if (solC && !usaTabelaContrato_(solC)) return { valor: '', base: 'Solicitação de proposta: use o valor da proposta.' };
   const data = solC ? dataRefPreco_(solC) : (dataTexto_(c.data) || hojeTxt_());
-  const ps = ler_('PrecosCliente').filter(function (p) {
-    if (!p.ativo || p.valorTransporte === '' || ids.indexOf(String(p.cadastroId)) < 0 || !modalidadeComTransporte_(p.modalidade)) return false;
-    const ini = dataTexto_(p.vigenciaInicio), fim = dataTexto_(p.vigenciaFim);
-    return (!ini || ini <= data) && (!fim || fim >= data);
-  }).sort(function (a, b) { return ids.indexOf(String(a.cadastroId)) - ids.indexOf(String(b.cadastroId)); });
-  const p = ps[0]; if (!p) return { valor: '', base: 'Cliente sem preço de transporte no Mapa.' };
-  if (!modalidadeKm_(p.modalidade)) return { valor: num_(p.valorTransporte), base: 'Transporte por viagem (' + p.modalidade + ').' };
-  const v = porId_('Viagens', c.viagemId), sol = c.solicitacaoId ? porId_('Solicitacoes', c.solicitacaoId) : null;
+  const v = porId_('Viagens', c.viagemId), vei = v && v.veiculoId ? porId_('Veiculos', v.veiculoId) : null;
+  const p = transporteDoVeiculo_(itensVigentes_(cli.id, data), vei ? String(vei.tipoVeiculoId || '') : '');
+  if (!p) return { valor: '', base: 'Cliente sem preço de transporte no contrato (Mapa)' + (vei ? ' para ' + (nomeTipoVeiculo_(vei.tipoVeiculoId) || 'este veículo') : '') + '.' };
+  const tv = p.tipoVeiculoId ? ' · ' + nomeTipoVeiculo_(p.tipoVeiculoId) : '';
+  if (p.tipo !== 'Transporte por km') return { valor: num_(p.valor), base: 'Transporte por viagem' + tv + '.' };
+  const vk = num_(p.valor);
+  const sol = solC;
   const ki = v ? numOuVazio_(v.kmInicial) : '', kf = v ? numOuVazio_(v.kmFinal) : '';
   const sozinha = v && onde_('Paradas', 'viagemId', v.id).length === 1;
-  if (sozinha && ki !== '' && kf !== '' && kf > ki) return { valor: r2_((kf - ki) * num_(p.valorTransporte)), base: (kf - ki) + ' km rodados × R$ ' + num_(p.valorTransporte) + '/km.' };
+  if (sozinha && ki !== '' && kf !== '' && kf > ki) return { valor: r2_((kf - ki) * vk), base: (kf - ki) + ' km rodados × R$ ' + vk + '/km.' };
   const kmp = sol ? num_(sol.kmPrevista) : 0;
-  return kmp > 0 ? { valor: r2_(kmp * num_(p.valorTransporte)), base: kmp + ' km previstos × R$ ' + num_(p.valorTransporte) + '/km.' } : { valor: '', base: 'Transporte por km (R$ ' + num_(p.valorTransporte) + '/km): informe o km.' };
+  return kmp > 0 ? { valor: r2_(kmp * vk), base: kmp + ' km previstos × R$ ' + vk + '/km.' } : { valor: '', base: 'Transporte por km (R$ ' + vk + '/km): informe o km.' };
 }
 function cobrancaPublica_(c, noBm) {
   const o = publico_('CobrancasFrustracao', c);

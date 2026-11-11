@@ -101,6 +101,10 @@ const TABELAS = {
                           texto: ['numero', 'arquivoId', 'arquivoNome'], data: ['inicio', 'validade', 'alertaValidade', 'alertaVencidoValidade'] },
   ContratoAditivos:     { prefixo: 'ADT', colunas: ['id', 'contratoId', 'numero', 'data', 'descricao', 'novaValidade', 'arquivoId', 'arquivoNome', 'ativo'],
                           texto: ['numero', 'arquivoId', 'arquivoNome'], data: ['data', 'novaValidade'] },
+  // Itens do contrato (preço de venda): cada coisa cobrada do cliente, com valor e vigência (substituem PrecosCliente)
+  ContratoItens:        { prefixo: 'CIT', colunas: ['id', 'cadastroId', 'contratoId', 'aditivoId', 'tipo', 'tipoVeiculoId', 'residuoId', 'capacidade', 'destinacaoInclusa',
+                                                      'cobrancaAluguel', 'valor', 'vigenciaInicio', 'vigenciaFim', 'obs', 'precoOrigemId', 'ativo'],
+                          numero: ['capacidade', 'valor'], data: ['vigenciaInicio', 'vigenciaFim'] },
   Preferencias:         { prefixo: 'PRF', colunas: ['id', 'usuarioId', 'chave', 'valor'], texto: ['chave', 'valor'] },
   Motivos:              { prefixo: 'MOT', colunas: ['id', 'tipo', 'nome', 'responsavel', 'ordem', 'ativo'], numero: ['ordem'] },
   // Cobrança de viagem frustrada (ou cancelada no dia com a equipe na rua) por culpa do cliente
@@ -130,12 +134,15 @@ const REFERENCIAS = {
                  ['Unidades', 'cadastroId', 'unidade do grupo GVC'],
                  ['Cdfs', 'destinadorId', 'CDF(s) no módulo Ambiental'],
                  ['CobrancasFrustracao', 'clienteId', 'cobrança(s) de viagem frustrada'],
-                 ['Contratos', 'cadastroId', 'contrato do cliente']],
-  Contratos:    [['ContratoAditivos', 'contratoId', 'aditivo(s) do contrato']],
+                 ['Contratos', 'cadastroId', 'contrato do cliente'],
+                 ['ContratoItens', 'cadastroId', 'item(ns) de preço do contrato']],
+  Contratos:    [['ContratoAditivos', 'contratoId', 'aditivo(s) do contrato'], ['ContratoItens', 'contratoId', 'item(ns) de preço do contrato']],
+  ContratoItens: [['FaturamentoItens', 'precoClienteId', 'item(ns) de BM/NF no Faturamento']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['SolicitacaoItens', 'residuoId', 'resíduo(s) de solicitações'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
-                 ['PrecosCliente', 'residuoId', 'preço(s) de venda de clientes']],
+                 ['PrecosCliente', 'residuoId', 'preço(s) de venda de clientes'],
+                 ['ContratoItens', 'residuoId', 'item(ns) de preço de contratos']],
   Equipamentos: [['CadastroEquipamentos', 'equipamentoId', 'cadastro(s) no Mapa Operacional']],
   Unidades:     [['Lancamentos', 'unidadeId', 'lançamento(s) no Controle de Destinação'],
                  ['LocacaoMensal', 'unidadeId', 'item(ns) na locação mensal'],
@@ -147,7 +154,7 @@ const REFERENCIAS = {
                  ['Pessoas', 'unidadeId', 'pessoa(s) cadastrada(s)'],
                  ['Adiantamentos', 'unidadeId', 'adiantamento(s) no DP'],
                  ['Rotinas', 'unidadeId', 'coleta(s) recorrente(s)']],
-  TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota']],
+  TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota'], ['ContratoItens', 'tipoVeiculoId', 'item(ns) de preço de contratos']],
   Veiculos:     [['LocacaoMensal', 'veiculoId', 'mês(es) de locação'],
                  ['Viagens', 'veiculoId', 'viagem(ns) na Programação']],
   Caixas:       [['LocacaoMensal', 'caixaId', 'mês(es) de locação'],
@@ -431,6 +438,7 @@ function gravarHistorico_() {
 function quemEmail_(u) { return u ? u.email : 'sistema'; }
 
 const ROTULOS_CAMPOS = {
+  destinacaoInclusa: 'Destinação inclusa na troca', cobrancaAluguel: 'Cobrança do aluguel', aditivoId: 'Aditivo de origem', contratoId: 'Contrato', precoOrigemId: 'Preço antigo de origem',
   nome: 'Nome', codigoUplog: 'Código UPLOG', tipos: 'Tipos', razaoSocial: 'Razão social', categoria: 'Categoria', cnpj: 'CNPJ',
   contatoNome: 'Contato', telefones: 'Telefones', emails: 'E-mails', obs: 'Observações', cadastroPrincipalId: 'Cadastro principal',
   logradouro: 'Logradouro', numero: 'Número', bairro: 'Bairro', cidade: 'Cidade', uf: 'UF', cep: 'CEP', lat: 'Latitude', lng: 'Longitude',

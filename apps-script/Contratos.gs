@@ -18,7 +18,7 @@ const TIPOS_ARQ_CONTRATO = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'ima
 function dataRefPreco_(s) { return dataTexto_(s && s.dataSolicitacao) || dataTexto_(s && s.dataDesejada) || dataTexto_(s && s.dataColeta) || hojeTxt_(); }
 function usaTabelaContrato_(s) { return !!s && String(s.perfil || '') === 'Contrato'; }
 /** Preço por km da solicitação (só perfil Contrato, vigente na data da solicitação). */
-function precoKmSol_(s) { return usaTabelaContrato_(s) ? precoKmVigente_(s.clienteId, dataRefPreco_(s)) : null; }
+function precoKmSol_(s) { return usaTabelaContrato_(s) ? precoKmVigente_(s.clienteId, dataRefPreco_(s), tipoVeiculoDaSol_(s.id)) : null; }
 
 /* ---------------- vínculo matriz / filial ---------------- */
 /** Cadastro que recebe o BM/NF das coletas deste cliente. */
@@ -103,10 +103,14 @@ function contratoDados_(cadastroId, u) {
 /** x = {id?, cadastroId, numero, objeto, inicio, validade, renovacaoAutomatica, encerrado, obs} */
 function salvarContrato_(x, u) {
   x = x || {};
-  const atual = x.id ? porId_('Contratos', x.id) : null;
+  let atual = x.id ? porId_('Contratos', x.id) : null;
   if (x.id && !atual) return erroDados_('Contrato não encontrado. Atualize.');
   const cad = porId_('Cadastros', atual ? atual.cadastroId : String(x.cadastroId || '')); if (!cad) return erroDados_('Cadastro não encontrado.');
-  if (!atual && contratoDoCliente_(cad.id)) return erroDados_('Este cliente já tem contrato. Serviços novos entram como aditivo.');
+  if (!atual) { // o contrato "a completar" criado com os itens de preço é completado aqui
+    const ex = contratoDoCliente_(cad.id);
+    if (ex && dataTexto_(ex.validade)) return erroDados_('Este cliente já tem contrato. Serviços novos entram como aditivo.');
+    atual = ex;
+  }
   const r = { cadastroId: cad.id, numero: String(x.numero || '').trim(), objeto: String(x.objeto || '').trim(), inicio: dataTexto_(x.inicio), validade: dataTexto_(x.validade),
     renovacaoAutomatica: x.renovacaoAutomatica === true ? 'SIM' : 'NÃO', encerrado: x.encerrado === true ? 'SIM' : 'NÃO', obs: String(x.obs || '').trim() };
   if (!r.inicio) return erroDados_('Informe a data de início do contrato.');
