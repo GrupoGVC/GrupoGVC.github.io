@@ -1529,6 +1529,16 @@ tr.cad-inativo td:last-child { opacity: 1; }
 .pv-form label { font-size: 0.66rem; margin-bottom: 3px; display: block; }
 .pv-form input, .pv-form select { width: 100%; }
 .pv-hint { font-size: 0.7rem; color: var(--text-muted); }
+/* Matriz/filiais e contrato do cliente */
+.ct-sit { display: inline-block; font-size: 0.66rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border-radius: 10px; padding: 1px 8px; margin-left: 6px; }
+.ct-sit.Vigente { background: #dcefe6; color: #1d6b52; } .ct-sit.Vencendo { background: #fff3dc; color: #a86400; }
+.ct-sit.Vencido { background: #fde2e1; color: #b42318; } .ct-sit.Encerrado, .ct-sit.A-completar { background: var(--border); color: var(--text-muted); }
+.ct-box { border: 1px solid var(--border2); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: 0.76rem; }
+.ct-box b { font-weight: 600; }
+.ct-arq { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.ct-radio { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.74rem; }
+.ct-radio label { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-size: 0.74rem; }
+.ct-radio input { width: auto; }
 
 /* Modal actions */
 .modal-actions {
@@ -5502,6 +5512,26 @@ function showRouteError(msg) {
       <div class="collapse-body" id="pv-body" style="display:none"></div>
     </div>
 
+    <!-- MATRIZ E FILIAIS (clientes já salvos) -->
+    <div class="fg equip-wrap" id="vn-wrap" style="display:none">
+      <button type="button" class="collapse-head" id="vn-head" onclick="vnToggle()" aria-expanded="false" aria-controls="vn-body">
+        <span class="collapse-arrow" id="vn-arrow">▸</span>
+        <span class="collapse-title">🔗 Matriz e filiais</span>
+        <span class="collapse-count" id="vn-count">…</span>
+      </button>
+      <div class="collapse-body" id="vn-body" style="display:none"></div>
+    </div>
+
+    <!-- CONTRATO DO CLIENTE (arquivo, aditivos, validade) -->
+    <div class="fg equip-wrap" id="ct-wrap" style="display:none">
+      <button type="button" class="collapse-head" id="ct-head" onclick="ctToggle()" aria-expanded="false" aria-controls="ct-body">
+        <span class="collapse-arrow" id="ct-arrow">▸</span>
+        <span class="collapse-title">📄 Contrato</span>
+        <span class="collapse-count" id="ct-count">…</span>
+      </button>
+      <div class="collapse-body" id="ct-body" style="display:none"></div>
+    </div>
+
     <div class="fg">
       <label>Observações</label>
       <textarea id="f-obs" rows="2" placeholder="Informações adicionais, condições comerciais, restrições..."></textarea>
@@ -6351,6 +6381,8 @@ function openModal(id, draft) {
   if (markNewBtn) markNewBtn.style.display = (!id && modalNewLat === null) ? 'flex' : 'none';
 
   pvAbrirCadastro(id, fonte.tipos || []);
+  vnAbrirCadastro(id, fonte.tipos || []);
+  ctAbrirCadastro(id, fonte.tipos || []);
   aplicarSomenteLeituraModal();
   document.getElementById('overlay').classList.add('open');
   document.querySelector('#overlay .modal')?.scrollTo?.(0, 0);
@@ -6395,7 +6427,9 @@ function pvRender() {
   const e = PV.edit;
   const porKm = m => /^Km rodado/.test(m || '');
   const comTransp = m => m === 'Transporte + kg' || m === 'Valorização com transporte' || porKm(m);
-  b.innerHTML = `<div class="pv-hint">Preço cobrado do cliente. Valorização = o kg é pago ao cliente e entra como desconto no BM. Km rodado = transporte em R$ por km; o solicitante escolhe o km real ou o previsto antes do BM.</div>
+  const pvMat = (points.find(x => x.id === PV.id) || {}).cadastroPrincipalId; const pvMatP = pvMat ? points.find(x => x.id === pvMat) : null;
+  b.innerHTML = `<div class="pv-hint">Preço cobrado do cliente, usado nas solicitações com perfil Contrato (vigente na data da solicitação). Valorização = o kg é pago ao cliente e entra como desconto no BM. Km rodado = transporte em R$ por km; o solicitante escolhe o km real ou o previsto antes do BM.</div>
+    ${pvMatP ? `<div class="pv-hint" style="margin-top:4px">Filial de <b>${pvEsc(pvMatP.nome)}</b>: os preços da matriz também valem; um preço próprio da filial vem antes do da matriz.</div>` : ''}
     ${PV.precos.length ? PV.precos.map(p => `<div class="pv-row ${p.ativo ? '' : 'inativo'}"><div><b>${pvEsc(p.residuoId ? pvResNome(p.residuoId) : 'Transporte')}</b> · ${pvEsc(p.modalidade)}
         <div class="pv-sub">${[p.valorTransporte !== '' ? 'transporte ' + pvR(p.valorTransporte) + (porKm(p.modalidade) ? '/km' : '') : '', p.precoKg !== '' ? pvR(p.precoKg) + '/kg' : ''].filter(Boolean).join(' + ')} · desde ${pvD(p.vigenciaInicio)}${p.vigenciaFim ? ' até ' + pvD(p.vigenciaFim) : ''}${p.ativo ? '' : ' · inativo'}${p.obs ? ' · ' + pvEsc(p.obs) : ''}</div></div>
         <div class="pv-acts">${somenteLeitura || !p.ativo ? '' : `<button type="button" class="pv-mini" onclick="pvEditar('${p.id}')">Editar</button><button type="button" class="pv-mini del" onclick="pvExcluir('${p.id}')">Excluir</button>`}</div></div>`).join('')
@@ -6422,6 +6456,186 @@ async function pvExcluir(id) {
   if (!confirm('Excluir este preço de venda?')) return;
   try { const r = await Portal.api('mapa.excluirPrecoVenda', { id }); if (r.mensagem) alert(r.mensagem); await pvCarregar(); }
   catch (e) { alert((e && e.mensagem) || 'Não foi possível excluir.'); }
+}
+
+
+// ─── MATRIZ E FILIAIS (cadastroPrincipalId + faturaPara; um nível só) ───
+const VN = { id: null, aberto: false, edit: null };
+const vnRot = p => (p.codigoUplog ? p.codigoUplog + ' · ' : '') + (p.nome || p.razaoSocial || p.id);
+function vnAbrirCadastro(id, tipos) {
+  const wrap = document.getElementById('vn-wrap'); if (!wrap) return;
+  VN.id = id && /^CAD-/.test(id) && (tipos || []).includes('cliente') ? id : null; VN.edit = null;
+  wrap.style.display = VN.id ? '' : 'none';
+  vnSetAberto(false); if (VN.id) vnRender();
+}
+function vnSetAberto(a) {
+  VN.aberto = a;
+  document.getElementById('vn-body').style.display = a ? '' : 'none';
+  document.getElementById('vn-arrow').textContent = a ? '▾' : '▸';
+  document.getElementById('vn-head').setAttribute('aria-expanded', a ? 'true' : 'false');
+}
+function vnToggle() { vnSetAberto(!VN.aberto); }
+function vnRender() {
+  const b = document.getElementById('vn-body'); if (!b || !VN.id) return;
+  const p = points.find(x => x.id === VN.id) || {};
+  const filiais = points.filter(x => x.cadastroPrincipalId === VN.id);
+  const matriz = p.cadastroPrincipalId ? points.find(x => x.id === p.cadastroPrincipalId) : null;
+  const cnt = document.getElementById('vn-count');
+  cnt.textContent = filiais.length ? 'matriz de ' + filiais.length : matriz ? 'filial de ' + (matriz.nome || matriz.id) : 'sem vínculo';
+  cnt.classList.toggle('has', !!(filiais.length || matriz));
+  const fat = q => q.faturaPara === 'principal' ? 'fatura no CNPJ da matriz' : 'fatura no próprio CNPJ';
+  let h = `<div class="pv-hint">Filial ligada à matriz: herda o preço de venda, o contrato e os documentos padrão da matriz. Escolha em qual CNPJ sai o BM/NF das coletas da filial. Um nível só (filial de filial não pode).</div>`;
+  if (filiais.length) {
+    h += `<div class="ct-box"><b>Este cadastro é matriz de:</b>${filiais.map(f => `<div class="pv-sub">• ${pvEsc(vnRot(f))} — ${fat(f)}</div>`).join('')}</div>
+      <div class="pv-hint" style="margin-top:6px">Uma matriz não pode ser filial de outro cadastro. Para mudar, abra a filial.</div>`;
+    b.innerHTML = h; return;
+  }
+  const e = VN.edit;
+  if (!e) {
+    h += matriz ? `<div class="ct-box">Filial de <b>${pvEsc(vnRot(matriz))}</b><div class="pv-sub">${fat(p)}</div></div>` : '<div class="pv-hint" style="margin-top:6px">Não está ligado a uma matriz.</div>';
+    if (!somenteLeitura) h += `<button type="button" class="multi-add" onclick="vnEditar()">${matriz ? 'Alterar vínculo' : '+ Ligar a uma matriz'}</button>`;
+    b.innerHTML = h; return;
+  }
+  const opcoes = points.filter(x => x.id !== VN.id && /^CAD-/.test(x.id) && x.ativo !== false && !x.cadastroPrincipalId && (x.tipos || []).includes('cliente'))
+    .sort((a, c) => String(a.nome).localeCompare(String(c.nome), 'pt-BR'));
+  h += `<div class="pv-form">
+    <div class="pv-full"><label for="vn-mat">Matriz (cadastro principal)</label><input id="vn-mat" list="vn-dl" placeholder="Código UPLOG ou nome da matriz" value="${pvEsc(e.principalId ? vnRot(points.find(x => x.id === e.principalId) || { id: e.principalId }) : '')}"><datalist id="vn-dl">${opcoes.map(x => `<option value="${pvEsc(vnRot(x))}">`).join('')}</datalist></div>
+    <div class="pv-full"><span class="pv-hint" style="display:block;margin-bottom:4px">O BM/NF das coletas desta filial sai no CNPJ:</span><div class="ct-radio">
+      <label><input type="radio" name="vn-fat" value="" ${e.faturaPara !== 'principal' ? 'checked' : ''}> da própria filial</label>
+      <label><input type="radio" name="vn-fat" value="principal" ${e.faturaPara === 'principal' ? 'checked' : ''}> da matriz</label></div></div>
+    <div class="pv-full" style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">${p.cadastroPrincipalId ? '<button type="button" class="pv-mini del" onclick="vnSalvar(true)">Desligar da matriz</button>' : ''}<span style="flex:1"></span><button type="button" class="pv-mini" onclick="VN.edit=null;vnRender()">Cancelar</button><button type="button" class="residuo-add-btn" style="padding:7px 14px" onclick="vnSalvar()">Salvar vínculo</button></div>
+  </div>`;
+  b.innerHTML = h;
+}
+function vnEditar() { const p = points.find(x => x.id === VN.id) || {}; VN.edit = { principalId: p.cadastroPrincipalId || '', faturaPara: p.faturaPara || '' }; vnRender(); }
+async function vnSalvar(desligar) {
+  let principalId = '', faturaPara = '';
+  if (!desligar) {
+    const v = (document.getElementById('vn-mat').value || '').trim();
+    const m = points.find(x => vnRot(x) === v) || points.find(x => x.codigoUplog && x.codigoUplog === v) || points.find(x => x.id === v);
+    if (!m) { alert('Escolha a matriz na lista.'); return; }
+    principalId = m.id; faturaPara = (document.querySelector('input[name="vn-fat"]:checked') || {}).value || '';
+  } else if (!confirm('Desligar este cadastro da matriz? Ele deixa de herdar o preço e o contrato da matriz.')) return;
+  try {
+    await Portal.api('mapa.salvarVinculo', { id: VN.id, principalId, faturaPara });
+    const p = points.find(x => x.id === VN.id); if (p) { p.cadastroPrincipalId = principalId; p.faturaPara = faturaPara; try { saveToStorage(); } catch (e) {} }
+    VN.edit = null; vnRender(); ctCarregar();
+  } catch (e) { alert((e && e.mensagem) || 'Não foi possível salvar o vínculo.'); }
+}
+
+// ─── CONTRATO DO CLIENTE (um por cliente + aditivos; arquivo só para quem tem autorização) ───
+const CT = { id: null, aberto: false, d: null, edit: null, editAd: null };
+const ctSitCls = s => String(s || '').replace(/\s+/g, '-');
+function ctAbrirCadastro(id, tipos) {
+  const wrap = document.getElementById('ct-wrap'); if (!wrap) return;
+  CT.id = id && /^CAD-/.test(id) && (tipos || []).includes('cliente') ? id : null; CT.d = null; CT.edit = null; CT.editAd = null;
+  wrap.style.display = CT.id ? '' : 'none';
+  ctSetAberto(false); if (CT.id) ctCarregar();
+}
+function ctSetAberto(a) {
+  CT.aberto = a;
+  document.getElementById('ct-body').style.display = a ? '' : 'none';
+  document.getElementById('ct-arrow').textContent = a ? '▾' : '▸';
+  document.getElementById('ct-head').setAttribute('aria-expanded', a ? 'true' : 'false');
+}
+function ctToggle() { ctSetAberto(!CT.aberto); }
+async function ctCarregar() {
+  const alvo = CT.id; if (!alvo) return; document.getElementById('ct-count').textContent = '…';
+  try {
+    const r = await Portal.api('mapa.contrato', { cadastroId: alvo }); if (alvo !== CT.id) return;
+    CT.d = r; const c = r.contrato || r.daMatriz;
+    const cnt = document.getElementById('ct-count');
+    cnt.innerHTML = c ? (r.daMatriz && !r.contrato ? 'da matriz ' : '') + `<span class="ct-sit ${ctSitCls(c.situacao)}">${pvEsc(c.situacao)}</span>` : 'sem contrato';
+    cnt.classList.toggle('has', !!c);
+    ctRender();
+  } catch (e) { document.getElementById('ct-count').textContent = 'erro ao carregar'; }
+}
+function ctLinhaArq(tipo, x) {
+  const pode = CT.d && CT.d.podeVerArquivo;
+  const nome = x.temArquivo ? `📎 ${pvEsc(x.arquivoNome || 'arquivo')}` : '<span class="pv-sub">sem arquivo anexado</span>';
+  return `<div class="ct-arq">${nome}${x.temArquivo && pode ? `<button type="button" class="pv-mini" onclick="ctAbrirArq('${tipo}','${x.id}')">Abrir</button>` : ''}${x.temArquivo && !pode ? '<span class="pv-sub">(sem autorização para abrir)</span>' : ''}
+    ${!somenteLeitura && pode ? `<label class="pv-mini" style="cursor:pointer">${x.temArquivo ? 'Trocar arquivo' : 'Anexar PDF/imagem'}<input type="file" accept="application/pdf,image/jpeg,image/png" style="display:none" onchange="ctAnexar('${tipo}','${x.id}', this)"></label>` : ''}</div>`;
+}
+function ctRender() {
+  const b = document.getElementById('ct-body'); if (!b || !CT.d) return;
+  const r = CT.d, c = r.contrato, e = CT.edit, ea = CT.editAd;
+  let h = `<div class="pv-hint">Um contrato por cliente; serviços novos e prorrogações entram como aditivo. Quem recebe o alerta é avisado ${r.diasAlerta} dias antes do vencimento e no vencimento.</div>`;
+  if (!c && r.daMatriz && !e) {
+    const m = r.daMatriz;
+    h += `<div class="ct-box">Usa o contrato da matriz <b>${pvEsc(m.matrizNome)}</b>${m.numero ? ' · nº ' + pvEsc(m.numero) : ''}<span class="ct-sit ${ctSitCls(m.situacao)}">${pvEsc(m.situacao)}</span>
+      <div class="pv-sub">${pvD(m.inicio)} a ${pvD(m.validadeEfetiva)}</div></div>`;
+  }
+  if (c && !e) {
+    h += `<div class="ct-box"><b>Contrato ${pvEsc(c.numero || 's/nº')}</b><span class="ct-sit ${ctSitCls(c.situacao)}">${pvEsc(c.situacao)}</span>
+      ${c.objeto ? `<div>${pvEsc(c.objeto)}</div>` : ''}
+      <div class="pv-sub">Vigência ${pvD(c.inicio)} a ${pvD(c.validadeEfetiva)}${c.validadeEfetiva !== c.validade ? ' (prorrogado por aditivo; original ' + pvD(c.validade) + ')' : ''}${c.situacao === 'Vencendo' ? ' · vence em ' + c.diasParaVencer + ' dia(s)' : ''}${c.renovacaoAutomatica ? ' · renovação automática' : ''}${c.encerrado ? ' · encerrado' : ''}</div>
+      ${c.obs ? `<div class="pv-sub">${pvEsc(c.obs)}</div>` : ''}
+      ${ctLinhaArq('contrato', c)}
+      ${somenteLeitura ? '' : `<div style="display:flex;justify-content:flex-end;margin-top:6px"><button type="button" class="pv-mini" onclick="ctEditar()">Editar dados</button></div>`}</div>`;
+    h += `<div style="margin-top:10px;font-size:.74rem;font-weight:600">Aditivos</div>`;
+    h += c.aditivos.length ? c.aditivos.map(a => `<div class="pv-row"><div><b>${pvEsc(a.numero ? 'Aditivo ' + a.numero : 'Aditivo')}</b> · ${pvD(a.data)}${a.novaValidade ? ' · nova validade ' + pvD(a.novaValidade) : ''}
+        <div class="pv-sub">${pvEsc(a.descricao)}</div>${ctLinhaArq('aditivo', a)}</div>
+        <div class="pv-acts">${somenteLeitura ? '' : `<button type="button" class="pv-mini" onclick="ctEditarAd('${a.id}')">Editar</button><button type="button" class="pv-mini del" onclick="ctExcluirAd('${a.id}')">Excluir</button>`}</div></div>`).join('')
+      : '<div class="pv-hint">Nenhum aditivo.</div>';
+    if (!somenteLeitura) h += ea ? `<div class="pv-form">
+        <div><label for="ad-num">Nº do aditivo</label><input id="ad-num" value="${pvEsc(ea.numero)}" oninput="CT.editAd.numero=this.value"></div>
+        <div><label for="ad-data">Data</label><input id="ad-data" type="date" value="${pvEsc(ea.data)}" oninput="CT.editAd.data=this.value"></div>
+        <div class="pv-full"><label for="ad-desc">O que muda (serviços novos, reajuste, prorrogação…)</label><input id="ad-desc" value="${pvEsc(ea.descricao)}" oninput="CT.editAd.descricao=this.value"></div>
+        <div><label for="ad-nv">Nova validade (se prorroga)</label><input id="ad-nv" type="date" value="${pvEsc(ea.novaValidade)}" oninput="CT.editAd.novaValidade=this.value"></div>
+        <div class="pv-full" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="pv-mini" onclick="CT.editAd=null;ctRender()">Cancelar</button><button type="button" class="residuo-add-btn" style="padding:7px 14px" onclick="ctSalvarAd()">${ea.id ? 'Salvar aditivo' : 'Incluir aditivo'}</button></div>
+      </div>` : `<button type="button" class="multi-add" onclick="ctNovoAd()">+ Incluir aditivo</button>`;
+  }
+  if (!c && !e && !somenteLeitura) h += `<button type="button" class="multi-add" onclick="ctEditar()">+ Cadastrar contrato${r.daMatriz ? ' próprio' : ''}</button>`;
+  if (!c && !r.daMatriz && somenteLeitura) h += '<div class="pv-hint" style="margin-top:6px">Sem contrato cadastrado.</div>';
+  if (e) h += `<div class="pv-form">
+      <div><label for="ct-num">Nº do contrato</label><input id="ct-num" value="${pvEsc(e.numero)}" oninput="CT.edit.numero=this.value"></div>
+      <div><label for="ct-ini">Início</label><input id="ct-ini" type="date" value="${pvEsc(e.inicio)}" oninput="CT.edit.inicio=this.value"></div>
+      <div class="pv-full"><label for="ct-obj">Objeto</label><input id="ct-obj" value="${pvEsc(e.objeto)}" placeholder="Ex.: coleta e destinação de RSS" oninput="CT.edit.objeto=this.value"></div>
+      <div><label for="ct-val">Validade</label><input id="ct-val" type="date" value="${pvEsc(e.validade)}" oninput="CT.edit.validade=this.value"></div>
+      <div style="display:flex;flex-direction:column;justify-content:flex-end;gap:4px"><label class="ct-radio"><input type="checkbox" id="ct-ren" ${e.renovacaoAutomatica ? 'checked' : ''} onchange="CT.edit.renovacaoAutomatica=this.checked"> Renovação automática</label>
+        ${e.id ? `<label class="ct-radio"><input type="checkbox" id="ct-enc" ${e.encerrado ? 'checked' : ''} onchange="CT.edit.encerrado=this.checked"> Contrato encerrado</label>` : ''}</div>
+      <div class="pv-full"><label for="ct-obs">Observação</label><input id="ct-obs" value="${pvEsc(e.obs)}" oninput="CT.edit.obs=this.value"></div>
+      <div class="pv-full pv-hint">${e.id ? '' : 'Depois de salvar, anexe o contrato escaneado (PDF ou imagem).'}</div>
+      <div class="pv-full" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="pv-mini" onclick="CT.edit=null;ctRender()">Cancelar</button><button type="button" class="residuo-add-btn" style="padding:7px 14px" onclick="ctSalvar()">${e.id ? 'Salvar contrato' : 'Cadastrar contrato'}</button></div>
+    </div>`;
+  b.innerHTML = h;
+}
+function ctEditar() { const c = CT.d && CT.d.contrato; CT.edit = c ? { id: c.id, numero: c.numero, objeto: c.objeto, inicio: c.inicio, validade: c.validade, renovacaoAutomatica: c.renovacaoAutomatica, encerrado: c.encerrado, obs: c.obs } : { numero: '', objeto: '', inicio: '', validade: '', renovacaoAutomatica: false, encerrado: false, obs: '' }; ctRender(); }
+async function ctSalvar() {
+  try { await Portal.api('mapa.salvarContrato', { registro: Object.assign({ cadastroId: CT.id }, CT.edit) }); CT.edit = null; await ctCarregar(); }
+  catch (e) { alert((e && e.mensagem) || 'Não foi possível salvar o contrato.'); }
+}
+function ctNovoAd() { const d = new Date(); CT.editAd = { numero: '', data: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'), descricao: '', novaValidade: '' }; ctRender(); }
+function ctEditarAd(id) { const a = CT.d.contrato.aditivos.find(x => x.id === id); CT.editAd = { id: a.id, numero: a.numero, data: a.data, descricao: a.descricao, novaValidade: a.novaValidade }; ctRender(); }
+async function ctSalvarAd() {
+  try { await Portal.api('mapa.salvarAditivo', { registro: Object.assign({ contratoId: CT.d.contrato.id }, CT.editAd) }); CT.editAd = null; await ctCarregar(); }
+  catch (e) { alert((e && e.mensagem) || 'Não foi possível salvar o aditivo.'); }
+}
+async function ctExcluirAd(id) {
+  if (!confirm('Excluir este aditivo?')) return;
+  try { await Portal.api('mapa.excluirAditivo', { id }); await ctCarregar(); } catch (e) { alert((e && e.mensagem) || 'Não foi possível excluir.'); }
+}
+function ctAnexar(tipo, id, input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  if (!/^(application\/pdf|image\/(jpeg|png))$/.test(f.type)) { alert('Envie o contrato em PDF, JPG ou PNG.'); input.value = ''; return; }
+  if (f.size > 10 * 1024 * 1024) { alert('Arquivo grande demais (máximo 10 MB).'); input.value = ''; return; }
+  const rd = new FileReader();
+  rd.onload = async () => {
+    document.getElementById('ct-count').textContent = 'enviando…';
+    try { await Portal.api('mapa.anexarContrato', { tipo, id, nome: f.name, dataUrl: rd.result }); await ctCarregar(); }
+    catch (e) { alert((e && e.mensagem) || 'Não foi possível enviar o arquivo.'); ctCarregar(); }
+  };
+  rd.readAsDataURL(f);
+}
+async function ctAbrirArq(tipo, id) {
+  const w = window.open('', '_blank');
+  try {
+    const r = await Portal.api('mapa.arquivoContrato', { tipo, id });
+    const m = String(r.dataUrl).match(/^data:([^;]+);base64,(.*)$/); const bin = atob(m[2]); const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([u8], { type: m[1] }));
+    if (w) w.location = url; else { const a = document.createElement('a'); a.href = url; a.download = r.nome || 'contrato'; document.body.appendChild(a); a.click(); a.remove(); }
+  } catch (e) { if (w) w.close(); alert((e && e.mensagem) || 'Não foi possível abrir o arquivo.'); }
 }
 
 // No nível leitor o formulário abre só para consulta: campos travados, sem salvar/mover.
@@ -6524,7 +6738,7 @@ function savePoint() {
   p.gmaps = gmapsDe(p);
   // mantém o que só o servidor sabe (situação, data/hora, local) até a resposta da planilha chegar
   const anterior = editingId ? points.find(x => x.id === editingId) : null;
-  if (anterior) ['ativo', 'criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor', 'localId', 'cadastroPrincipalId'].forEach(k => { if (k in anterior) p[k] = anterior[k]; });
+  if (anterior) ['ativo', 'criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor', 'localId', 'cadastroPrincipalId', 'faturaPara'].forEach(k => { if (k in anterior) p[k] = anterior[k]; });
 
   if (editingId) {
     points = points.map(x => x.id === editingId ? p : x);
@@ -6698,7 +6912,7 @@ function aplicarRespostaServidor(idLocal, srv) {
   if (!srv || !srv.id) return;
   const p = points.find(x => x.id === idLocal);
   if (!p) return;
-  ['ativo', 'criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor', 'localId', 'cadastroPrincipalId', 'codigoUplog'].forEach(k => { if (k in srv) p[k] = srv[k]; });
+  ['ativo', 'criadoEm', 'criadoPor', 'atualizadoEm', 'atualizadoPor', 'localId', 'cadastroPrincipalId', 'faturaPara', 'codigoUplog'].forEach(k => { if (k in srv) p[k] = srv[k]; });
   if (srv.id !== idLocal) {
     removeLeafletPoint(idLocal);
     p.id = srv.id;
