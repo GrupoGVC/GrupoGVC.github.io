@@ -410,6 +410,7 @@ const COLS = {
     { k: 'uni', label: 'Unidade', v: c => uniNome(c.unidadeId), vazio: 'Sem unidade', h: c => uniCell(c.unidadeId) },
     { k: 'sit', label: 'Situação', v: c => c.ativo ? c.situacao : 'Inativa', h: c => c.ativo ? situPill(c.situacao) : '<span class="pill">Inativa</span>' },
     { k: 'onde', label: 'Onde está', v: c => cadNome(c.cadastroAtualId) || '—', cls: 'wrap' },
+    { k: 'desde', label: 'No cliente desde', v: c => c.situacao === 'Em cliente' && c.dataEntrega ? String(c.dataEntrega).slice(0, 10) : '', h: c => c.situacao === 'Em cliente' && c.dataEntrega ? esc(String(c.dataEntrega).slice(0, 10).split('-').reverse().join('/')) : '<span class="sub">—</span>' },
     { k: 'loc', label: 'Locadora', v: c => cadNome(c.locadoraId), oculta: true },
     { k: 'obs', label: 'Observações', v: c => c.obs || '', cls: 'wrap', oculta: true }],
   tipos: [
@@ -526,6 +527,7 @@ function formCaixa() {
       <div class="fld"><label for="f-uni">Unidade</label><select id="f-uni">${opts(S.d.unidades.map(u => [u.id, u.nome]), e.unidadeId, 'Sem unidade definida')}</select></div>
       <div class="fld"><label for="f-sit">Situação</label><select id="f-sit" required>${opts(L.situacaoCaixa, e.situacao)}</select></div>
       <div class="fld" id="fld-onde" style="grid-column:span 2"><label for="f-onde">Onde está (cadastro no Mapa)</label><select id="f-onde">${opts(S.d.cadastros.map(c => [c.id, c.nome]), e.cadastroAtualId, '—')}</select></div>
+      <div class="fld" id="fld-desde"><label for="f-desde">Entregue no cliente em</label><input id="f-desde" type="date" value="${esc(String(e.dataEntrega || '').slice(0, 10))}"><div class="hint">Base do aluguel. A Programação preenche sozinha; informe para as caixas que já estavam no cliente.</div></div>
       <div class="fld" style="grid-column:1/-1"><label for="f-obs">Observações</label><input id="f-obs" value="${esc(e.obs)}"></div>
       <div class="row" style="grid-column:1/-1;justify-content:flex-end"><button class="btn pri" id="f-save" type="submit">${e.id ? 'Salvar alterações' : 'Cadastrar caixa'}</button></div>
     </form>${rodapeForm(e)}</section>`;
@@ -542,16 +544,16 @@ function renderCaixas() {
     ${lista.map(c => `<tr class="${c.ativo ? '' : 'inativo'}">${tb('caixas').celulas(c)}<td>${botoes(c)}</td></tr>`).join('') || `<tr><td colspan="${tb('caixas').nVis() + 1}" class="empty">Nenhuma caixa com os filtros das colunas.</td></tr>`}
     </tbody></table></div>` : '<div class="empty">Nenhuma caixa com esses filtros. Cadastre as caixas em "+ Caixa".</div>'}</section>`;
   ligarFiltros('caixas', COLS.caixas, base);
-  ligarToolbar(() => ({ numero: '', capacidade: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Na base', cadastroAtualId: '', obs: '' }));
+  ligarToolbar(() => ({ numero: '', capacidade: '', propriedade: 'Própria', locadoraId: '', unidadeId: unidadePadrao(), situacao: 'Na base', cadastroAtualId: '', dataEntrega: '', obs: '' }));
   ligarAcoes('Caixas', S.d.caixas, c => nomeCaixa(c.numero));
   if (!S.edit) return;
-  const sync = () => { $('#fld-loc').hidden = $('#f-prop').value !== 'Locada'; $('#fld-onde').hidden = $('#f-sit').value !== 'Em cliente'; };
+  const sync = () => { $('#fld-loc').hidden = $('#f-prop').value !== 'Locada'; $('#fld-onde').hidden = $('#fld-desde').hidden = $('#f-sit').value !== 'Em cliente'; };
   $('#f-prop').onchange = sync; $('#f-sit').onchange = sync; sync();
   $('#f-cancel').onclick = () => { S.edit = null; render(); };
   $('#f').onsubmit = ev => { ev.preventDefault();
     salvarForm('Caixas', { id: S.edit.id, numero: $('#f-num').value, capacidade: $('#f-cap').value, propriedade: $('#f-prop').value,
       locadoraId: $('#f-prop').value === 'Locada' ? $('#f-loc').value : '', unidadeId: $('#f-uni').value, situacao: $('#f-sit').value,
-      cadastroAtualId: $('#f-sit').value === 'Em cliente' ? $('#f-onde').value : '', obs: $('#f-obs').value.trim() }, 'Caixa');
+      cadastroAtualId: $('#f-sit').value === 'Em cliente' ? $('#f-onde').value : '', dataEntrega: $('#f-sit').value === 'Em cliente' ? $('#f-desde').value : '', obs: $('#f-obs').value.trim() }, 'Caixa');
   };
 }
 
