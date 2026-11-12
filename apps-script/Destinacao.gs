@@ -88,19 +88,20 @@ function salvarItensSolicitacao_(sol, itens, u) {
   return '';
 }
 /** O que falta para liberar para programar (vazio = pode). */
-function faltaParaLiberar_(s, itensNovos) {
-  if (!exigeDestinacao_(s)) return '';
-  const itens = itensNovos ? itensNovos.filter(function (x) { return x && (x.residuoId || x.destinadorId || (x.pesoEstimado !== '' && x.pesoEstimado != null)); })
-    : itensDaSolicitacao_(s.id);
-  const f = [];
-  if (!itens.length) f.push('os resíduos com o destinador previsto');
-  itens.forEach(function (it, i) {
-    const n = nomeRes_(it.residuoId) || ('resíduo ' + (i + 1));
-    if (!(num_(it.pesoEstimado) > 0)) f.push('o peso estimado de ' + n);
-    if (!it.destinadorId) f.push('o destinador ou reciclador de ' + n);
-  });
-  if (!(num_(s.kmPrevista) > 0)) f.push('a km prevista');
-  if (!(num_(s.diariasPrevistas) > 0)) f.push('as diárias previstas (dias de operação)');
+function faltaParaLiberar_(s, itensNovos, precosNovos, semProposta) {
+  const f = semProposta ? [] : faltaProposta_(s, precosNovos); // proposta: nº, data e itens (PrecoSolicitacao.gs)
+  if (exigeDestinacao_(s)) {
+    const itens = itensNovos ? itensNovos.filter(function (x) { return x && (x.residuoId || x.destinadorId || (x.pesoEstimado !== '' && x.pesoEstimado != null)); })
+      : itensDaSolicitacao_(s.id);
+    if (!itens.length) f.push('os resíduos com o destinador previsto');
+    itens.forEach(function (it, i) {
+      const n = nomeRes_(it.residuoId) || ('resíduo ' + (i + 1));
+      if (!(num_(it.pesoEstimado) > 0)) f.push('o peso estimado de ' + n);
+      if (!it.destinadorId) f.push('o destinador ou reciclador de ' + n);
+    });
+    if (!(num_(s.kmPrevista) > 0)) f.push('a km prevista');
+    if (!(num_(s.diariasPrevistas) > 0)) f.push('as diárias previstas (dias de operação)');
+  }
   return f.length ? 'Para liberar, informe ' + f.join(', ') + '.' : '';
 }
 /** Troca do destinador pela programadora: justificativa obrigatória (voltar ao previsto não precisa). */

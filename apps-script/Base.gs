@@ -52,9 +52,15 @@ const TABELAS = {
                                                       // cobrança por km rodado: o solicitante escolhe o km real ou o previsto (Km.gs)
                                                       'kmCobranca', 'kmCobrado', 'kmDefinidoPor', 'kmDefinidoEm', 'kmObs',
                                                       // datas pela Programação (dataPrevista = saída da viagem, dataColeta = data da parada); motivo padrão do cancelamento
-                                                      'dataDesejada', 'motivoId', 'canceladaDaViagemId', 'cancelCiente', 'ativo'],
-                          texto: ['residuoIds', 'idOrigem'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'kmCobrado'],
-                          data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'kmDefinidoEm', 'dataDesejada'] },
+                                                      'dataDesejada', 'motivoId', 'canceladaDaViagemId', 'cancelCiente',
+                                                      // preço previsto (PrecoSolicitacao.gs): veículo, valor pela tabela do contrato e justificativa; nº e data da proposta
+                                                      'tipoVeiculoId', 'valorTabela', 'justificativaValor', 'propostaNumero', 'propostaData', 'ativo'],
+                          texto: ['residuoIds', 'idOrigem', 'propostaNumero'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'kmCobrado', 'valorTabela'],
+                          data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'kmDefinidoEm', 'dataDesejada', 'propostaData'] },
+  // Itens previstos da solicitação: do contrato (contratoItemId, valor da tabela) ou da proposta (valores digitados)
+  SolicitacaoPrecos:    { prefixo: 'SPR', colunas: ['id', 'solicitacaoId', 'ordem', 'origem', 'contratoItemId', 'tipo', 'tipoVeiculoId', 'residuoId', 'capacidade',
+                                                      'destinacaoInclusa', 'cobrancaAluguel', 'quantidade', 'valorUnitario', 'obs'],
+                          numero: ['ordem', 'capacidade', 'quantidade', 'valorUnitario'] },
   // Resíduos da solicitação, com a destinação prevista na precificação (o destinador pode ser trocado na Programação, com justificativa)
   SolicitacaoItens:     { prefixo: 'SIT', colunas: ['id', 'solicitacaoId', 'ordem', 'residuoId', 'pesoEstimado', 'destinadorId', 'destinadorPrevistoId', 'precoKg', 'natureza',
                                                       'justificativaTroca'], numero: ['ordem', 'pesoEstimado', 'precoKg'] },
@@ -137,7 +143,7 @@ const REFERENCIAS = {
                  ['Contratos', 'cadastroId', 'contrato do cliente'],
                  ['ContratoItens', 'cadastroId', 'item(ns) de preço do contrato']],
   Contratos:    [['ContratoAditivos', 'contratoId', 'aditivo(s) do contrato'], ['ContratoItens', 'contratoId', 'item(ns) de preço do contrato']],
-  ContratoItens: [['FaturamentoItens', 'precoClienteId', 'item(ns) de BM/NF no Faturamento']],
+  ContratoItens: [['FaturamentoItens', 'precoClienteId', 'item(ns) de BM/NF no Faturamento'], ['SolicitacaoPrecos', 'contratoItemId', 'item(ns) previsto(s) em solicitações']],
   Residuos:     [['CadastroResiduos', 'residuoId', 'cadastro(s) no Mapa Operacional'],
                  ['SolicitacaoItens', 'residuoId', 'resíduo(s) de solicitações'],
                  ['Lancamentos', 'residuoId', 'lançamento(s) no Controle de Destinação'],
@@ -154,7 +160,7 @@ const REFERENCIAS = {
                  ['Pessoas', 'unidadeId', 'pessoa(s) cadastrada(s)'],
                  ['Adiantamentos', 'unidadeId', 'adiantamento(s) no DP'],
                  ['Rotinas', 'unidadeId', 'coleta(s) recorrente(s)']],
-  TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota'], ['ContratoItens', 'tipoVeiculoId', 'item(ns) de preço de contratos']],
+  TiposVeiculo: [['Veiculos', 'tipoVeiculoId', 'veículo(s) na Frota'], ['ContratoItens', 'tipoVeiculoId', 'item(ns) de preço de contratos'], ['Solicitacoes', 'tipoVeiculoId', 'solicitação(ões)']],
   Veiculos:     [['LocacaoMensal', 'veiculoId', 'mês(es) de locação'],
                  ['Viagens', 'veiculoId', 'viagem(ns) na Programação']],
   Caixas:       [['LocacaoMensal', 'caixaId', 'mês(es) de locação'],
@@ -181,7 +187,7 @@ const REFERENCIAS = {
 const FILHAS = {
   Cadastros: [['CadastroResiduos', 'cadastroId'], ['CadastroEquipamentos', 'cadastroId'], ['CadastroLocais', 'cadastroId'], ['Locais', 'cadastroId'],
               ['DocumentosPadrao', 'cadastroId']],
-  Solicitacoes: [['SolicitacaoDocumentos', 'solicitacaoId'], ['SolicitacaoItens', 'solicitacaoId']],
+  Solicitacoes: [['SolicitacaoDocumentos', 'solicitacaoId'], ['SolicitacaoItens', 'solicitacaoId'], ['SolicitacaoPrecos', 'solicitacaoId']],
   Faturamentos: [['FaturamentoItens', 'faturamentoId']],
   Viagens: [['ViagemEquipe', 'viagemId'], ['Paradas', 'viagemId']],
 };
@@ -438,6 +444,7 @@ function gravarHistorico_() {
 function quemEmail_(u) { return u ? u.email : 'sistema'; }
 
 const ROTULOS_CAMPOS = {
+  valorTabela: 'Valor pela tabela do contrato (R$)', justificativaValor: 'Justificativa do valor diferente do contrato', propostaNumero: 'Nº da proposta', propostaData: 'Data da proposta',
   destinacaoInclusa: 'Destinação inclusa na troca', cobrancaAluguel: 'Cobrança do aluguel', aditivoId: 'Aditivo de origem', contratoId: 'Contrato', precoOrigemId: 'Preço antigo de origem',
   nome: 'Nome', codigoUplog: 'Código UPLOG', tipos: 'Tipos', razaoSocial: 'Razão social', categoria: 'Categoria', cnpj: 'CNPJ',
   contatoNome: 'Contato', telefones: 'Telefones', emails: 'E-mails', obs: 'Observações', cadastroPrincipalId: 'Cadastro principal',

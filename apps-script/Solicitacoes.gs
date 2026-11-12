@@ -33,7 +33,7 @@ function migrarFase2_() {
     });
   });
   TIPOS_DOCUMENTO_INICIAIS.forEach(function (n) { if (!idPorNome_('TiposDocumento', n)) inserir_('TiposDocumento', { nome: n, ativo: true }, null, null); });
-  ['Solicitacoes', 'Consultores', 'DocumentosPadrao', 'SolicitacaoDocumentos', 'PrecosCliente', 'ContratoItens', 'Faturamentos', 'FaturamentoItens'].forEach(function (t) { aba_(t); });
+  ['Solicitacoes', 'Consultores', 'DocumentosPadrao', 'SolicitacaoDocumentos', 'PrecosCliente', 'ContratoItens', 'SolicitacaoPrecos', 'Faturamentos', 'FaturamentoItens'].forEach(function (t) { aba_(t); });
   // acesso: administradores do portal recebem os dois módulos novos; os demais, o admin libera na tela Usuários
   ler_('Usuarios').forEach(function (us) {
     if (!simNao_(us.adminPortal)) return;
@@ -62,6 +62,7 @@ function solPublica_(r) {
   ['kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'].forEach(function (c) { o[c] = numOuVazio_(r[c]); });
   o.exigeDestinacao = exigeDestinacao_(r);
   o.kmCobrado = numOuVazio_(r.kmCobrado); o.kmDefinidoEm = dataTexto_(r.kmDefinidoEm);
+  o.valorTabela = numOuVazio_(r.valorTabela); o.propostaData = dataTexto_(r.propostaData);
   return o;
 }
 /** Situação de faturamento de cada solicitação (BM/NF ativos). */
@@ -116,6 +117,10 @@ function solDados_(u) {
     podeCadastrarMotivos: podeCadastrarMotivos_(u), hoje: dataTexto_(new Date()),
     frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,
     contratos: situacaoContratosPorCliente_(),
+    precosSol: ler_('SolicitacaoPrecos').filter(function (p) { return visiveis[p.solicitacaoId]; }).map(precoSolPublico_),
+    itensContrato: ler_('ContratoItens').filter(function (p) { return p.ativo; }).map(itemContratoPublico_),
+    tiposItem: Object.keys(TIPOS_ITEM).map(function (k) { return Object.assign({ nome: k }, TIPOS_ITEM[k]); }), cobrancasAluguel: COBRANCAS_ALUGUEL,
+    tiposVeiculo: ler_('TiposVeiculo').filter(function (t) { return t.ativo; }).map(function (t) { return { id: t.id, nome: String(t.nome), capacidadesCaixa: String(t.capacidadesCaixa || '') }; }),
     podeImportar: !!u.adminPortal };
 }
 
@@ -154,10 +159,13 @@ function solSalvar_(reg, u) {
   if (atual && !veUnidade_(u, atual.unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
   // data da solicitação = dia da criação; data prevista e data da coleta vêm da Programação (não são editadas aqui)
   const campos = ['unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds', 'descricao',
-                  'dataSolicitacaoConsultor', 'dataDesejada', 'valorPrevisto', 'obs', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'];
+                  'dataSolicitacaoConsultor', 'dataDesejada', 'valorPrevisto', 'obs', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos',
+                  'tipoVeiculoId', 'justificativaValor', 'propostaNumero', 'propostaData'];
   const r = {};
   campos.forEach(function (c) { r[c] = c in reg ? reg[c] : (atual ? atual[c] : ''); });
-  ['dataSolicitacaoConsultor', 'dataDesejada'].forEach(function (c) { r[c] = dataTexto_(r[c]); });
+  ['dataSolicitacaoConsultor', 'dataDesejada', 'propostaData'].forEach(function (c) { r[c] = dataTexto_(r[c]); });
+  r.propostaNumero = String(r.propostaNumero || '').trim(); r.tipoVeiculoId = String(r.tipoVeiculoId || '');
+  if (r.tipoVeiculoId && !porId_('TiposVeiculo', r.tipoVeiculoId)) return erroDados_('Tipo de veículo não encontrado.');
   r.dataSolicitacao = atual ? dataTexto_(atual.dataSolicitacao) : dataTexto_(new Date());
   ['kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos'].forEach(function (c) {
     r[c] = r[c] === '' || r[c] == null ? '' : num_(r[c]);
@@ -168,9 +176,16 @@ function solSalvar_(reg, u) {
   const temItens = Array.isArray(reg.itens);
   if (temItens) r.residuoIds = reg.itens.map(function (x) { return String((x || {}).residuoId || ''); }).filter(String);
   const erro = validarSol_(r, atual, u); if (erro) return erroDados_(erro);
+  // itens previstos (quadro do contrato ou itens da proposta) e regras do valor previsto
+  let calc = null;
+  if (Array.isArray(reg.precos)) {
+    calc = validarPrecosSol_(r, reg.precos); if (calc.erro) return erroDados_(calc.erro);
+    const e4 = aplicarPrecoPrevisto_(r, calc); if (e4) return erroDados_(e4);
+  }
   // depois de liberada, os dados da precificação não podem ficar incompletos
   if (atual && ['Liberada para programar', 'Programada'].indexOf(String(atual.status)) >= 0) {
-    const falta = faltaParaLiberar_(Object.assign({}, atual, r, { id: atual.id }), temItens ? reg.itens : null);
+    // proposta liberada antes da etapa 4 (sem nº) não fica travada por isso
+    const falta = faltaParaLiberar_(Object.assign({}, atual, r, { id: atual.id }), temItens ? reg.itens : null, calc ? calc.linhas : null, !String(atual.propostaNumero || '').trim());
     if (falta) return erroDados_(falta.replace('Para liberar, informe', 'Esta solicitação já foi liberada: informe'));
   }
   if (temItens) {
@@ -186,10 +201,12 @@ function solSalvar_(reg, u) {
       r.kmCobrado = r.kmPrevista;
     }
     atualizar_('Solicitacoes', id, r, u, 'solicitacoes', { registroNome: rotuloSol_(r) });
+    if (calc) salvarPrecosSol_(Object.assign({}, atual, r, { id: id }), calc.linhas, u);
     return { ok: true, id: id };
   }
   r.status = 'Recebida'; r.origem = 'portal'; r.ativo = true; r.dataPrevista = ''; r.dataColeta = '';
   const nova = inserir_('Solicitacoes', r, u, 'solicitacoes', rotuloSol_(r));
+  if (calc) salvarPrecosSol_(nova, calc.linhas, u);
   if (temItens) { const e3 = salvarItensSolicitacao_(nova, reg.itens, u); if (e3) return { ok: true, id: nova.id, aviso: e3 }; }
   // documentos padrão do cliente (e do cadastro principal), para o serviço escolhido ou para todos
   const cli = porId_('Cadastros', r.clienteId);
