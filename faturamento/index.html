@@ -413,6 +413,44 @@ function precosDaSol(s) {
     .sort((a, b) => ids.indexOf(a.cadastroId) - ids.indexOf(b.cadastroId) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)));
   const vistos = {}; return vig.filter(p => { const k = chavePreco(p); if (vistos[k]) return false; vistos[k] = 1; return true; });
 }
+// caixas: item do contrato pela capacidade; entrega/retirada sem item próprio são cobradas como troca, se houver
+const cxItem = (precosS, tipo, cap) => precosS.find(p => p.tipo === tipo && +p.capacidade === +cap);
+function itensCaixaDaColeta(sid, precosS, dc) {
+  const out = []; let inclusa = false;
+  ((S.d.caixasSol || {})[sid] || []).forEach(m => {
+    const linha = (it, cxs) => { out.push({ solicitacaoId: sid, precoClienteId: it.id, descricao: itemDesc(it) + ' · ' + cxs + (dc ? ' (' + dc + ')' : ''), quantidade: 1, unidadeMedida: it.un, valorUnitario: it.valor, sentido: 'Cobrança' }); if (it.tipo === 'Troca de caixa' && it.destinacaoInclusa) inclusa = true; };
+    const nE = m.entregue ? 'caixa ' + m.entregue.numero : '', nR = m.retirada ? 'caixa ' + m.retirada.numero : '';
+    if (m.entregue && m.retirada) {
+      const tr = cxItem(precosS, 'Troca de caixa', m.retirada.capacidade) || cxItem(precosS, 'Troca de caixa', m.entregue.capacidade);
+      if (tr) return linha(tr, 'entregou ' + nE + ', retirou ' + nR);
+      const e = cxItem(precosS, 'Entrega de caixa', m.entregue.capacidade), r = cxItem(precosS, 'Retirada de caixa', m.retirada.capacidade);
+      if (e) linha(e, 'entregou ' + nE); if (r) linha(r, 'retirou ' + nR); return;
+    }
+    if (m.entregue) { const it = cxItem(precosS, 'Entrega de caixa', m.entregue.capacidade) || cxItem(precosS, 'Troca de caixa', m.entregue.capacidade); if (it) linha(it, 'entregou ' + nE); }
+    if (m.retirada) { const it = cxItem(precosS, 'Retirada de caixa', m.retirada.capacidade) || cxItem(precosS, 'Troca de caixa', m.retirada.capacidade); if (it) linha(it, 'retirou ' + nR); }
+  });
+  return { itens: out, inclusa };
+}
+const propostaDe = sid => (S.d.precosSol || []).filter(p => p.solicitacaoId === sid && p.origem === 'Proposta').sort((a, b) => a.ordem - b.ordem);
+/** Aluguel das caixas no mês (clientes que faturam neste CNPJ): mês cheio = 1; proporcional = dias no cliente ÷ dias do mês. */
+function aluguelDoMes(clienteId, mes) {
+  const [y, m] = mes.split('-').map(Number); const ini = mes + '-01'; const dm = new Date(y, m, 0).getDate(); const fim = mes + '-' + String(dm).padStart(2, '0');
+  const dias = (a, z) => Math.round((Date.UTC(+z.slice(0, 4), +z.slice(5, 7) - 1, +z.slice(8)) - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8))) / 864e5) + 1;
+  const itens = [], semItem = [], semData = [];
+  (S.d.permanencias || []).filter(pp => fatDe(pp.clienteId) === clienteId).forEach(pp => {
+    const a = !pp.inicio || pp.inicio < ini ? ini : pp.inicio, z = !pp.fim || pp.fim > fim ? fim : pp.fim;
+    if (a > z) return;
+    const it = precosDaSol({ id: '', clienteId: pp.clienteId, perfil: 'Contrato', dataSolicitacao: ini }).find(p => p.tipo === 'Aluguel de caixa' && +p.capacidade === +pp.capacidade);
+    if (!it) { semItem.push(pp.numero); return; }
+    if (!pp.inicio) semData.push(pp.numero);
+    const n = dias(a, z);
+    itens.push({ solicitacaoId: '', precoClienteId: it.id, descricao: itemDesc(it) + ' · caixa ' + pp.numero + ' · ' + D(a) + ' a ' + D(z) + ' (' + n + ' dia(s))' + (pp.clienteId !== clienteId ? ' · ' + cliNome(pp.clienteId) : ''),
+      quantidade: it.cobrancaAluguel === 'Mês cheio' ? 1 : Math.round(n / dm * 10000) / 10000, unidadeMedida: 'mês', valorUnitario: it.valor, sentido: 'Cobrança', _uni: pp.unidadeId });
+  });
+  return { itens, semItem, semData };
+}
+const temAluguel = cid => (S.d.permanencias || []).some(pp => fatDe(pp.clienteId) === cid && (S.d.precos || []).some(p => p.tipo === 'Aluguel de caixa' && (p.cadastroId === pp.clienteId || p.cadastroId === cliDe(pp.clienteId).principalId)));
+const mesAnterior = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
 const kmTxt = k => 'km ' + (k.escolha === 'Real' ? 'real' : 'previsto') + (k.definidoPor ? ', definido por ' + k.definidoPor + (k.definidoEm ? ' em ' + D(k.definidoEm) : '') : '');
 function render() {
   if (!S.d) return;
@@ -485,10 +523,11 @@ function renderAFaturar() {
           ${T.celulas(s)}</tr>`).join('')}
         </tbody></table></div>` : ''}
         ${(cobs[cid] || []).length ? `<h3 class="sec">Frustradas a cobrar</h3><div class="chips">${cobs[cid].map(c => `<label class="chip">${S.ro ? '' : `<input type="checkbox" data-selc="${esc(c.id)}" ${S.selc[c.id] ? 'checked' : ''}>`} ${esc(cobTxt(c))} · <b>${R(c.valor)}</b></label>`).join('')}</div>` : ''}</div>`; }).join('') : `<div class="empty">${solsTela.length ? 'Nenhuma coleta com os filtros das colunas.' : 'Nenhuma coleta realizada esperando BM.'}</div>`}
-  </section>`;
+  </section>${aluguelHTML()}`;
   ligarBusca(); T.ligar();
   $$('[data-sel]').forEach(c => c.onchange = () => { S.sel[c.dataset.sel] = c.checked; });
   $$('[data-selc]').forEach(c => c.onchange = () => { S.selc[c.dataset.selc] = c.checked; });
+  $$('[data-bmalug]').forEach(x => x.onclick = () => novoBM(x.dataset.bmalug, [], []));
   $$('[data-montar]').forEach(b => b.onclick = () => {
     const cid = b.dataset.montar;
     const livres = grupos[cid].filter(s => !kmPend(s)), cl = cobs[cid] || [];
@@ -497,6 +536,15 @@ function renderAFaturar() {
     if (!ids2.length && !cIds.length) { toast('As coletas deste cliente aguardam o solicitante definir o km da cobrança.'); return; }
     novoBM(cid, ids2, cIds);
   });
+}
+/** Clientes com caixa e aluguel no contrato: BM só do aluguel do mês. */
+function aluguelHTML() {
+  if (S.ro) return '';
+  const cids = [...new Set((S.d.permanencias || []).filter(pp => !pp.fim || pp.fim >= mesAnterior() + '-01').map(pp => fatDe(pp.clienteId)))].filter(temAluguel)
+    .filter(cid => !S.uni || (S.d.permanencias || []).some(pp => fatDe(pp.clienteId) === cid && pp.unidadeId === S.uni)).sort((a, b) => cliNome(a).localeCompare(cliNome(b), 'pt-BR'));
+  if (!cids.length) return '';
+  return `<section class="panel"><div class="panel-h"><div><h2>Aluguel de caixas</h2><p class="sub">Clientes com caixa estacionária e aluguel no contrato. O aluguel do mês pode ir num BM próprio ou junto com as coletas (botão "Incluir aluguel" no BM).</p></div></div>
+    <div class="chips">${cids.map(cid => `<span class="chip">${esc(cliNome(cid))} · ${(S.d.permanencias || []).filter(pp => fatDe(pp.clienteId) === cid && !pp.fim).length} caixa(s) no cliente <button class="btn sm" data-bmalug="${esc(cid)}">BM de aluguel</button></span>`).join('')}</div></section>`;
 }
 function novoBM(clienteId, solIds, cobIds) {
   cobIds = cobIds || [];
@@ -565,10 +613,12 @@ function renderBM() {
     </tbody><tfoot><tr><td colspan="6">Total do BM</td><td class="num" id="bm-total"><b>${R(total)}</b></td><td></td></tr></tfoot></table></div>
     <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
       <button class="btn sm" id="it-livre">+ Item livre</button>
-      ${precos.length ? '<button class="btn sm pri" id="it-sugerir" title="Usa a tabela de preço do contrato (vigente na data de cada solicitação) e o peso confirmado na destinação">Sugerir itens</button>' : ''}
+      ${precos.length || b.solIds.some(id => propostaDe(id).length) ? '<button class="btn sm pri" id="it-sugerir" title="Contrato: tabela vigente na data de cada solicitação, veículo que foi, caixas e peso confirmado. Proposta: itens aprovados.">Sugerir itens</button>' : ''}
       ${precos.length ? `<select id="it-preco" style="width:auto;max-width:100%">${opts(precos.map(p => [p.id, precoRot(p)]), '', 'Item da tabela de preço do cliente…')}</select><button class="btn sm" id="it-preco-add">Incluir</button>`
         : `<span class="sub">${temCliPreco && b.solIds.length ? 'Nenhuma coleta deste BM usa a tabela do contrato (perfil Proposta ou preço fora da vigência na data da solicitação).' : 'Cliente sem tabela de preço de venda.'} <a href="../mapa/?abrir=${encodeURIComponent(b.clienteId)}" target="_blank" rel="noopener">Cadastrar no Mapa ↗</a></span>`}
     </div>
+    ${temAluguel(b.clienteId) ? `<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center"><span class="sub" style="margin:0">Aluguel de caixas do mês</span>
+      <input type="month" id="al-mes" value="${esc(b.alMes || mesAnterior())}" style="width:auto" aria-label="Mês do aluguel"><button class="btn sm" id="al-add">Incluir aluguel</button></div>` : ''}
     ${b.criadoEm ? `<div class="gvc-audit" style="margin-top:12px">${Portal.auditoriaHTML(b)}</div>` : ''}
     <div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px">${b.id ? '<button class="btn" id="bm-hist">Histórico</button>' : ''}<button class="btn pri" id="bm-salvar">${b.id ? 'Salvar BM' : 'Registrar BM enviado'}</button></div>
   </section>`;
@@ -610,21 +660,32 @@ function renderBM() {
     b.solIds.forEach(sid => {
       const d = dest[sid] || { viagens: 0, kg: {} }; const dc = D(solDe(sid).dataColeta);
       const sk = solDe(sid).km;
-      const precosS = precosDaSol(solDe(sid)); if (!usaContrato(solDe(sid))) nProp++;
-      const tr = transporteDaSol(solDe(sid), precosS);
+      const sol = solDe(sid);
+      if (!usaContrato(sol)) { // proposta: os itens aprovados, com o peso e as viagens reais quando houver
+        const pl = propostaDe(sid); if (!pl.length) { nProp++; return; }
+        pl.forEach(p => { let q = +p.quantidade || 0;
+          if (p.tipo === 'Transporte por viagem' && d.viagens) q = d.viagens;
+          if ((p.tipo === 'Destinação' || p.tipo === 'Valorização') && +(d.kg[p.residuoId] || 0) > 0) q = Math.round(+d.kg[p.residuoId] * 1000) / 1000;
+          novos.push({ solicitacaoId: sid, precoClienteId: '', descricao: itemDesc(p) + ' · proposta' + (sol.propostaNumero ? ' ' + sol.propostaNumero : '') + (dc ? ' (' + dc + ')' : ''), quantidade: q, unidadeMedida: p.un || 'un', valorUnitario: p.valorUnitario, sentido: p.tipo === 'Valorização' ? 'Desconto' : 'Cobrança' }); });
+        return;
+      }
+      const precosS = precosDaSol(sol);
+      const tr = transporteDaSol(sol, precosS);
       if (tr && tr.tipo === 'Transporte por km') {
         if (sk && sk.escolha) novos.push({ solicitacaoId: sid, precoClienteId: tr.id, descricao: itemDesc(tr) + ' · ' + kmTxt(sk) + (dc ? ' (' + dc + ')' : ''), quantidade: +sk.kmCobrado || 0, unidadeMedida: 'km', valorUnitario: tr.valor, sentido: 'Cobrança' });
       } else if (tr) novos.push({ solicitacaoId: sid, precoClienteId: tr.id, descricao: itemDesc(tr) + (dc ? ' (' + dc + ')' : ''), quantidade: d.viagens || 1, unidadeMedida: 'viagem', valorUnitario: tr.valor, sentido: 'Cobrança' });
       else if (precosS.some(p => TRANSP.includes(p.tipo))) semVei++;
+      const cx = itensCaixaDaColeta(sid, precosS, dc); cx.itens.forEach(x => novos.push(x));
       precosS.filter(p => p.tipo === 'Destinação' || p.tipo === 'Valorização').forEach(p => {
+        if (cx.inclusa && p.tipo === 'Destinação') return; // destinação inclusa na troca da caixa
         const kg = +(d.kg[p.residuoId] || 0);
         if (kg > 0) novos.push({ solicitacaoId: sid, precoClienteId: p.id, descricao: itemDesc(p) + (dc ? ' (' + dc + ')' : ''), quantidade: Math.round(kg * 1000) / 1000, unidadeMedida: 'kg', valorUnitario: p.valor, sentido: p.tipo === 'Valorização' ? 'Desconto' : 'Cobrança' });
       });
     });
-    if (!novos.length) { toast(nProp === b.solIds.length ? 'As coletas deste BM são de proposta: informe os valores da proposta.' : 'Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
+    if (!novos.length) { toast(nProp === b.solIds.length ? 'As coletas deste BM são de proposta sem itens registrados: informe os valores da proposta.' : 'Nada para sugerir: a tabela de preço não bate com os resíduos lançados na Programação.'); return; }
     const deCob = b.itens.filter(it => it.cobrancaId), outros = b.itens.filter(it => !it.cobrancaId);
     if (outros.length && !confirm('Trocar os ' + outros.length + ' item(ns) atuais pelos ' + novos.length + ' sugeridos? (as viagens frustradas ficam)')) return;
-    b.itens = novos.concat(deCob); marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s)' + (nProp ? ' · ' + nProp + ' coleta(s) de proposta ficaram de fora' : '') + (semVei ? ' · ' + semVei + ' coleta(s) sem transporte: o veículo não tem preço no contrato' : '') + '. Caixas: inclua pelo item da tabela. Confira e salve.');
+    b.itens = novos.concat(deCob); marcar(); renderBM(); toast(novos.length + ' item(ns) sugerido(s)' + (nProp ? ' · ' + nProp + ' coleta(s) de proposta sem itens ficaram de fora' : '') + (semVei ? ' · ' + semVei + ' coleta(s) sem transporte: o veículo não tem preço no contrato' : '') + '. Confira e salve.');
   };
   const pa = $('#it-preco-add'); if (pa) pa.onclick = () => {
     const p = precos.find(x => x.id === $('#it-preco').value); if (!p) return;
@@ -642,12 +703,20 @@ function renderBM() {
     }
     marcar(); renderBM(); toast(msg);
   };
+  const al = $('#al-add'); if (al) al.onclick = () => {
+    const mes = $('#al-mes').value; if (!mes) return; b.alMes = mes;
+    const r = aluguelDoMes(b.clienteId, mes);
+    if (!r.itens.length) { toast(r.semItem.length ? 'Caixas sem item de aluguel no contrato para a capacidade: ' + r.semItem.join(', ') + '.' : 'Nenhuma caixa no cliente neste mês.'); return; }
+    if (!b.unidadeId) b.unidadeId = r.itens[0]._uni || '';
+    r.itens.forEach(x => { delete x._uni; b.itens.push(x); });
+    marcar(); renderBM(); toast(r.itens.length + ' caixa(s) com aluguel em ' + mes.split('-').reverse().join('/') + (r.semData.length ? ' · sem data de entrega (contado desde o início do mês): ' + r.semData.join(', ') : '') + (r.semItem.length ? ' · sem item de aluguel: ' + r.semItem.join(', ') : '') + '.');
+  };
   $('#bm-fechar').onclick = () => { if (b.sujo && !confirm('Fechar sem salvar o BM?')) return; S.bm = null; render(); };
   const h = $('#bm-hist'); if (h) h.onclick = () => Portal.mostrarHistorico('Faturamentos', b.id, 'BM ' + (b.bmNumero || 's/nº') + ' · ' + cliNome(b.clienteId));
   $('#bm-salvar').onclick = async ev => {
     const zero = b.itens.find(it => !(+it.quantidade > 0)); if (zero) { toast('Informe a quantidade de todos os itens (' + (zero.descricao || 'item sem descrição') + ').'); return; }
     ev.target.disabled = true;
-    try { await Portal.api('fat.salvar', { registro: { id: b.id || '', clienteId: b.clienteId, bmNumero: b.bmNumero, bmData: b.bmData, obs: b.obs, itens: b.itens } });
+    try { await Portal.api('fat.salvar', { registro: { id: b.id || '', clienteId: b.clienteId, unidadeId: b.unidadeId || '', bmNumero: b.bmNumero, bmData: b.bmData, obs: b.obs, itens: b.itens } });
       toast(b.id ? 'BM atualizado' : 'BM registrado'); b.solIds.forEach(id => delete S.sel[id]); (b.cobIds || []).forEach(id => delete S.selc[id]); S.bm = null; S.tab = 'abertos'; setTab('abertos'); await carregar(true); }
     catch (e) { ev.target.disabled = false; falha(e); }
   };
