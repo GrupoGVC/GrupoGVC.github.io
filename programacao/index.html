@@ -735,6 +735,9 @@ function motivoParadaHTML(p, ro) {
     <div class="fld full"><label>Observação (obrigatória)</label><input data-f="motivo" value="${esc(p.motivo)}" ${ro ? 'disabled' : ''}></div>
     ${(m && (m.responsavel === 'Cliente' || (m.responsavel === 'Na hora' && p.responsavel === 'Cliente'))) && (p.resultado === 'Frustrada' || p.equipeSaiu === 'SIM') ? '<p class="hint full">Responsabilidade do cliente: vai para a decisão de cobrança da viagem.</p>' : ''}`;
 }
+// ponto de coleta pedido na solicitação (cliente com vários locais)
+const pontoDeP = id => (S.d.pontosColeta || []).find(p => p.id === id);
+const pontoTxt = id => { const p = pontoDeP(id); if (!p) return ''; const end = [[p.logradouro, p.numero].filter(Boolean).join(', '), p.bairro, [p.cidade, p.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '); return p.nome + (end ? ' — ' + end : ''); };
 const tvNome = id => ((S.d.tiposVeiculo || []).find(t => t.id === id) || {}).nome || '';
 /** Veículo da viagem diferente do pedido: proposta não troca; contrato pergunta se foi combinado com o cliente. */
 function veiculoParadaHTML(p, s, ro) {
@@ -752,7 +755,7 @@ function paradaHTML(p, i, ro, cxs) {
   const cxRet = cxs.filter(x => x.situacao === 'Em cliente' && (!x.cadastroAtualId || x.cadastroAtualId === p.clienteId) || x.id === p.caixaRetiradaId);
   return `<div class="parada ${p.resultado === 'Realizada' ? 'ok' : ruim ? 'x' : ''}" data-p="${i}">
     <div class="pa-h"><span class="pa-n">${i + 1}</span><div style="flex:1;min-width:0"><b>${esc(c.nome || '—')}</b> ${c.codigoUplog ? `<span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}
-      <div class="sub">${s ? 'Solicitação de ' + esc(D(s.dataSolicitacao)) + (s.dataDesejada ? ' · desejada pelo cliente ' + esc(D(s.dataDesejada)) : '') + (s.perfil ? ' · ' + esc(s.perfil) : '') + (s.tipoVeiculoId ? ' · veículo pedido: <b>' + esc(tvNome(s.tipoVeiculoId)) + '</b>' : '') : 'Parada avulsa'}</div></div>
+      <div class="sub">${s ? 'Solicitação de ' + esc(D(s.dataSolicitacao)) + (s.dataDesejada ? ' · desejada pelo cliente ' + esc(D(s.dataDesejada)) : '') + (s.perfil ? ' · ' + esc(s.perfil) : '') + (s.tipoVeiculoId ? ' · veículo pedido: <b>' + esc(tvNome(s.tipoVeiculoId)) + '</b>' : '') + (s.localId && pontoTxt(s.localId) ? '<br>📍 Ponto de coleta: <b>' + esc(pontoTxt(s.localId)) + '</b>' : '') : 'Parada avulsa'}</div></div>
       ${ro ? '' : `<div class="pa-acts"><button class="btn sm" data-up="${i}" aria-label="Subir" ${i ? '' : 'disabled'}>↑</button><button class="btn sm" data-down="${i}" aria-label="Descer">↓</button><button class="btn sm danger" data-rm="${i}" aria-label="Remover parada">×</button></div>`}</div>
     ${veiculoParadaHTML(p, s, ro)}
     <div class="form pa-f">
@@ -918,7 +921,7 @@ function imprimirOS(v) {
       ${v.execucao === 'Terceirizada' ? '' : `<tr><th>Motorista</th><td>${esc(colDe(v.motoristaId).nome || '')}</td></tr><tr><th>Ajudantes</th><td>${esc(v.equipe.map(id => colDe(id).nome).join(', ') || '—')}</td></tr>
       <tr><th>Pernoites previstos</th><td>${esc(v.pernoitesPrevistos || 0)}</td></tr>`}${v.obs ? `<tr><th>Observações</th><td>${esc(v.obs)}</td></tr>` : ''}</table>
     <h2>Paradas</h2><table class="os-t"><thead><tr><th>#</th><th>Cliente</th><th>Caixas</th><th>Resíduos → destino</th><th>Observação</th><th>MTR / peso (kg)</th><th>Visto do cliente</th></tr></thead><tbody>
-    ${v.paradas.map((p, i) => { const c = cliDe(p.clienteId); return `<tr><td>${i + 1}</td><td><b>${esc(c.nome || '')}</b>${c.codigoUplog ? '<br>Cód. ' + esc(c.codigoUplog) : ''}</td>
+    ${v.paradas.map((p, i) => { const c = cliDe(p.clienteId); return `<tr><td>${i + 1}</td><td><b>${esc(c.nome || '')}</b>${c.codigoUplog ? '<br>Cód. ' + esc(c.codigoUplog) : ''}${p.solicitacaoId && solDe(p.solicitacaoId).localId && pontoTxt(solDe(p.solicitacaoId).localId) ? '<br>Ponto: ' + esc(pontoTxt(solDe(p.solicitacaoId).localId)) : ''}</td>
       <td>${p.caixaEntregueId ? 'Entregar ' + esc(cxRot(cxDe(p.caixaEntregueId))) + '<br>' : ''}${p.caixaRetiradaId ? 'Retirar ' + esc(cxRot(cxDe(p.caixaRetiradaId))) : ''}</td><td>${esc((p.itens || []).map(it => resNomeG(it.residuoId) + ' → ' + (destNome(it.destinadorId) || '?')).join('; '))}</td><td>${esc(p.obs || '')}</td><td></td><td></td></tr>`; }).join('')}
     </tbody></table><div class="os-ass"><div>Programação</div><div>Motorista</div></div>`;
   window.print();
