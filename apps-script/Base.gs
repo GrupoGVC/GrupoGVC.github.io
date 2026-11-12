@@ -41,8 +41,9 @@ const TABELAS = {
   TiposVeiculo:         { prefixo: 'TVE', colunas: ['id', 'nome', 'categoriaCnh', 'capacidadesCaixa', 'ativo'], texto: ['capacidadesCaixa'] },
   Veiculos:             { prefixo: 'VEI', colunas: ['id', 'unidadeId', 'placa', 'tipoVeiculoId', 'propriedade', 'locadoraId', 'modelo', 'ano', 'situacao', 'obs', 'ativo'],
                           texto: ['placa', 'ano'] },
-  Caixas:               { prefixo: 'CXA', colunas: ['id', 'unidadeId', 'numero', 'capacidade', 'propriedade', 'locadoraId', 'situacao', 'cadastroAtualId', 'obs', 'ativo'],
-                          texto: ['numero'], numero: ['capacidade'] },
+  Caixas:               { prefixo: 'CXA', colunas: ['id', 'unidadeId', 'numero', 'capacidade', 'propriedade', 'locadoraId', 'situacao', 'cadastroAtualId', 'obs',
+                                                      'dataEntrega', 'ativo'],
+                          texto: ['numero'], numero: ['capacidade'], data: ['dataEntrega'] },
   // Fase 2: Solicitações, documentos, preço de venda e Faturamento (BM = NF)
   Consultores:          { prefixo: 'CON', colunas: ['id', 'nome', 'email', 'telefone', 'ativo'], texto: ['email', 'telefone'] },
   Solicitacoes:         { prefixo: 'SOL', colunas: ['id', 'unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds',
@@ -89,7 +90,7 @@ const TABELAS = {
                           data: ['dataSaida', 'dataRetornoPrevisto', 'dataRetorno'] },
   ViagemEquipe:         { prefixo: 'VEQ', colunas: ['id', 'viagemId', 'colaboradorId', 'funcao'] },
   Paradas:              { prefixo: 'PAR', colunas: ['id', 'viagemId', 'ordem', 'solicitacaoId', 'clienteId', 'data', 'resultado', 'motivo', 'caixaEntregueId', 'caixaRetiradaId',
-                                                      'peso', 'destinacao', 'obs', 'motivoId', 'responsavel', 'equipeSaiu'],
+                                                      'peso', 'destinacao', 'obs', 'motivoId', 'responsavel', 'equipeSaiu', 'alteradoComCliente'],
                           numero: ['ordem', 'peso'], data: ['data'] },
   // Fase 4: DP (adiantamentos de pernoite)
   Adiantamentos:        { prefixo: 'ADI', colunas: ['id', 'viagemId', 'unidadeId', 'colaboradorId', 'noites', 'valorNoite', 'valor', 'status', 'pagoEm', 'pagoPor',
@@ -444,6 +445,7 @@ function gravarHistorico_() {
 function quemEmail_(u) { return u ? u.email : 'sistema'; }
 
 const ROTULOS_CAMPOS = {
+  dataEntrega: 'Entregue no cliente em', alteradoComCliente: 'Troca do veículo combinada com o cliente',
   valorTabela: 'Valor pela tabela do contrato (R$)', justificativaValor: 'Justificativa do valor diferente do contrato', propostaNumero: 'Nº da proposta', propostaData: 'Data da proposta',
   destinacaoInclusa: 'Destinação inclusa na troca', cobrancaAluguel: 'Cobrança do aluguel', aditivoId: 'Aditivo de origem', contratoId: 'Contrato', precoOrigemId: 'Preço antigo de origem',
   nome: 'Nome', codigoUplog: 'Código UPLOG', tipos: 'Tipos', razaoSocial: 'Razão social', categoria: 'Categoria', cnpj: 'CNPJ',

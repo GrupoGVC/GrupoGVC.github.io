@@ -36,6 +36,9 @@ function fatDados_(u) {
     residuos: ler_('Residuos').map(function (r) { return { id: r.id, nome: String(r.nome) }; }),
     precos: ler_('ContratoItens').filter(function (p) { return p.ativo; }).map(itemContratoPublico_),
     veiculoSol: veiculosDasSols_(brutas),
+    caixasSol: caixasDasSols_(brutas),
+    precosSol: (function () { const q = {}; brutas.forEach(function (r) { q[r.id] = 1; }); return ler_('SolicitacaoPrecos').filter(function (p) { return q[p.solicitacaoId]; }).map(precoSolPublico_); })(),
+    permanencias: permanenciasCaixas_(),
     tiposVeiculo: ler_('TiposVeiculo').map(function (t) { return { id: t.id, nome: String(t.nome) }; }),
     destinacao: destinacaoPorSolicitacao_(),
     cobrancas: cobrancasVisiveis_(u).filter(function (c) { return c.decisao === 'Cobrar'; }),
@@ -74,7 +77,7 @@ function fatSalvar_(reg, u) {
     return erroDados_('Já existe um BM com o número ' + bmNumero + '.');
   const jaNoBm = faturamentoPorSolicitacao_(), cobNoBm = cobrancasNoBm_();
   const itens = [];
-  let erro = '', unidadeId = '';
+  let erro = '', unidadeId = '', temAluguel = false;
   (reg.itens || []).forEach(function (x, i) {
     if (erro) return;
     const it = { solicitacaoId: String(x.solicitacaoId || ''), cobrancaId: String(x.cobrancaId || ''), precoClienteId: String(x.precoClienteId || ''), descricao: String(x.descricao || '').trim(),
@@ -83,6 +86,7 @@ function fatSalvar_(reg, u) {
     if (!it.descricao) { erro = 'Item ' + (i + 1) + ': informe a descrição.'; return; }
     if (!(it.quantidade > 0)) { erro = 'Item ' + (i + 1) + ': a quantidade precisa ser maior que zero.'; return; }
     if (it.precoClienteId && !precoDoItem_(it.precoClienteId)) it.precoClienteId = '';
+    if (it.precoClienteId && (precoDoItem_(it.precoClienteId) || {}).tipo === 'Aluguel de caixa') temAluguel = true;
     if (it.cobrancaId) { // cobrança de viagem frustrada: não leva a solicitação (a coleta segue o fluxo dela)
       const c = porId_('CobrancasFrustracao', it.cobrancaId);
       if (!c || !c.ativo) { erro = 'Item ' + (i + 1) + ': cobrança de viagem frustrada não encontrada.'; return; }
@@ -109,7 +113,13 @@ function fatSalvar_(reg, u) {
   if (erro) return erroDados_(erro);
   const kmMudou = kmAlteradoNoBm_(itens, atual ? onde_('FaturamentoItens', 'faturamentoId', atual.id) : []);
   const solIds = itens.map(function (it) { return it.solicitacaoId; }).filter(String).filter(function (v, i, a) { return a.indexOf(v) === i; });
-  if (!solIds.length && !itens.some(function (it) { return it.cobrancaId; })) return erroDados_('Inclua pelo menos uma solicitação realizada (ou uma viagem frustrada a cobrar) no BM.');
+  if (!solIds.length && !itens.some(function (it) { return it.cobrancaId; }) && !temAluguel) return erroDados_('Inclua pelo menos uma solicitação realizada (ou uma viagem frustrada a cobrar, ou o aluguel de caixas) no BM.');
+  // BM só de aluguel de caixas: a unidade vem da tela (unidade das caixas)
+  if (!unidadeId && temAluguel) {
+    unidadeId = atual ? String(atual.unidadeId || '') : String(reg.unidadeId || '');
+    if (!porId_('Unidades', unidadeId)) return erroDados_('Escolha a unidade do BM de aluguel de caixas.');
+    if (!veUnidade_(u, unidadeId)) return semPermissao_('Você não tem acesso a esta unidade.');
+  }
   const total = arred2_(itens.reduce(function (t, it) { return t + (it.sentido === 'Desconto' ? -it.valor : it.valor); }, 0));
   const campos = { unidadeId: unidadeId, clienteId: cli.id, bmNumero: bmNumero, bmData: bmData, bmValor: total, obs: String(reg.obs || '').trim() };
   let id;

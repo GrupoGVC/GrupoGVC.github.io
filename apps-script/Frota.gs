@@ -20,7 +20,7 @@ const TIPOS_VEICULO_INICIAIS = [
 const TIPO_VEICULO_APELIDOS = { 'ROLL ON': 'Roll-on', 'ROLL-ON': 'Roll-on', 'POLIGUINDASTE': 'Poliguindaste duplo', 'HR': 'HR baú', 'HR BAU': 'HR baú', 'BAU': 'Baú', 'FIORINO': 'Fiorino' };
 
 /* ---------------- versão do esquema (migração automática da Fase 1) ---------------- */
-const VERSAO_ESQUEMA = '15';
+const VERSAO_ESQUEMA = '16';
 function nomeCaixa_(n) { n = String(n == null ? '' : n).trim(); return /^caixa/i.test(n) ? n : 'Caixa ' + n; }
 function garantirEsquema_() {
   const p = PropertiesService.getScriptProperties();
@@ -43,6 +43,7 @@ function garantirEsquema_() {
     if (v < 13) { migrarContratos_(); p.setProperty('ESQUEMA', '13'); }
     if (v < 14) { migrarItensContrato_(); p.setProperty('ESQUEMA', '14'); }
     if (v < 15) { migrarPrecoSolicitacao_(); p.setProperty('ESQUEMA', '15'); }
+    if (v < 16) { migrarCaixasCobranca_(); p.setProperty('ESQUEMA', '16'); }
     gravarHistorico_();
   } finally { lock.releaseLock(); }
 }
@@ -210,6 +211,9 @@ function validarFrota_(tabela, r, u) {
     if (L('capacidadeCaixa').indexOf(String(r.capacidade)) < 0) return 'Escolha a capacidade da caixa.';
     if (L('situacaoCaixa').indexOf(r.situacao) < 0) return 'Escolha a situação da caixa.';
     if (r.cadastroAtualId && !porId_('Cadastros', r.cadastroAtualId)) return 'Local da caixa não encontrado no Mapa.';
+    // data em que a caixa chegou no cliente (base do aluguel); a Programação preenche sozinha, aqui é para as que já estavam lá
+    if ('dataEntrega' in r) r.dataEntrega = r.situacao === 'Em cliente' && r.cadastroAtualId ? dataTexto_(r.dataEntrega) : '';
+    if (r.dataEntrega && r.dataEntrega > dataTexto_(new Date())) return 'A data de entrega no cliente é no futuro.';
   }
   return '';
 }

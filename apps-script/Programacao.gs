@@ -110,8 +110,9 @@ function progDados_(u) {
     paradas: paradas.map(paradaPublica_),
     solicitacoes: sols,
     veiculos: ler_('Veiculos').filter(function (v) { return veUnidade_(u, v.unidadeId); }).map(function (v) {
-      const t = tipos[v.tipoVeiculoId] || {}; return { id: v.id, placa: String(v.placa), unidadeId: String(v.unidadeId || ''), tipo: t.nome || '', categoriaCnh: t.categoriaCnh || '',
+      const t = tipos[v.tipoVeiculoId] || {}; return { id: v.id, placa: String(v.placa), unidadeId: String(v.unidadeId || ''), tipo: t.nome || '', tipoVeiculoId: String(v.tipoVeiculoId || ''), categoriaCnh: t.categoriaCnh || '',
         propriedade: String(v.propriedade), situacao: String(v.situacao), ativo: v.ativo }; }),
+    tiposVeiculo: Object.keys(tipos).map(function (id) { return { id: id, nome: tipos[id].nome }; }),
     caixas: ler_('Caixas').filter(function (c) { return veUnidade_(u, c.unidadeId); }).map(function (c) {
       return { id: c.id, numero: String(c.numero), capacidade: num_(c.capacidade), situacao: String(c.situacao), cadastroAtualId: String(c.cadastroAtualId || ''), ativo: c.ativo }; }),
     clientes: clientesLista_(),
@@ -262,7 +263,7 @@ function progSalvarViagem_(reg, confirmar, u) {
   // paradas
   const paradas = [];
   let erroP = '';
-  const trocas = [];
+  const trocas = [], trocasVeiculo = [];
   const pAntes = atual ? onde_('Paradas', 'viagemId', atual.id) : [];
   (reg.paradas || []).forEach(function (p, i) {
     if (erroP) return;
@@ -280,6 +281,10 @@ function progSalvarViagem_(reg, confirmar, u) {
       const outra = paradasAtivasDaSolicitacao_(s.id).filter(function (y) { return y.p.viagemId !== (atual && atual.id) && y.p.resultado === 'Pendente'; })[0];
       if (outra) { erroP = 'A solicitação de ' + rotuloSol_(s) + ' já está pendente em outra viagem (' + rotuloViagem_(outra.v) + ').'; return; }
     }
+    // veículo pedido na solicitação × veículo da viagem (contrato: troca combinada com o cliente; proposta: não troca)
+    const antesV = x.id ? pAntes.filter(function (y) { return y.id === x.id; })[0] : null;
+    const eV = conferirVeiculoParada_(sol, ve, v, x, p, antesV, atual, i + 1); if (eV) { erroP = eV; return; }
+    if (x._trocaVeiculo) trocasVeiculo.push(x);
     if (!porId_('Cadastros', x.clienteId)) { erroP = 'Parada ' + (i + 1) + ': escolha o cliente.'; return; }
     const antes = x.id ? pAntes.filter(function (y) { return y.id === x.id; })[0] : null;
     if (x.data < v.dataSaida && !(antes && dataTexto_(antes.data) === x.data)) { erroP = 'Parada ' + (i + 1) + ': a data da coleta (' + dataBr_(x.data) + ') é antes da saída da viagem (' + dataBr_(v.dataSaida) + ').'; return; }
@@ -336,6 +341,9 @@ function progSalvarViagem_(reg, confirmar, u) {
   const antesChave = atual ? chaveV(atual, onde_('ViagemEquipe', 'viagemId', atual.id).map(function (e) { return String(e.colaboradorId); })) : '';
   const antesSols = {}; pAntes.forEach(function (a) { if (a.solicitacaoId && a.resultado === 'Pendente') antesSols[a.solicitacaoId] = 1; });
   trocas.forEach(function (t) { trocarDestinadorItem_(t.sol, t.it, u); });
+  trocasVeiculo.forEach(function (x) { const s = porId_('Solicitacoes', x.solicitacaoId);
+    hist_(u, 'programacao', 'Solicitacoes', s.id, rotuloSol_(s), 'alterou', 'Veículo da coleta', nomeTipoVeiculo_(s.tipoVeiculoId), x._trocaVeiculo,
+      'Troca combinada com o cliente: ' + (x.alteradoComCliente === 'SIM' ? 'sim' : 'não') + '. O BM cobra pelo veículo que foi.'); });
   // grava viagem
   let id;
   const nomeV = rotuloViagem_(v);
@@ -360,7 +368,7 @@ function progSalvarViagem_(reg, confirmar, u) {
   const realizouAgora = [];
   paradas.forEach(function (x) {
     const a = x.id ? pAtuais.filter(function (y) { return y.id === x.id; })[0] : null;
-    const dados = Object.assign({}, x); delete dados.id; delete dados._mtrs;
+    const dados = Object.assign({}, x); delete dados.id; delete dados._mtrs; delete dados._trocaVeiculo;
     if (a) {
       x._id = a.id;
       if (a.solicitacaoId) solAfetadas[a.solicitacaoId] = 1;
@@ -402,10 +410,27 @@ function progSalvarViagem_(reg, confirmar, u) {
   }
   return { ok: true, id: id, avisos: conf.avisos };
 }
+/** Veículo pedido × veículo da viagem. Contrato: pode trocar, respondendo se foi combinado com o cliente
+ *  (x.alteradoComCliente = 'SIM'|'NÃO'); Proposta: o veículo é o da proposta. Paradas já gravadas sem mudança de
+ *  veículo não são conferidas de novo. Marca x._trocaVeiculo (nome do tipo que foi) para o histórico. */
+function conferirVeiculoParada_(sol, ve, v, x, p, antes, atual, n) {
+  const resp = String(p.alteradoComCliente || '');
+  x.alteradoComCliente = resp === 'SIM' || resp === 'NÃO' ? resp : (antes ? String(antes.alteradoComCliente || '') : '');
+  const pedido = sol ? String(sol.tipoVeiculoId || '') : '';
+  const foi = v.execucao !== 'Terceirizada' && ve ? String(ve.tipoVeiculoId || '') : '';
+  if (!pedido || !foi || pedido === foi || x.resultado === 'Cancelada') { if (pedido === foi) x.alteradoComCliente = ''; return ''; }
+  const mudou = !antes || !atual || String(atual.veiculoId || '') !== String(v.veiculoId || '') || String(antes.solicitacaoId || '') !== String(x.solicitacaoId || '');
+  if (!mudou) return '';
+  const rot = 'Parada ' + n + ' (' + rotuloSol_(sol) + '): ';
+  if (sol.perfil === 'Proposta') return rot + 'a proposta foi aprovada para ' + nomeTipoVeiculo_(pedido) + ' e o veículo da viagem é ' + nomeTipoVeiculo_(foi) + '. Na proposta o veículo não é trocado: use um ' + nomeTipoVeiculo_(pedido) + '.';
+  if (x.alteradoComCliente !== 'SIM' && x.alteradoComCliente !== 'NÃO') return rot + 'o cliente pediu ' + nomeTipoVeiculo_(pedido) + ' e o veículo da viagem é ' + nomeTipoVeiculo_(foi) + ': informe se a troca foi combinada com o cliente.';
+  x._trocaVeiculo = nomeTipoVeiculo_(foi);
+  return '';
+}
 /** Parada realizada: a caixa entregue fica no cliente; a retirada volta para a base. */
 function moverCaixas_(x, u) {
   const cli = porId_('Cadastros', x.clienteId);
-  if (x.caixaEntregueId) { const c = porId_('Caixas', x.caixaEntregueId); if (c) atualizar_('Caixas', c.id, { situacao: 'Em cliente', cadastroAtualId: x.clienteId }, u, 'programacao',
+  if (x.caixaEntregueId) { const c = porId_('Caixas', x.caixaEntregueId); if (c) atualizar_('Caixas', c.id, { situacao: 'Em cliente', cadastroAtualId: x.clienteId, dataEntrega: x.data }, u, 'programacao',
     { registroNome: nomeCaixa_(c.numero), prefixoCampo: 'Entregue em ' + (cli ? cli.nome : '') + ' · ' }); }
   if (x.caixaRetiradaId) { const c = porId_('Caixas', x.caixaRetiradaId); if (c) atualizar_('Caixas', c.id, { situacao: 'Na base', cadastroAtualId: '' }, u, 'programacao',
     { registroNome: nomeCaixa_(c.numero), prefixoCampo: 'Retirada de ' + (cli ? cli.nome : '') + ' · ' }); }
