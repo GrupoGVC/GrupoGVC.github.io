@@ -55,7 +55,9 @@ const TABELAS = {
                                                       // datas pela Programação (dataPrevista = saída da viagem, dataColeta = data da parada); motivo padrão do cancelamento
                                                       'dataDesejada', 'motivoId', 'canceladaDaViagemId', 'cancelCiente',
                                                       // preço previsto (PrecoSolicitacao.gs): veículo, valor pela tabela do contrato e justificativa; nº e data da proposta
-                                                      'tipoVeiculoId', 'valorTabela', 'justificativaValor', 'propostaNumero', 'propostaData', 'ativo'],
+                                                      'tipoVeiculoId', 'valorTabela', 'justificativaValor', 'propostaNumero', 'propostaData',
+                                                      // ponto de coleta (local do cadastro que não é o principal) — PontosColeta.gs
+                                                      'localId', 'ativo'],
                           texto: ['residuoIds', 'idOrigem', 'propostaNumero'], numero: ['valorPrevisto', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos', 'kmCobrado', 'valorTabela'],
                           data: ['dataSolicitacaoConsultor', 'dataSolicitacao', 'dataPrevista', 'dataColeta', 'kmDefinidoEm', 'dataDesejada', 'propostaData'] },
   // Itens previstos da solicitação: do contrato (contratoItemId, valor da tabela) ou da proposta (valores digitados)
@@ -173,7 +175,7 @@ const REFERENCIAS = {
                  ['Solicitacoes', 'consultorId', 'solicitação(ões) como consultor'],
                  ['Rotinas', 'consultorId', 'coleta(s) recorrente(s) como consultor'],
                  ['Usuarios', 'pessoaId', 'acesso ao portal (suspenda o acesso antes)']],
-  Locais:       [['CadastroLocais', 'localId', 'cadastro(s) que usam este local']],
+  Locais:       [['CadastroLocais', 'localId', 'cadastro(s) que usam este local'], ['Solicitacoes', 'localId', 'solicitação(ões) neste ponto de coleta']],
   TiposDocumento: [['DocumentosPadrao', 'tipoDocumentoId', 'cliente(s) com este documento como padrão'],
                    ['SolicitacaoDocumentos', 'tipoDocumentoId', 'solicitação(ões) com este documento']],
   Motivos:      [['Paradas', 'motivoId', 'parada(s) de viagem'], ['Solicitacoes', 'motivoId', 'solicitação(ões) cancelada(s)'], ['CobrancasFrustracao', 'motivoId', 'cobrança(s) de viagem frustrada']],
@@ -445,6 +447,7 @@ function gravarHistorico_() {
 function quemEmail_(u) { return u ? u.email : 'sistema'; }
 
 const ROTULOS_CAMPOS = {
+  localId: 'Ponto de coleta',
   dataEntrega: 'Entregue no cliente em', alteradoComCliente: 'Troca do veículo combinada com o cliente',
   valorTabela: 'Valor pela tabela do contrato (R$)', justificativaValor: 'Justificativa do valor diferente do contrato', propostaNumero: 'Nº da proposta', propostaData: 'Data da proposta',
   destinacaoInclusa: 'Destinação inclusa na troca', cobrancaAluguel: 'Cobrança do aluguel', aditivoId: 'Aditivo de origem', contratoId: 'Contrato', precoOrigemId: 'Preço antigo de origem',

@@ -20,7 +20,7 @@ const TIPOS_VEICULO_INICIAIS = [
 const TIPO_VEICULO_APELIDOS = { 'ROLL ON': 'Roll-on', 'ROLL-ON': 'Roll-on', 'POLIGUINDASTE': 'Poliguindaste duplo', 'HR': 'HR baú', 'HR BAU': 'HR baú', 'BAU': 'Baú', 'FIORINO': 'Fiorino' };
 
 /* ---------------- versão do esquema (migração automática da Fase 1) ---------------- */
-const VERSAO_ESQUEMA = '16';
+const VERSAO_ESQUEMA = '17';
 function nomeCaixa_(n) { n = String(n == null ? '' : n).trim(); return /^caixa/i.test(n) ? n : 'Caixa ' + n; }
 function garantirEsquema_() {
   const p = PropertiesService.getScriptProperties();
@@ -44,6 +44,7 @@ function garantirEsquema_() {
     if (v < 14) { migrarItensContrato_(); p.setProperty('ESQUEMA', '14'); }
     if (v < 15) { migrarPrecoSolicitacao_(); p.setProperty('ESQUEMA', '15'); }
     if (v < 16) { migrarCaixasCobranca_(); p.setProperty('ESQUEMA', '16'); }
+    if (v < 17) { migrarPontosColeta_(); p.setProperty('ESQUEMA', '17'); }
     gravarHistorico_();
   } finally { lock.releaseLock(); }
 }

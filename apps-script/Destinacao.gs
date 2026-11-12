@@ -121,16 +121,22 @@ function trocarDestinadorItem_(sol, x, u) {
 
 /** Coordenadas para sugerir a km prevista pela rota (unidade → cliente → destinadores → unidade). */
 function coordenadasCadastros_() {
-  const cad = {};
-  ler_('Locais').forEach(function (l) {
-    const lat = Number(l.lat), lng = Number(l.lng);
-    if (!l.cadastroId || cad[l.cadastroId] || !isFinite(lat) || !isFinite(lng) || (!lat && !lng) || l.lat === '' || l.lng === '') return;
-    if (l.ativo === false) return;
-    cad[String(l.cadastroId)] = [lat, lng];
+  const cad = {}, pr = principaisLocais_();
+  // o local principal de cada cadastro; sem coordenadas nele, o primeiro ponto ativo que tiver
+  [true, false].forEach(function (soPrincipal) {
+    ler_('Locais').forEach(function (l) {
+      const lat = Number(l.lat), lng = Number(l.lng);
+      if (!l.cadastroId || cad[l.cadastroId] || !isFinite(lat) || !isFinite(lng) || (!lat && !lng) || l.lat === '' || l.lng === '') return;
+      if (l.ativo === false || (soPrincipal && pr[String(l.cadastroId)] !== l.id)) return;
+      cad[String(l.cadastroId)] = [lat, lng];
+    });
   });
   const uni = {};
   ler_('Unidades').forEach(function (x) { if (x.cadastroId && cad[x.cadastroId]) uni[x.id] = cad[x.cadastroId]; });
-  return { cad: cad, uni: uni };
+  // pontos de coleta: coordenadas de cada local
+  const loc = {};
+  ler_('Locais').forEach(function (l) { const lat = Number(l.lat), lng = Number(l.lng); if (l.lat !== '' && l.lng !== '' && isFinite(lat) && isFinite(lng) && (lat || lng)) loc[l.id] = [lat, lng]; });
+  return { cad: cad, uni: uni, loc: loc };
 }
 
 /* ---------------- MTR na coleta realizada → lançamentos pendentes ---------------- */

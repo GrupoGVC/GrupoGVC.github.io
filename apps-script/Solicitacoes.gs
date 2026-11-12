@@ -116,7 +116,7 @@ function solDados_(u) {
     motivos: motivosTodos_(), cobrancas: cobrancasVisiveis_(u), podeDecidirCobranca: !!(u.adminPortal || u.decideCobranca),
     podeCadastrarMotivos: podeCadastrarMotivos_(u), hoje: dataTexto_(new Date()),
     frequencias: listaValores_('frequenciaRotina'), semanasRecorrentes: num_(parametro_('semanasRecorrentes')) || 4,
-    contratos: situacaoContratosPorCliente_(),
+    contratos: situacaoContratosPorCliente_(), pontosColeta: pontosColetaLista_(),
     precosSol: ler_('SolicitacaoPrecos').filter(function (p) { return visiveis[p.solicitacaoId]; }).map(precoSolPublico_),
     itensContrato: ler_('ContratoItens').filter(function (p) { return p.ativo; }).map(itemContratoPublico_),
     tiposItem: Object.keys(TIPOS_ITEM).map(function (k) { return Object.assign({ nome: k }, TIPOS_ITEM[k]); }), cobrancasAluguel: COBRANCAS_ALUGUEL,
@@ -160,7 +160,7 @@ function solSalvar_(reg, u) {
   // data da solicitação = dia da criação; data prevista e data da coleta vêm da Programação (não são editadas aqui)
   const campos = ['unidadeId', 'clienteId', 'consultorId', 'servico', 'demanda', 'perfil', 'execucao', 'residuoIds', 'descricao',
                   'dataSolicitacaoConsultor', 'dataDesejada', 'valorPrevisto', 'obs', 'kmPrevista', 'diariasPrevistas', 'pernoitesPrevistos',
-                  'tipoVeiculoId', 'justificativaValor', 'propostaNumero', 'propostaData'];
+                  'tipoVeiculoId', 'justificativaValor', 'propostaNumero', 'propostaData', 'localId'];
   const r = {};
   campos.forEach(function (c) { r[c] = c in reg ? reg[c] : (atual ? atual[c] : ''); });
   ['dataSolicitacaoConsultor', 'dataDesejada', 'propostaData'].forEach(function (c) { r[c] = dataTexto_(r[c]); });
@@ -176,6 +176,8 @@ function solSalvar_(reg, u) {
   const temItens = Array.isArray(reg.itens);
   if (temItens) r.residuoIds = reg.itens.map(function (x) { return String((x || {}).residuoId || ''); }).filter(String);
   const erro = validarSol_(r, atual, u); if (erro) return erroDados_(erro);
+  r.localId = String(r.localId || '');
+  if (r.localId) { const lo = porId_('Locais', r.localId); if (!lo || String(lo.cadastroId) !== String(r.clienteId)) return erroDados_('O ponto de coleta não é deste cliente.'); }
   // itens previstos (quadro do contrato ou itens da proposta) e regras do valor previsto
   let calc = null;
   if (Array.isArray(reg.precos)) {

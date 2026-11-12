@@ -113,6 +113,7 @@ function progDados_(u) {
       const t = tipos[v.tipoVeiculoId] || {}; return { id: v.id, placa: String(v.placa), unidadeId: String(v.unidadeId || ''), tipo: t.nome || '', tipoVeiculoId: String(v.tipoVeiculoId || ''), categoriaCnh: t.categoriaCnh || '',
         propriedade: String(v.propriedade), situacao: String(v.situacao), ativo: v.ativo }; }),
     tiposVeiculo: Object.keys(tipos).map(function (id) { return { id: id, nome: tipos[id].nome }; }),
+    pontosColeta: pontosColetaLista_(),
     caixas: ler_('Caixas').filter(function (c) { return veUnidade_(u, c.unidadeId); }).map(function (c) {
       return { id: c.id, numero: String(c.numero), capacidade: num_(c.capacidade), situacao: String(c.situacao), cadastroAtualId: String(c.cadastroAtualId || ''), ativo: c.ativo }; }),
     clientes: clientesLista_(),

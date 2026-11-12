@@ -51,7 +51,7 @@ function pontoDe_(c, nomesRes, nomesEq) {
 const MAPA = {
   listar: function () {
     const nr = nomesPorId_('Residuos'), ne = nomesPorId_('Equipamentos');
-    return { ok: true, pontos: ler_('Cadastros').map(function (c) { return pontoDe_(c, nr, ne); }) };
+    return { ok: true, pontos: ler_('Cadastros').map(function (c) { return pontoDe_(c, nr, ne); }), pontosColeta: pontosColetaLista_() };
   },
   lista: function (nome) {
     const cfg = MAPA_CATALOGOS[nome];

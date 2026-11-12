@@ -39,7 +39,8 @@ const ACOES_DESTINACAO_LEITURA = ['dados'];
 const ACOES_DESTINACAO_ESCRITA = ['salvarLancamento', 'excluirLancamento', 'definirNegocioLote', 'salvarLocacao', 'salvarDestinador', 'destinacao.confirmar'];
 const ACOES_MAPA_LEITURA = ['mapa.listar', 'mapa.lista', 'mapa.precosVenda', 'mapa.geo', 'mapa.contrato', 'mapa.arquivoContrato'];
 const ACOES_MAPA_ESCRITA = ['mapa.upsert', 'mapa.delete', 'mapa.inativar', 'mapa.reativar', 'mapa.listaAdd', 'mapa.listaDel', 'mapa.listaInativar', 'mapa.listaSet',
-                            'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda', 'mapa.salvarVinculo', 'mapa.salvarContrato', 'mapa.salvarAditivo', 'mapa.excluirAditivo', 'mapa.anexarContrato'];
+                            'mapa.salvarPrecoVenda', 'mapa.excluirPrecoVenda', 'mapa.salvarVinculo', 'mapa.salvarContrato', 'mapa.salvarAditivo', 'mapa.excluirAditivo', 'mapa.anexarContrato',
+                            'mapa.salvarPontoColeta', 'mapa.ativoPontoColeta'];
 const ACOES_SOL_LEITURA = ['sol.dados', 'sol.previstoReal'];
 const ACOES_SOL_ESCRITA = ['sol.salvar', 'sol.status', 'sol.documento', 'sol.excluir', 'sol.salvarCadastro', 'sol.excluirCadastro', 'sol.ativoCadastro',
                            'sol.docsPadrao', 'sol.salvarLista', 'sol.novoCliente', 'sol.rotSalvar', 'sol.rotAtivo', 'sol.rotGerar', 'sol.definirKm'];
@@ -204,6 +205,8 @@ function rotear_(body) {
       case 'mapa.salvarPrecoVenda': return salvarPrecoVenda_(body.registro, u);
       case 'mapa.excluirPrecoVenda': return excluirPrecoVenda_(String(body.id), u);
       case 'mapa.salvarVinculo': return salvarVinculo_(body, u);
+      case 'mapa.salvarPontoColeta': return salvarPontoColeta_(body.registro, u);
+      case 'mapa.ativoPontoColeta': return ativoPontoColeta_(String(body.id || ''), body.ativo === true, u);
       case 'mapa.salvarContrato': return salvarContrato_(body.registro, u);
       case 'mapa.salvarAditivo': return salvarAditivo_(body.registro, u);
       case 'mapa.excluirAditivo': return excluirAditivo_(String(body.id || ''), u);
