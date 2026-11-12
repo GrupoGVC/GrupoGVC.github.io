@@ -283,6 +283,20 @@ h3.sec{font:600 14px var(--f-body);margin:18px 0 8px;color:var(--ink)}
 .km-op .km-t input{width:auto;margin:0}
 .km-op .km-v{font-variant-numeric:tabular-nums}
 .ro-v{padding:8px 0;font-size:14px;min-height:36px}
+.pr-box{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}
+.pr-box h4{margin:0 0 4px;font:600 13.5px var(--f-body)}
+.pr-row{display:grid;grid-template-columns:minmax(0,2fr) 96px 110px 110px 34px;gap:8px;align-items:center;padding:6px 0;border-top:1px dashed var(--line);font-size:13px}
+.pr-row:first-of-type{border-top:none}
+.pr-row .pr-t{font-variant-numeric:tabular-nums;text-align:right}
+.pr-row .pr-u{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.pr-row input,.pr-row select{min-width:0}
+.pr-prop{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) 90px 110px 110px 34px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunken);margin-bottom:6px;font-size:13px}
+.pr-prop .pr-x{display:flex;flex-direction:column;gap:4px}
+.pr-tot{display:flex;justify-content:space-between;gap:8px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums}
+.pr-av{font-size:12.5px;color:var(--warn);background:var(--warn-bg);border-radius:var(--r);padding:6px 9px;margin-top:8px}
+.pr-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px}
+@media (max-width:720px){.pr-row{grid-template-columns:1fr 80px 1fr 34px}.pr-row .pr-n{grid-column:1/-1}.pr-row .pr-u{display:none}
+  .pr-prop{grid-template-columns:1fr 1fr}.pr-prop .pr-x,.pr-prop .pr-tp{grid-column:1/-1}}
 .lib-falta{font-size:12.5px;color:var(--warn);background:var(--warn-bg);border-radius:var(--r);padding:7px 10px;margin:0 0 10px}
 @media (max-width:720px){.it-row{grid-template-columns:1fr 1fr}.it-row .it-r,.it-row .it-d{grid-column:1/-1}.it-row .it-v{grid-column:1/2}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill.st.lib{background:#1c2c44;color:#8fb8ef}:root:not([data-theme="light"]) .pill.st.fat{background:#2c2240;color:#c3a6f0}:root:not([data-theme="light"]) .pill.st.ok{background:#14302b;color:#6fd3c2}}
@@ -359,8 +373,10 @@ function precosKmDe(clienteId, data) {
     .sort((a, b) => ids.indexOf(a.cadastroId) - ids.indexOf(b.cadastroId) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)))
     .filter(p => { const k = p.tipoVeiculoId || '-'; if (vistos[k]) return false; vistos[k] = 1; return true; });
 }
-function kmEstimadoTxt(clienteId, km, data) {
-  const ps = clienteId ? precosKmDe(clienteId, data) : []; if (!ps.length) return '';
+function kmEstimadoTxt(clienteId, km, data, vei) {
+  let ps = clienteId ? precosKmDe(clienteId, data) : [];
+  if (vei && ps.length) { const ex = ps.filter(p => p.tipoVeiculoId === vei); ps = ex.length ? ex : ps.filter(p => !p.tipoVeiculoId); }
+  if (!ps.length) return '';
   if (ps.length === 1) { const p = ps[0]; const v = p.tipoVeiculo ? ' (' + esc(p.tipoVeiculo) + ')' : '';
     return +km > 0 ? `Transporte estimado (km rodado${v}): ${esc(km)} km × ${R(p.valorKm)} = <b>${R(+km * p.valorKm)}</b>` : `O cliente paga o transporte por km rodado${v} (${R(p.valorKm)}/km): informe a km prevista.`; }
   const lista = ps.map(p => esc(p.tipoVeiculo || 'outros veículos') + ' ' + R(p.valorKm) + '/km' + (+km > 0 ? ' = <b>' + R(+km * p.valorKm) + '</b>' : '')).join(' · ');
@@ -575,18 +591,19 @@ function formSol() {
       <div class="fld"><label for="f-dem">Demanda</label><select id="f-dem">${opts(L.demanda, e.demanda, '—')}</select></div>
       <div class="fld"><label for="f-perf">Perfil</label><select id="f-perf" ${e.id ? '' : 'required'}>${opts(L.perfil, e.perfil, e.id ? '—' : 'Escolha…')}</select><div class="hint" id="h-perf"></div></div>
       <div class="fld"><label for="f-exec">Execução</label><select id="f-exec">${opts(L.execucao, e.execucao, '—')}</select></div>
+      <div class="fld"><label for="f-vei">Tipo de veículo</label><select id="f-vei" ${travado ? 'disabled' : ''}>${opts((S.d.tiposVeiculo || []).map(t => [t.id, t.nome]).concat(e.tipoVeiculoId && !(S.d.tiposVeiculo || []).some(t => t.id === e.tipoVeiculoId) ? [[e.tipoVeiculoId, e.tipoVeiculoId]] : []), e.tipoVeiculoId, 'A definir')}</select><div class="hint">O transporte do contrato é calculado por este veículo.</div></div>
       <div class="fld"><label for="f-dsc">Data da solicitação do consultor</label><input id="f-dsc" type="date" value="${esc(e.dataSolicitacaoConsultor)}"></div>
       <div class="fld"><label>Data da solicitação</label><div class="ro-v">${e.id ? esc(D(e.dataSolicitacao)) + (e.criadoPor ? ' <span class="sub">· ' + esc(String(e.criadoPor).split('@')[0]) + '</span>' : '') : 'Hoje, ao registrar'}</div></div>
       <div class="fld"><label for="f-dd">Data desejada pelo cliente</label><input id="f-dd" type="date" value="${esc(e.dataDesejada)}" title="Opcional: orienta a programadora"></div>
       <div class="fld"><label>Data prevista da coleta (saída)</label><div class="ro-v">${e.dataPrevista ? esc(D(e.dataPrevista)) : '<span class="sub">—</span>'}</div><div class="hint">Saída da viagem, vem da Programação.</div></div>
       <div class="fld"><label>Data da coleta</label><div class="ro-v">${e.dataColeta ? esc(D(e.dataColeta)) : '<span class="sub">—</span>'}</div><div class="hint">Chegada no cliente, informada pela programadora.</div></div>
-      <div class="fld"><label for="f-val">Valor previsto (R$)</label><input id="f-val" type="number" step="any" min="0" value="${esc(e.valorPrevisto)}"></div>
       <div class="fld full" style="grid-column:1/-1"><label>Resíduos e destinação prevista (da precificação)</label>
         <div class="itens" id="f-itens">${itensHTML(e, travado)}</div>
         ${travado ? '' : '<div class="row" style="gap:8px;margin-top:6px"><button class="btn sm" type="button" id="f-it-add">+ Resíduo</button><span class="hint" style="min-height:0">Um destinador ou reciclador por resíduo. O preço e se é custo ou receita vêm do Mapa.</span></div>'}</div>
       <div class="fld"><label for="f-km">Km prevista (total)</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="f-km" type="number" step="any" min="0" value="${esc(e.kmPrevista)}" ${travado ? 'disabled' : ''}>${travado ? '' : '<button class="btn sm" type="button" id="f-km-rota" style="white-space:nowrap" title="Unidade → cliente → destinadores → unidade, pelas localizações do Mapa">Pela rota</button>'}</div><div class="hint" id="h-km"></div><div class="hint" id="h-kmv">${kmEstimadoTxt(e.clienteId, e.kmPrevista, e.dataColeta || e.dataDesejada)}</div></div>
       <div class="fld"><label for="f-dia">Diárias da equipe (dias)</label><input id="f-dia" type="number" step="1" min="0" value="${esc(e.diariasPrevistas)}" title="Dias de operação contados na precificação" ${travado ? 'disabled' : ''}></div>
       <div class="fld"><label for="f-pern">Pernoites previstos</label><input id="f-pern" type="number" step="1" min="0" value="${esc(e.pernoitesPrevistos)}" ${travado ? 'disabled' : ''}></div>
+      <div class="fld full" style="grid-column:1/-1" id="f-preco-box">${precoHTML(e)}</div>
       <div class="fld full"><label for="f-desc">Descrição do serviço</label><textarea id="f-desc" rows="2" placeholder="O que coletar, quantidade estimada, equipamento…">${esc(e.descricao)}</textarea></div>
       <div class="fld full"><label for="f-obs">Observações</label><textarea id="f-obs" rows="2">${esc(e.obs)}</textarea></div>
       ${e.origem === 'planilha' && (e.solicitanteNome || e.programadorNome) ? `<p class="hint full">Na planilha: solicitante ${esc(e.solicitanteNome || '—')}, programador ${esc(e.programadorNome || '—')}.</p>` : ''}
@@ -598,6 +615,171 @@ function formSol() {
     ${e.id && e.criadoEm ? `<div class="gvc-audit" style="margin-top:12px">${Portal.auditoriaHTML(e)}</div>` : ''}
     ${e.id ? `<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sm" id="f-hist">Histórico</button>${travado ? '' : '<button class="btn sm danger" id="f-del">Excluir</button>'}</div>` : ''}
   </section>`;
+}
+/* ---------- preço previsto: quadro do contrato (perfil Contrato) ou itens da proposta (perfil Proposta) ---------- */
+const TRANSP_T = ['Transporte por viagem', 'Transporte por km'];
+const tipoItem = t => (S.d.tiposItem || []).find(x => x.nome === t) || {};
+const veiNome = id => ((S.d.tiposVeiculo || []).find(t => t.id === id) || {}).nome || '';
+const chaveIt = p => [p.tipo, p.tipoVeiculoId || '', p.residuoId || '', p.capacidade === '' || p.capacidade == null ? '' : +p.capacidade].join('|');
+const sinalIt = p => p.tipo === 'Valorização' ? -1 : 1;
+const arred2 = v => Math.round(v * 100) / 100;
+// itens do contrato vigentes na data (o do próprio cliente antes do da matriz) — mesma regra do servidor
+function itensVigentesCli(clienteId, data) {
+  if (!clienteId) return [];
+  const c = cliDe(clienteId) || {}; const ids = [clienteId, c.principalId].filter(Boolean); data = data || hojeISO();
+  const vistos = {};
+  return (S.d.itensContrato || []).filter(p => ids.includes(p.cadastroId) && (!p.vigenciaInicio || p.vigenciaInicio <= data) && (!p.vigenciaFim || p.vigenciaFim >= data))
+    .sort((a, b) => ids.indexOf(a.cadastroId) - ids.indexOf(b.cadastroId) || String(b.vigenciaInicio).localeCompare(String(a.vigenciaInicio)))
+    .filter(p => { const k = chaveIt(p); if (vistos[k]) return false; vistos[k] = 1; return true; });
+}
+function transpDoVeiculo(itens, v) {
+  const ts = itens.filter(p => TRANSP_T.includes(p.tipo)); if (!ts.length) return null;
+  return (v && ts.find(p => p.tipoVeiculoId === v)) || ts.find(p => !p.tipoVeiculoId) || (ts.length === 1 ? ts[0] : null) || (!v && ts.every(p => p.tipo === ts[0].tipo) ? ts[0] : null);
+}
+function itemRot(p) {
+  const t = tipoItem(p.tipo);
+  return [p.tipo, t.veiculo ? (p.tipoVeiculoId ? veiNome(p.tipoVeiculoId) : 'qualquer veículo') : '', p.residuoId ? resNome(p.residuoId) : '',
+    t.caixa && p.capacidade !== '' && p.capacidade != null ? 'caixa ' + p.capacidade + ' m³' : '', t.inclusa && p.destinacaoInclusa ? 'destinação inclusa' : '',
+    t.aluguel ? String(p.cobrancaAluguel || '').toLowerCase() : ''].filter(Boolean).join(' · ');
+}
+function iniciarPreco(e) {
+  if (e._pr) return e._pr;
+  const salvas = e.id ? (S.d.precosSol || []).filter(p => p.solicitacaoId === e.id).sort((a, b) => a.ordem - b.ordem) : [];
+  e._pr = { perfil: e.perfil || '', vei: e.tipoVeiculoId || '', cli: e.clienteId || '', km: e.kmPrevista ?? '',
+    ct: salvas.filter(p => p.contratoItemId).map(p => ({ contratoItemId: p.contratoItemId, quantidade: p.quantidade, carregada: true })),
+    prop: salvas.filter(p => p.origem === 'Proposta').map(p => ({ tipo: p.tipo, tipoVeiculoId: p.tipoVeiculoId, residuoId: p.residuoId, capacidade: p.capacidade,
+      destinacaoInclusa: p.destinacaoInclusa, cobrancaAluguel: p.cobrancaAluguel, quantidade: p.quantidade, valorUnitario: p.valorUnitario })),
+    valor: e.valorPrevisto ?? '', just: e.justificativaValor || '', pnum: e.propostaNumero || '', pdata: e.propostaData || '',
+    valorManual: e.valorTabela !== '' && e.valorTabela != null && e.valorPrevisto !== '' && e.valorPrevisto != null && Math.abs(+e.valorPrevisto - +e.valorTabela) > 0.005 };
+  if (e.perfil === 'Proposta' && !e._pr.prop.length) e._pr.prop.push(novaLinhaProp(e._pr));
+  return e._pr;
+}
+const novaLinhaProp = pr => ({ tipo: 'Transporte por viagem', tipoVeiculoId: pr.vei || '', residuoId: '', capacidade: '', destinacaoInclusa: false, cobrancaAluguel: '', quantidade: 1, valorUnitario: '' });
+/** Monta o quadro: transporte pelo veículo (viagem = 1, km = km prevista), kg por resíduo pelo peso estimado, caixas escolhidas. */
+function quadroContrato(e) {
+  const pr = iniciarPreco(e);
+  const vig = itensVigentesCli(pr.cli, e.dataSolicitacao || hojeISO());
+  const porId = {}; vig.forEach(p => { porId[p.id] = p; });
+  const desejadas = [];
+  const tr = transpDoVeiculo(vig, pr.vei);
+  if (tr) desejadas.push({ id: tr.id, q: tr.tipo === 'Transporte por km' ? (+pr.km || 0) : 1 });
+  const pesos = {}; (e._itens || []).forEach(i => { if (i.residuoId) pesos[i.residuoId] = (pesos[i.residuoId] || 0) + (+i.pesoEstimado || 0); });
+  vig.filter(p => (p.tipo === 'Destinação' || p.tipo === 'Valorização') && p.residuoId in pesos).forEach(p => desejadas.push({ id: p.id, q: pesos[p.residuoId] }));
+  const novo = [];
+  desejadas.forEach(d => {
+    const a = pr.ct.find(x => x.contratoItemId === d.id);
+    if (a && a.carregada) { a.manual = +a.quantidade !== +d.q; delete a.carregada; }
+    if (a) { if (!a.manual) a.quantidade = d.q; novo.push(a); } else novo.push({ contratoItemId: d.id, quantidade: d.q, manual: false });
+  });
+  pr.ct.forEach(x => { const it = porId[x.contratoItemId]; if (it && /caixa/i.test(it.tipo) && !novo.includes(x)) { delete x.carregada; x.caixa = true; novo.push(x); } });
+  pr.ct = novo;
+  const linhas = pr.ct.map(x => ({ x, it: porId[x.contratoItemId] })).filter(l => l.it);
+  const total = arred2(linhas.reduce((t, l) => t + (+l.x.quantidade || 0) * l.it.valor * sinalIt(l.it), 0));
+  if (!pr.valorManual && linhas.length) pr.valor = total;
+  return { vig, tr, linhas, total, temTransp: vig.some(p => TRANSP_T.includes(p.tipo)), caixas: vig.filter(p => /caixa/i.test(p.tipo)) };
+}
+const totalProp = pr => arred2(pr.prop.reduce((t, p) => t + (+p.quantidade || 0) * (+p.valorUnitario || 0) * sinalIt(p), 0));
+const difContrato = (pr, q) => q.linhas.length && pr.valor !== '' && pr.valor != null && Math.abs(+pr.valor - q.total) > 0.005;
+function propRowHTML(p, i, ro) {
+  const t = tipoItem(p.tipo); const dis = ro ? 'disabled' : '';
+  const resAt = S.d.residuos.filter(r => r.ativo || r.id === p.residuoId);
+  const det = [t.veiculo ? `<select data-pf="tipoVeiculoId" aria-label="Veículo do item ${i + 1}" ${dis}>${opts((S.d.tiposVeiculo || []).map(v => [v.id, v.nome]), p.tipoVeiculoId, 'Qualquer veículo')}</select>` : '',
+    t.residuo ? `<select data-pf="residuoId" aria-label="Resíduo do item ${i + 1}" ${dis}>${opts(resAt.map(r => [r.id, r.nome]), p.residuoId, 'Resíduo…')}</select>` : '',
+    t.caixa ? `<input data-pf="capacidade" type="number" step="any" min="0" placeholder="Caixa (m³)" aria-label="Capacidade da caixa do item ${i + 1}" value="${esc(p.capacidade)}" ${dis}>` : '',
+    t.inclusa ? `<label class="chip" style="font-size:12px"><input type="checkbox" data-pf="destinacaoInclusa" ${p.destinacaoInclusa ? 'checked' : ''} ${dis}> destinação inclusa</label>` : '',
+    t.aluguel ? `<select data-pf="cobrancaAluguel" aria-label="Cobrança do aluguel do item ${i + 1}" ${dis}>${opts(S.d.cobrancasAluguel || [], p.cobrancaAluguel, 'Cobrança do aluguel…')}</select>` : ''].filter(Boolean).join('');
+  return `<div class="pr-prop" data-pp="${i}">
+    <select class="pr-tp" data-pf="tipo" aria-label="Tipo do item ${i + 1}" ${dis}>${opts((S.d.tiposItem || []).map(x => [x.nome, x.nome + ' (' + x.un + ')']), p.tipo, 'Tipo…')}</select>
+    <div class="pr-x">${det || '<span class="sub">—</span>'}</div>
+    <input data-pf="quantidade" type="number" step="any" min="0" aria-label="Quantidade do item ${i + 1}" value="${esc(p.quantidade)}" ${dis}>
+    <input data-pf="valorUnitario" type="number" step="any" min="0" placeholder="R$ por ${esc(t.un || 'un')}" aria-label="Valor unitário do item ${i + 1}" value="${esc(p.valorUnitario)}" ${dis}>
+    <span class="pr-t" data-ppt>${(sinalIt(p) < 0 ? '− ' : '') + R((+p.quantidade || 0) * (+p.valorUnitario || 0))}</span>
+    ${ro ? '<span></span>' : `<button class="btn sm danger" type="button" data-ppx aria-label="Tirar o item ${i + 1}">×</button>`}</div>`;
+}
+function precoHTML(e) {
+  const pr = iniciarPreco(e); const ro = S.ro;
+  const valorFld = (readonly, hint) => `<div class="fld"><label for="f-val">Valor previsto (R$)</label><input id="f-val" type="number" step="any" min="0" value="${esc(pr.valor)}" ${readonly ? 'readonly' : ''} ${ro ? 'disabled' : ''}>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+  if (pr.perfil === 'Contrato') {
+    const q = quadroContrato(e); const dif = difContrato(pr, q);
+    return `<div class="pr-box" id="pr-ct"><h4>Tabela de preço do contrato</h4>
+      ${!pr.cli ? '<p class="sub">Escolha o cliente.</p>' : !q.vig.length ? '<p class="sub">Cliente sem itens de contrato vigentes na data da solicitação. Cadastre em Mapa › Itens do contrato.</p>' : `
+      <p class="sub">Itens vigentes em ${esc(D(e.dataSolicitacao || hojeISO()))}. Quantidades pela km prevista e pelo peso estimado de cada resíduo; ajuste se precisar.</p>
+      ${q.temTransp && !q.tr ? `<div class="pr-av">${pr.vei ? 'O contrato não tem transporte para ' + esc(veiNome(pr.vei)) + ': escolha outro veículo ou informe o valor com justificativa.' : 'Escolha o tipo de veículo para calcular o transporte.'}</div>` : ''}
+      ${q.linhas.map((l, i) => `<div class="pr-row" data-pr="${i}"><div class="pr-n">${esc(itemRot(l.it))}${l.it.tipo === 'Valorização' ? ' <span class="sub">(desconto)</span>' : ''}</div>
+        <input type="number" step="any" min="0" data-prq value="${esc(l.x.quantidade)}" aria-label="Quantidade de ${esc(itemRot(l.it))}" ${ro ? 'disabled' : ''}>
+        <span class="pr-u">× ${R(l.it.valor)}/${esc(l.it.un)}</span><span class="pr-t" data-prt>${(sinalIt(l.it) < 0 ? '− ' : '') + R((+l.x.quantidade || 0) * l.it.valor)}</span>
+        ${l.x.caixa && !ro ? '<button class="btn sm danger" type="button" data-prx aria-label="Tirar a caixa">×</button>' : '<span></span>'}</div>`).join('')}
+      ${q.caixas.length && !ro ? `<div class="row" style="gap:6px;margin-top:6px"><select id="pr-cx" style="width:auto;max-width:100%" aria-label="Caixa do contrato">${opts(q.caixas.map(p => [p.id, itemRot(p) + ' · ' + R(p.valor) + '/' + p.un]), '', 'Caixa do contrato…')}</select><button class="btn sm" type="button" id="pr-cx-add">+ Caixa</button></div>` : ''}
+      <div class="pr-tot"><span>Valor pela tabela do contrato</span><span id="pr-total">${R(q.total)}</span></div>`}
+      <div class="pr-g">${valorFld(false, q.linhas.length ? 'Pode ser diferente do contrato, com justificativa.' : '')}
+        <div class="fld" id="pr-just-f" ${dif ? '' : 'hidden'}><label for="f-just">Justificativa do valor diferente do contrato</label><textarea id="f-just" rows="2" ${ro ? 'disabled' : ''}>${esc(pr.just)}</textarea></div></div>
+      <div class="pr-av" id="pr-dif" ${dif ? '' : 'hidden'}>Valor diferente do contrato (${R(q.total)}).</div></div>`;
+  }
+  if (pr.perfil === 'Proposta') {
+    const tot = totalProp(pr);
+    return `<div class="pr-box" id="pr-prop"><h4>Itens da proposta</h4>
+      <p class="sub">Serviço avulso: os valores aprovados na proposta (a tabela do contrato não é usada). O nº, a data e os itens são exigidos para liberar.</p>
+      <div class="pr-g" style="margin:4px 0 8px"><div class="fld"><label for="f-pnum">Nº da proposta</label><input id="f-pnum" value="${esc(pr.pnum)}" ${ro ? 'disabled' : ''}></div>
+        <div class="fld"><label for="f-pdata">Data da proposta</label><input id="f-pdata" type="date" value="${esc(pr.pdata)}" ${ro ? 'disabled' : ''}></div></div>
+      ${pr.prop.map((p, i) => propRowHTML(p, i, ro)).join('')}
+      ${ro ? '' : '<button class="btn sm" type="button" id="pr-pp-add">+ Item da proposta</button>'}
+      <div class="pr-tot"><span>Total da proposta</span><span id="pr-total">${R(tot)}</span></div>
+      <div class="pr-g">${valorFld(pr.prop.length > 0, pr.prop.length ? 'Soma dos itens da proposta.' : '')}</div></div>`;
+  }
+  return `<div class="pr-g" style="margin-top:0">${valorFld(false, '')}</div>`;
+}
+function redesenharPreco(e) { const b = $('#f-preco-box'); if (!b) return; b.innerHTML = precoHTML(e); ligarPreco(e); }
+function totaisPreco(e) {
+  const pr = iniciarPreco(e); const fv = $('#f-val');
+  if (pr.perfil === 'Contrato') {
+    const q = quadroContrato(e);
+    $$('#pr-ct [data-pr]').forEach(row => { const l = q.linhas[+row.dataset.pr]; if (l) row.querySelector('[data-prt]').textContent = (sinalIt(l.it) < 0 ? '− ' : '') + R((+l.x.quantidade || 0) * l.it.valor); });
+    const t = $('#pr-total'); if (t) t.textContent = R(q.total);
+    if (fv && !pr.valorManual && q.linhas.length) fv.value = pr.valor;
+    const dif = difContrato(pr, q); const j = $('#pr-just-f'), d = $('#pr-dif');
+    if (j) j.hidden = !dif; if (d) { d.hidden = !dif; d.textContent = 'Valor diferente do contrato (' + R(q.total) + ').'; }
+  } else if (pr.perfil === 'Proposta') {
+    $$('#pr-prop [data-pp]').forEach(row => { const p = pr.prop[+row.dataset.pp]; row.querySelector('[data-ppt]').textContent = (sinalIt(p) < 0 ? '− ' : '') + R((+p.quantidade || 0) * (+p.valorUnitario || 0)); });
+    const tot = totalProp(pr); const t = $('#pr-total'); if (t) t.textContent = R(tot);
+    if (pr.prop.length) { pr.valor = tot; if (fv) fv.value = tot; }
+  }
+}
+function ligarPreco(e) {
+  const pr = iniciarPreco(e); if (S.ro) return;
+  const fv = $('#f-val'); if (fv) fv.oninput = () => {
+    if (pr.perfil === 'Contrato') { const q = quadroContrato(e); pr.valorManual = q.linhas.length > 0 && fv.value !== '' && Math.abs(+fv.value - q.total) > 0.005; }
+    pr.valor = fv.value;
+    totaisPreco(e);
+  };
+  const fj = $('#f-just'); if (fj) fj.oninput = () => { pr.just = fj.value; };
+  $$('#pr-ct [data-pr]').forEach(row => {
+    const q = quadroContrato(e); const l = q.linhas[+row.dataset.pr]; if (!l) return;
+    row.querySelector('[data-prq]').oninput = ev => { l.x.quantidade = ev.target.value; l.x.manual = true; totaisPreco(e); };
+    const x = row.querySelector('[data-prx]'); if (x) x.onclick = () => { pr.ct = pr.ct.filter(y => y !== l.x); redesenharPreco(e); };
+  });
+  const cx = $('#pr-cx-add'); if (cx) cx.onclick = () => { const id = $('#pr-cx').value; if (!id) return; pr.ct.push({ contratoItemId: id, quantidade: 1, manual: true, caixa: true }); redesenharPreco(e); };
+  const pn = $('#f-pnum'); if (pn) pn.oninput = () => { pr.pnum = pn.value; };
+  const pd = $('#f-pdata'); if (pd) pd.oninput = () => { pr.pdata = pd.value; };
+  $$('#pr-prop [data-pp]').forEach(row => {
+    const p = pr.prop[+row.dataset.pp];
+    row.querySelectorAll('[data-pf]').forEach(inp => {
+      const k = inp.dataset.pf;
+      if (k === 'destinacaoInclusa') inp.onchange = () => { p[k] = inp.checked; };
+      else if (k === 'tipo') inp.onchange = () => { p.tipo = inp.value; redesenharPreco(e); };
+      else if (inp.tagName === 'SELECT') inp.onchange = () => { p[k] = inp.value; };
+      else inp.oninput = () => { p[k] = inp.value; totaisPreco(e); };
+    });
+    row.querySelector('[data-ppx]').onclick = () => { pr.prop.splice(+row.dataset.pp, 1); redesenharPreco(e); };
+  });
+  const pa = $('#pr-pp-add'); if (pa) pa.onclick = () => { pr.prop.push(novaLinhaProp(pr)); redesenharPreco(e); };
+}
+/** O que vai para o servidor. */
+function precosParaSalvar(e) {
+  const pr = iniciarPreco(e);
+  if (pr.perfil === 'Contrato') return quadroContrato(e).linhas.map(l => ({ contratoItemId: l.x.contratoItemId, quantidade: l.x.quantidade }));
+  if (pr.perfil === 'Proposta') return pr.prop.map(p => ({ tipo: p.tipo, tipoVeiculoId: p.tipoVeiculoId || '', residuoId: p.residuoId || '', capacidade: p.capacidade, destinacaoInclusa: p.destinacaoInclusa === true,
+    cobrancaAluguel: p.cobrancaAluguel || '', quantidade: p.quantidade, valorUnitario: p.valorUnitario }));
+  return [];
 }
 function iniciarItens(e) {
   if (e._itens) return e._itens;
@@ -642,9 +824,14 @@ function itensTotal(its) {
   return kg ? `<div class="it-tot">Total estimado: ${kgF(kg)}${custo ? ' · custo de destinação ' + R(custo) : ''}${rec ? ' · receita de reciclagem ' + R(rec) : ''}</div>` : '';
 }
 function faltaLiberar(e) {
-  if (semDest(e.servico)) return '';
-  const its = (e._itens || itensDe(e.id)).filter(i => i.residuoId || i.destinadorId || i.pesoEstimado !== '');
   const f = [];
+  if (e.perfil === 'Proposta') {
+    if (!String(e.propostaNumero || '').trim()) f.push('o nº da proposta');
+    if (!e.propostaData) f.push('a data da proposta');
+    if (!(S.d.precosSol || []).some(p => p.solicitacaoId === e.id)) f.push('os itens da proposta');
+  }
+  if (semDest(e.servico)) return f.length ? 'Para liberar para programar, informe ' + f.join(', ') + '.' : '';
+  const its = (e._itens || itensDe(e.id)).filter(i => i.residuoId || i.destinadorId || i.pesoEstimado !== '');
   if (!its.length) f.push('os resíduos com o destinador previsto');
   its.forEach((it, i) => { const n = resNome(it.residuoId) || 'resíduo ' + (i + 1); if (!(+it.pesoEstimado > 0)) f.push('o peso estimado de ' + n); if (!it.destinadorId) f.push('o destinador de ' + n); });
   if (!(+e.kmPrevista > 0)) f.push('a km prevista');
@@ -715,13 +902,14 @@ function ligarForm() {
     catch (er) { falha(er); }
   };
   const box = $('#f-itens');
-  const redesenharItens = () => { box.innerHTML = itensHTML(e, S.ro); ligarItens(); };
+  const prCt = () => { if (iniciarPreco(e).perfil === 'Contrato') redesenharPreco(e); };
+  const redesenharItens = () => { box.innerHTML = itensHTML(e, S.ro); ligarItens(); prCt(); };
   const ligarItens = () => {
     $$('#f-itens [data-it]').forEach(row => {
       const it = e._itens[+row.dataset.it];
       const atual = () => { const v = row.querySelector('[data-itv]'); if (v) v.innerHTML = itemValor(it); const t = box.querySelector('.it-tot'); if (t) t.outerHTML = itensTotal(e._itens); else box.insertAdjacentHTML('beforeend', itensTotal(e._itens)); };
       row.querySelector('[data-itr]').onchange = ev => { it.residuoId = ev.target.value; redesenharItens(); };
-      row.querySelector('[data-itp]').oninput = ev => { it.pesoEstimado = ev.target.value; atual(); };
+      row.querySelector('[data-itp]').oninput = ev => { it.pesoEstimado = ev.target.value; atual(); prCt(); };
       row.querySelector('[data-itd]').onchange = ev => { it.destinadorId = ev.target.value; atual(); };
       const x = row.querySelector('[data-itx]'); if (x) x.onclick = () => { e._itens.splice(+row.dataset.it, 1); if (!e._itens.length) e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' }); redesenharItens(); };
     });
@@ -729,16 +917,20 @@ function ligarForm() {
   if (box) ligarItens();
   const ia = $('#f-it-add'); if (ia) ia.onclick = () => { e._itens.push({ residuoId: '', pesoEstimado: '', destinadorId: '' }); redesenharItens(); const l = $$('#f-itens [data-itr]'); l[l.length - 1].focus(); };
   // tabela de preço do contrato: só perfil Contrato, vigente na data da solicitação
-  const kmv = () => { const h = $('#h-kmv'); if (h) h.innerHTML = $('#f-perf').value === 'Contrato' ? kmEstimadoTxt(resolver(), $('#f-km').value, e.dataSolicitacao || hojeISO()) : ''; };
+  const kmv = () => { const h = $('#h-kmv'); if (h) h.innerHTML = $('#f-perf').value === 'Contrato' ? kmEstimadoTxt(resolver(), $('#f-km').value, e.dataSolicitacao || hojeISO(), ($('#f-vei') || {}).value) : ''; };
   const perfInfo = () => { const h = $('#h-perf'); if (!h) return; const pf = $('#f-perf').value, cid = resolver();
     if (pf === 'Proposta') { h.innerHTML = 'Serviço avulso: valores da proposta (a tabela do contrato não é usada).'; return; }
     if (pf !== 'Contrato' || !cid) { h.innerHTML = ''; return; }
     const c = cliDe(cid) || {}; const ct = (S.d.contratos || {})[cid] || (S.d.contratos || {})[c.principalId];
     h.innerHTML = !ct ? '<span class="warn">Cliente sem contrato cadastrado no Mapa.</span>' : ct.situacao === 'Vencido' ? `<span class="warn">Contrato ${esc(ct.numero || '')} vencido em ${esc(D(ct.validade))}.</span>`
       : ct.situacao === 'Vencendo' ? `Contrato ${esc(ct.numero || '')} vence em ${esc(D(ct.validade))}.` : ct.situacao === 'Encerrado' ? '<span class="warn">Contrato encerrado.</span>' : ''; };
-  const fkm = $('#f-km'); if (fkm) fkm.addEventListener('input', kmv);
-  if (ic) { ic.addEventListener('change', kmv); ic.addEventListener('change', perfInfo); }
-  const fpf = $('#f-perf'); if (fpf) { fpf.addEventListener('change', kmv); fpf.addEventListener('change', perfInfo); perfInfo(); kmv(); }
+  const pr = iniciarPreco(e);
+  const fkm = $('#f-km'); if (fkm) { fkm.addEventListener('input', kmv); fkm.addEventListener('input', () => { pr.km = fkm.value; prCt(); }); }
+  if (ic) { ic.addEventListener('change', kmv); ic.addEventListener('change', perfInfo); ic.addEventListener('change', () => { const c = resolver(); if (c === pr.cli) return; pr.cli = c; redesenharPreco(e); }); }
+  const fpf = $('#f-perf'); if (fpf) { fpf.addEventListener('change', kmv); fpf.addEventListener('change', perfInfo); perfInfo(); kmv();
+    fpf.addEventListener('change', () => { pr.perfil = fpf.value; if (pr.perfil === 'Proposta' && !pr.prop.length) pr.prop.push(novaLinhaProp(pr)); redesenharPreco(e); }); }
+  const fvei = $('#f-vei'); if (fvei) fvei.addEventListener('change', () => { pr.vei = fvei.value; kmv(); prCt(); });
+  ligarPreco(e);
   ligarKm(e); ligarCobrancas(e);
   const kr = $('#f-km-rota'); if (kr) kr.onclick = async () => {
     const cliId = resolver(); const uniId = $('#f-uni').value;
@@ -747,15 +939,17 @@ function ligarForm() {
     const r = await kmPelaRota(uniId, cliId, e._itens.map(i => i.destinadorId));
     kr.disabled = false;
     if (r.erro) { $('#h-km').innerHTML = `<span class="warn">${esc(r.erro)}</span>`; return; }
-    $('#f-km').value = r.km; kmv();
+    $('#f-km').value = r.km; kmv(); pr.km = r.km; prCt();
     $('#h-km').textContent = r.fonte === 'rota' ? 'Pela rota: unidade → cliente → destinador(es) → unidade.' : 'Estimativa em linha reta (+30%): a rota não respondeu.';
   };
   const f = $('#f'); if (f) f.onsubmit = async ev => {
     ev.preventDefault();
     const clienteId = resolver(); if (!clienteId) { toast('Escolha um cliente da lista (ou cadastre com "+ Novo cliente").'); ic.focus(); return; }
+    if (pr.perfil === 'Contrato' && difContrato(pr, quadroContrato(e)) && !String(pr.just || '').trim()) { toast('O valor previsto é diferente do contrato: informe a justificativa.'); const j = $('#f-just'); if (j) j.focus(); return; }
     const reg = { id: e.id || '', clienteId, unidadeId: $('#f-uni').value, consultorId: $('#f-con').value, servico: $('#f-serv').value, demanda: $('#f-dem').value,
       perfil: $('#f-perf').value, execucao: $('#f-exec').value, dataSolicitacaoConsultor: $('#f-dsc').value, dataDesejada: $('#f-dd').value,
       valorPrevisto: $('#f-val').value, descricao: $('#f-desc').value, obs: $('#f-obs').value,
+      tipoVeiculoId: $('#f-vei').value, justificativaValor: pr.just, propostaNumero: pr.pnum, propostaData: pr.pdata, precos: precosParaSalvar(e),
       kmPrevista: $('#f-km').value, diariasPrevistas: $('#f-dia').value, pernoitesPrevistos: $('#f-pern').value,
       itens: e._itens.filter(i => i.residuoId || i.destinadorId || i.pesoEstimado !== '').map(i => ({ id: i.id || '', residuoId: i.residuoId, pesoEstimado: i.pesoEstimado, destinadorId: i.destinadorId })) };
     const b = $('#f-save'); b.disabled = true;
