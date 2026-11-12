@@ -1516,6 +1516,13 @@ tr.cad-inativo td:last-child { opacity: 1; }
 
 
 /* Preço de venda (cliente) */
+.pc-busca { display: flex; gap: 6px; }
+.pc-busca input { flex: 1; min-width: 0; }
+.pc-res { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.pc-res button { text-align: left; background: var(--bg-input, transparent); border: 1px solid var(--border2); border-radius: 6px; padding: 6px 8px; font-size: 0.72rem; color: var(--text); cursor: pointer; font-family: var(--font-main); }
+.pc-res button:hover { border-color: var(--retec); }
+.pc-pin { width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+.pc-pin span { transform: rotate(45deg); width: 7px; height: 7px; border-radius: 50%; background: #fff; }
 .pv-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 7px 0; border-top: 1px dashed var(--border); font-size: 0.76rem; }
 .pv-row:first-child { border-top: none; }
 .pv-row.inativo { opacity: 0.5; }
@@ -5536,6 +5543,16 @@ function showRouteError(msg) {
       <div class="collapse-body" id="ct-body" style="display:none"></div>
     </div>
 
+    <!-- PONTOS DE COLETA (um CNPJ com vários locais; um pino por ponto) -->
+    <div class="fg equip-wrap" id="pc-wrap" style="display:none">
+      <button type="button" class="collapse-head" id="pc-head" onclick="pcToggle()" aria-expanded="false" aria-controls="pc-body">
+        <span class="collapse-arrow" id="pc-arrow">▸</span>
+        <span class="collapse-title">📍 Pontos de coleta</span>
+        <span class="collapse-count" id="pc-count">…</span>
+      </button>
+      <div class="collapse-body" id="pc-body" style="display:none"></div>
+    </div>
+
     <div class="fg">
       <label>Observações</label>
       <textarea id="f-obs" rows="2" placeholder="Informações adicionais, condições comerciais, restrições..."></textarea>
@@ -5734,6 +5751,7 @@ function toggleFilter(tipo) {
 }
 
 function applyFilters() {
+  if (typeof pcRedesenharPinos === 'function') setTimeout(pcRedesenharPinos, 0);
   Object.entries(leafletLayers).forEach(([id, layers]) => {
     const p = points.find(x => x.id === id);
     if (!p) return;
@@ -6387,6 +6405,7 @@ function openModal(id, draft) {
   pvAbrirCadastro(id, fonte.tipos || []);
   vnAbrirCadastro(id, fonte.tipos || []);
   ctAbrirCadastro(id, fonte.tipos || []);
+  pcAbrirCadastro(id, fonte.tipos || []);
   aplicarSomenteLeituraModal();
   document.getElementById('overlay').classList.add('open');
   document.querySelector('#overlay .modal')?.scrollTo?.(0, 0);
@@ -6487,6 +6506,108 @@ async function pvExcluir(id) {
   if (!confirm('Excluir este item de preço?')) return;
   try { const r = await Portal.api('mapa.excluirPrecoVenda', { id }); if (r.mensagem) alert(r.mensagem); await pvCarregar(); }
   catch (e) { alert((e && e.mensagem) || 'Não foi possível excluir.'); }
+}
+
+
+// ─── PONTOS DE COLETA (Locais além do principal: um CNPJ com vários pontos; um pino por ponto) ───
+let PC_LISTA = [];
+const PC = { id: null, aberto: false, edit: null, res: [] };
+let pcLayers = [];
+const pcDoCadastro = id => PC_LISTA.filter(p => p.cadastroId === id);
+const pcEndereco = p => [[p.logradouro, p.numero].filter(Boolean).join(', '), p.bairro, [p.cidade, p.uf].filter(Boolean).join('/'), p.cep].filter(Boolean).join(' · ');
+const pcTemCoord = p => p.lat !== '' && p.lng !== '' && p.lat != null && p.lng != null && isFinite(+p.lat) && isFinite(+p.lng);
+function pcIcone(tipo) {
+  const c = (TIPOS[tipo] || TIPOS.cliente || { color: '#1f7a5a' }).color;
+  return L.divIcon({ html: `<div class="pc-pin" style="background:${c}"><span></span></div>`, className: '', iconSize: [22, 22], iconAnchor: [11, 22], popupAnchor: [0, -20] });
+}
+function pcRedesenharPinos() {
+  pcLayers.forEach(m => { clusterGroup.removeLayer(m); if (map.hasLayer(m)) map.removeLayer(m); });
+  pcLayers = [];
+  PC_LISTA.forEach(pc => {
+    const pai = points.find(x => x.id === pc.cadastroId);
+    if (!pai || !pc.ativo || !pcTemCoord(pc) || !pontoVisivel(pai)) return;
+    const m = L.marker([+pc.lat, +pc.lng], { icon: pcIcone(pai.tipo), title: pc.nome + ' · ' + (pai.nome || '') });
+    m.bindPopup(`<div class="popup-title" style="font-weight:700">📍 ${pvEsc(pc.nome)}</div>
+      <div style="font-size:.75rem;margin:4px 0">Ponto de coleta de <b>${pvEsc(pai.nome || '')}</b>${pai.codigoUplog ? ' · ' + pvEsc(pai.codigoUplog) : ''}</div>
+      ${pcEndereco(pc) ? `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:6px">${pvEsc(pcEndereco(pc))}</div>` : ''}
+      <a class="popup-edit-btn" href="https://maps.google.com/?q=${+pc.lat},${+pc.lng}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-bottom:6px;">📍 Ver no Google Maps</a>
+      <button class="popup-edit-btn" onclick="openModal('${pai.id}')">${somenteLeitura ? '👁 Ver o cadastro' : '✏ Abrir o cadastro'}</button>`,
+      { maxWidth: 300, minWidth: 200, className: 'gvc-popup', autoPanPaddingTopLeft: [16, 70], autoPanPaddingBottomRight: [16, 16] });
+    clusterGroup.addLayer(m); pcLayers.push(m);
+  });
+}
+function pcAbrirCadastro(id, tipos) {
+  const wrap = document.getElementById('pc-wrap'); if (!wrap) return;
+  PC.id = id && /^CAD-/.test(id) && (tipos || []).includes('cliente') ? id : null; PC.edit = null; PC.res = [];
+  wrap.style.display = PC.id ? '' : 'none';
+  pcSetAberto(false); if (PC.id) pcRender();
+}
+function pcSetAberto(a) {
+  PC.aberto = a;
+  document.getElementById('pc-body').style.display = a ? '' : 'none';
+  document.getElementById('pc-arrow').textContent = a ? '▾' : '▸';
+  document.getElementById('pc-head').setAttribute('aria-expanded', a ? 'true' : 'false');
+}
+function pcToggle() { pcSetAberto(!PC.aberto); }
+function pcRender() {
+  const b = document.getElementById('pc-body'); if (!b || !PC.id) return;
+  const lista = pcDoCadastro(PC.id).sort((x, y) => (y.ativo - x.ativo) || x.nome.localeCompare(y.nome, 'pt-BR'));
+  const n = lista.filter(p => p.ativo).length;
+  const c = document.getElementById('pc-count'); c.textContent = n ? n + ' ponto(s)' : 'só o endereço principal'; c.classList.toggle('has', n > 0);
+  const e = PC.edit;
+  b.innerHTML = `<div class="pv-hint">Para o mesmo CNPJ com vários locais de coleta (lojas, galpões, obras). Cada ponto ativo vira um pino no mapa e pode ser escolhido na solicitação. O endereço principal continua na Localização do cadastro.</div>
+    ${lista.map(p => `<div class="pv-row ${p.ativo ? '' : 'inativo'}" data-pc="${p.id}"><div><b>${pvEsc(p.nome)}</b>${p.ativo ? '' : ' · inativo'}
+        <div class="pv-sub">${pvEsc(pcEndereco(p) || 'sem endereço')}${pcTemCoord(p) ? '' : ' · <span style="color:#d97706">sem coordenadas (não aparece no mapa)</span>'}</div></div>
+      <div class="pv-acts">${pcTemCoord(p) && p.ativo ? `<button type="button" class="pv-mini" onclick="pcVer('${p.id}')">Ver</button>` : ''}${somenteLeitura ? '' : `<button type="button" class="pv-mini" onclick="pcEditar('${p.id}')">Editar</button>
+        <button type="button" class="pv-mini ${p.ativo ? 'del' : ''}" onclick="pcAtivo('${p.id}', ${!p.ativo})">${p.ativo ? 'Inativar' : 'Reativar'}</button>`}</div></div>`).join('')}
+    ${somenteLeitura ? '' : e ? `<div class="pv-form" id="pc-form">
+      <div class="pv-full"><label for="pc-nome">Nome do ponto</label><input id="pc-nome" value="${pvEsc(e.nome)}" placeholder="Ex.: Loja Centro, Galpão 2" oninput="PC.edit.nome=this.value"></div>
+      <div class="pv-full"><label for="pc-q">Localização</label><div class="pc-busca"><input id="pc-q" placeholder="Endereço, lugar, link do Google Maps ou -12.84, -38.42" onkeydown="if(event.key==='Enter'){event.preventDefault();pcBuscar();}"><button type="button" class="pv-mini" onclick="pcBuscar()">Buscar</button></div>
+        <div class="pc-res" id="pc-res">${PC.res.map((r, i) => `<button type="button" onclick="pcEscolher(${i})">${pvEsc(r.nome)}</button>`).join('')}</div>
+        <div class="pv-hint" id="pc-st" style="margin-top:4px">${pcTemCoord(e) ? 'Coordenadas: ' + (+e.lat).toFixed(5) + ', ' + (+e.lng).toFixed(5) : 'Sem coordenadas ainda.'}</div></div>
+      <div><label for="pc-log">Logradouro</label><input id="pc-log" value="${pvEsc(e.logradouro)}" oninput="PC.edit.logradouro=this.value"></div>
+      <div><label for="pc-num">Número</label><input id="pc-num" value="${pvEsc(e.numero)}" oninput="PC.edit.numero=this.value"></div>
+      <div><label for="pc-bai">Bairro</label><input id="pc-bai" value="${pvEsc(e.bairro)}" oninput="PC.edit.bairro=this.value"></div>
+      <div><label for="pc-cid">Cidade</label><input id="pc-cid" value="${pvEsc(e.cidade)}" oninput="PC.edit.cidade=this.value"></div>
+      <div><label for="pc-uf">UF</label><input id="pc-uf" maxlength="2" value="${pvEsc(e.uf)}" oninput="PC.edit.uf=this.value"></div>
+      <div><label for="pc-cep">CEP</label><input id="pc-cep" value="${pvEsc(e.cep)}" oninput="PC.edit.cep=this.value"></div>
+      <div class="pv-full" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="pv-mini" onclick="PC.edit=null;PC.res=[];pcRender()">Cancelar</button><button type="button" class="residuo-add-btn" style="padding:7px 14px" onclick="pcSalvar()">${e.id ? 'Salvar ponto' : 'Incluir ponto'}</button></div>
+    </div>` : `<button type="button" class="multi-add" onclick="pcNovo()">+ Incluir ponto de coleta</button>`}`;
+}
+function pcNovo() { PC.edit = { nome: '', logradouro: '', numero: '', bairro: '', cidade: '', uf: '', cep: '', lat: '', lng: '' }; PC.res = []; pcRender(); document.getElementById('pc-nome')?.focus(); }
+function pcEditar(id) { PC.edit = { ...PC_LISTA.find(p => p.id === id) }; PC.res = []; pcRender(); }
+function pcVer(id) { const p = PC_LISTA.find(x => x.id === id); if (!p) return; closeModal(); setAppView('mapa'); map.flyTo([+p.lat, +p.lng], 16); }
+function pcAplicar(lat, lng, end) {
+  const e = PC.edit; if (!e) return;
+  e.lat = lat; e.lng = lng;
+  if (end) ['logradouro', 'numero', 'bairro', 'cidade', 'uf', 'cep'].forEach(k => { if (end[k] && !String(e[k] || '').trim()) e[k] = end[k]; });
+  PC.res = []; pcRender();
+}
+async function pcBuscar() {
+  const q = (document.getElementById('pc-q').value || '').trim(); if (!q) return;
+  const st = document.getElementById('pc-st');
+  const c = coordsDoTexto(q); if (c) { pcAplicar(c.lat, c.lng, null); return; }
+  st.textContent = 'Buscando…';
+  const r = ehLinkMaps(q) ? await geoGoogle({ tipo: 'link', url: q }) : await geoGoogle({ tipo: 'buscar', q });
+  if (!r.ok) { st.textContent = r.mensagem || 'Não foi possível buscar.'; return; }
+  if (r.resultado) { pcAplicar(r.resultado.lat, r.resultado.lng, r.resultado.endereco); return; }
+  PC.res = r.resultados || [];
+  if (!PC.res.length) { st.textContent = 'Nada encontrado: tente com cidade e UF, o CEP, ou cole o link do Google Maps.'; return; }
+  const v = document.getElementById('pc-q').value; pcRender(); document.getElementById('pc-q').value = v;
+}
+function pcEscolher(i) { const r = PC.res[i]; if (r) pcAplicar(r.lat, r.lng, r.endereco); }
+async function pcSalvar() {
+  const e = PC.edit; if (!e) return;
+  try {
+    const r = await Portal.api('mapa.salvarPontoColeta', { registro: { id: e.id || '', cadastroId: PC.id, nome: e.nome, logradouro: e.logradouro, numero: e.numero, bairro: e.bairro, cidade: e.cidade, uf: e.uf, cep: e.cep, lat: e.lat, lng: e.lng } });
+    if (r.pontosColeta) PC_LISTA = r.pontosColeta;
+    PC.edit = null; PC.res = []; pcRender(); pcRedesenharPinos();
+  } catch (err) { alert((err && err.mensagem) || 'Não foi possível salvar o ponto de coleta.'); }
+}
+async function pcAtivo(id, ativo) {
+  if (!ativo && !confirm('Inativar este ponto de coleta? Ele sai do mapa e das solicitações novas.')) return;
+  try { const r = await Portal.api('mapa.ativoPontoColeta', { id, ativo }); if (r.pontosColeta) PC_LISTA = r.pontosColeta; pcRender(); pcRedesenharPinos(); }
+  catch (err) { alert((err && err.mensagem) || 'Não foi possível alterar.'); }
 }
 
 
@@ -8698,6 +8819,7 @@ function replacePointsFromRemote(remote) {
 async function buscarPontos() {
   const j = await Portal.api('mapa.listar', {});
   if (!Array.isArray(j.pontos)) throw new Error('Resposta inválida');
+  PC_LISTA = j.pontosColeta || [];
   return j.pontos;
 }
 
