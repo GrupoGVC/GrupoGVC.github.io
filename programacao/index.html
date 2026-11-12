@@ -302,6 +302,8 @@ table.itens td input,table.itens td select{min-width:70px}
 .parada{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}
 .parada.ok{border-left:4px solid var(--ok)} .parada.x{border-left:4px solid var(--crit)}
 .pa-h{display:flex;gap:10px;align-items:flex-start;margin-bottom:6px}
+.pa-vei{font-size:12.5px;border-radius:var(--r);padding:6px 9px;margin:0 0 8px;background:var(--warn-bg);color:var(--warn)}
+.pa-vei.crit{background:var(--crit-bg);color:var(--crit)}
 .pa-n{font:700 15px var(--f-mono);background:var(--sunken);border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;flex:none}
 .pa-acts{display:flex;gap:4px}
 .pa-f{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
@@ -733,6 +735,16 @@ function motivoParadaHTML(p, ro) {
     <div class="fld full"><label>Observação (obrigatória)</label><input data-f="motivo" value="${esc(p.motivo)}" ${ro ? 'disabled' : ''}></div>
     ${(m && (m.responsavel === 'Cliente' || (m.responsavel === 'Na hora' && p.responsavel === 'Cliente'))) && (p.resultado === 'Frustrada' || p.equipeSaiu === 'SIM') ? '<p class="hint full">Responsabilidade do cliente: vai para a decisão de cobrança da viagem.</p>' : ''}`;
 }
+const tvNome = id => ((S.d.tiposVeiculo || []).find(t => t.id === id) || {}).nome || '';
+/** Veículo da viagem diferente do pedido: proposta não troca; contrato pergunta se foi combinado com o cliente. */
+function veiculoParadaHTML(p, s, ro) {
+  const pedido = s && s.tipoVeiculoId; const vv = veiDe(S.v.veiculoId);
+  const foi = S.v.execucao !== 'Terceirizada' && vv.id ? vv.tipoVeiculoId : '';
+  if (!pedido || !foi || pedido === foi || p.resultado === 'Cancelada') return '';
+  if (s.perfil === 'Proposta') return `<div class="pa-vei crit">A proposta foi aprovada para <b>${esc(tvNome(pedido))}</b> e o veículo da viagem é ${esc(tvNome(foi))}. Na proposta o veículo não é trocado.</div>`;
+  return `<div class="pa-vei">O cliente pediu <b>${esc(tvNome(pedido))}</b> e vai <b>${esc(tvNome(foi))}</b> (o BM cobra pelo veículo que foi).
+    <div class="fld" style="margin-top:6px;max-width:360px"><label>A troca foi combinada com o cliente?</label><select data-f="alteradoComCliente" ${ro ? 'disabled' : ''}>${opts([['SIM', 'Sim, combinado com o cliente'], ['NÃO', 'Não']], p.alteradoComCliente, 'Responda…')}</select></div></div>`;
+}
 function paradaHTML(p, i, ro, cxs) {
   const c = cliDe(p.clienteId); const s = p.solicitacaoId ? solDe(p.solicitacaoId) : null;
   const ruim = p.resultado === 'Frustrada' || p.resultado === 'No-show' || p.resultado === 'Cancelada';
@@ -740,8 +752,9 @@ function paradaHTML(p, i, ro, cxs) {
   const cxRet = cxs.filter(x => x.situacao === 'Em cliente' && (!x.cadastroAtualId || x.cadastroAtualId === p.clienteId) || x.id === p.caixaRetiradaId);
   return `<div class="parada ${p.resultado === 'Realizada' ? 'ok' : ruim ? 'x' : ''}" data-p="${i}">
     <div class="pa-h"><span class="pa-n">${i + 1}</span><div style="flex:1;min-width:0"><b>${esc(c.nome || '—')}</b> ${c.codigoUplog ? `<span class="mono sub">${esc(c.codigoUplog)}</span>` : ''}
-      <div class="sub">${s ? 'Solicitação de ' + esc(D(s.dataSolicitacao)) + (s.dataDesejada ? ' · desejada pelo cliente ' + esc(D(s.dataDesejada)) : '') : 'Parada avulsa'}</div></div>
+      <div class="sub">${s ? 'Solicitação de ' + esc(D(s.dataSolicitacao)) + (s.dataDesejada ? ' · desejada pelo cliente ' + esc(D(s.dataDesejada)) : '') + (s.perfil ? ' · ' + esc(s.perfil) : '') + (s.tipoVeiculoId ? ' · veículo pedido: <b>' + esc(tvNome(s.tipoVeiculoId)) + '</b>' : '') : 'Parada avulsa'}</div></div>
       ${ro ? '' : `<div class="pa-acts"><button class="btn sm" data-up="${i}" aria-label="Subir" ${i ? '' : 'disabled'}>↑</button><button class="btn sm" data-down="${i}" aria-label="Descer">↓</button><button class="btn sm danger" data-rm="${i}" aria-label="Remover parada">×</button></div>`}</div>
+    ${veiculoParadaHTML(p, s, ro)}
     <div class="form pa-f">
       <div class="fld"><label>Resultado</label><select data-f="resultado" ${ro ? 'disabled' : ''}>${resultadoOpts(p)}</select></div>
       <div class="fld"><label>Data da coleta (chegada no cliente)</label><input type="date" data-f="data" value="${esc(p.data)}" required ${ro ? 'disabled' : ''}></div>
@@ -855,7 +868,7 @@ async function salvarViagem(confirmar) {
     equipe: v.equipe, transportadorId: v.transportadorId, custoTerceiro: v.custoTerceiro, pernoitesPrevistos: v.noitesManual ? v.pernoitesPrevistos : '', obs: v.obs,
     kmInicial: v.kmInicial ?? '', kmFinal: v.kmFinal ?? '',
     paradas: v.paradas.map(p => { const x = { id: p.id, solicitacaoId: p.solicitacaoId, clienteId: p.clienteId, data: p.data, resultado: p.resultado, motivo: p.motivo,
-      motivoId: p.motivoId || '', responsavel: p.responsavel || '', equipeSaiu: p.equipeSaiu || '', caixaEntregueId: p.caixaEntregueId,
+      motivoId: p.motivoId || '', responsavel: p.responsavel || '', equipeSaiu: p.equipeSaiu || '', alteradoComCliente: p.alteradoComCliente || '', caixaEntregueId: p.caixaEntregueId,
       caixaRetiradaId: p.caixaRetiradaId, peso: p.resultado === 'Realizada' && (p.mtrs || []).length ? '' : p.peso, destinacao: p.destinacao, obs: p.obs,
       itens: (p.itens || []).filter(it => it._orig && it.destinadorId && it.destinadorId !== it._orig).map(it => ({ id: it.id, destinadorId: it.destinadorId, justificativa: it._just })) };
       if (!p.travada) x.mtrs = p.resultado === 'Realizada' ? (p.mtrs || []).filter(b => b.destinadorId || b.mtr || b.linhas.some(l => l.residuoId || l.kg)).map(b => ({ destinadorId: b.destinadorId, mtr: b.mtr, negocio: b.negocio,
