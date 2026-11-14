@@ -7,28 +7,48 @@
   // Raiz do site = pasta onde este arquivo está (funciona no GitHub Pages e em testes locais).
   const RAIZ = new URL('.', (document.currentScript && document.currentScript.src) || location.href).href;
   const SEM_LOGIN = ['login', 'enviarCodigo', 'definirSenha', 'sair'];
+  // Ordem = caminho da coleta (pedido → programação → destinação → MTR/CDF → faturamento), depois o apoio.
   const MODULOS = {
-    destinacao: { nome: 'Controle de Destinação', caminho: 'destinacao/',
-      desc: 'Destinações de resíduos (custo), vendas de recicláveis (receita), locação de veículos e conferência dos MTRs do mês.' },
-    mapa: { nome: 'Mapa Operacional', caminho: 'mapa/',
-      desc: 'Clientes, unidades GVC, parceiros, fornecedores, destinadores, transportadores e recicladores no mapa, com resíduos, preços e equipamentos.' },
-    frota: { nome: 'Frota', caminho: 'frota/',
-      desc: 'Veículos, caixas estacionárias, tipos de veículo e locação mensal de cada unidade.' },
     solicitacoes: { nome: 'Solicitações', caminho: 'solicitacoes/',
       desc: 'Pedidos dos clientes da chegada até a NF: documentos, liberação para programar, consultores e histórico.' },
     programacao: { nome: 'Programação', caminho: 'programacao/',
       desc: 'Viagens e paradas da unidade, equipe com CNH, pernoites, terceirizadas e caixas entregues ou retiradas.' },
-    dp: { nome: 'DP · Pernoites', caminho: 'dp/',
-      desc: 'Adiantamentos de pernoite lançados pela Programação, pagamentos, acertos depois da viagem e relatório do mês.' },
-    minhas: { nome: 'Minhas solicitações', caminho: 'minhas/',
-      desc: 'Para consultores: acompanhe os pedidos dos seus clientes, da chegada até a nota fiscal.' },
-    faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
-      desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
+    destinacao: { nome: 'Controle de Destinação', caminho: 'destinacao/',
+      desc: 'Destinações de resíduos (custo), vendas de recicláveis (receita), locação de veículos e conferência dos MTRs do mês.' },
     ambiental: { nome: 'Ambiental', caminho: 'ambiental/',
       desc: 'Todos os MTRs de coletas e da operação interna, a destinar e destinados, e o registro dos CDFs recebidos dos destinadores.' },
-    pessoas: { nome: 'Pessoas', caminho: 'pessoas/',
+    faturamento: { nome: 'Faturamento', caminho: 'faturamento/',
+      desc: 'Coletas realizadas que faltam BM, BMs enviados, aprovação do cliente e emissão da NF.' },
+    dp: { nome: 'DP · Pernoites', caminho: 'dp/',
+      desc: 'Adiantamentos de pernoite lançados pela Programação, pagamentos, acertos depois da viagem e relatório do mês.' },
+    mapa: { nome: 'Mapa Operacional', caminho: 'mapa/', curta: 'Clientes, parceiros, destinadores e preços no mapa.',
+      desc: 'Clientes, unidades GVC, parceiros, fornecedores, destinadores, transportadores e recicladores no mapa, com resíduos, preços e equipamentos.' },
+    frota: { nome: 'Frota', caminho: 'frota/', curta: 'Veículos, caixas estacionárias e locação mensal.',
+      desc: 'Veículos, caixas estacionárias, tipos de veículo e locação mensal de cada unidade.' },
+    pessoas: { nome: 'Pessoas', caminho: 'pessoas/', curta: 'Motoristas, ajudantes, consultores e acessos.',
       desc: 'Cadastro único de motoristas, ajudantes, consultores e equipe do escritório, com funções, CNH e acesso ao portal.' },
+    minhas: { nome: 'Minhas solicitações', caminho: 'minhas/',
+      desc: 'Para consultores: acompanhe os pedidos dos seus clientes, da chegada até a nota fiscal.' },
   };
+  // Blocos do painel e do menu "Módulos". Módulo novo fora da lista cai em "Outros".
+  const GRUPOS = [
+    { k: 'operacao', nome: 'Operação do dia a dia', sub: 'Na ordem da coleta: do pedido do cliente à destinação e ao CDF.', mods: ['solicitacoes', 'programacao', 'destinacao', 'ambiental'] },
+    { k: 'financeiro', nome: 'Financeiro e pessoal', sub: 'Faturamento das coletas e pernoites da equipe.', mods: ['faturamento', 'dp'] },
+    { k: 'cadastros', nome: 'Cadastros', sub: 'A base de tudo: o que é cadastrado aqui aparece nos outros módulos.', mods: ['mapa', 'frota', 'pessoas'], compacto: true },
+    { k: 'consultor', nome: 'Consultor', sub: 'Acompanhamento dos pedidos dos seus clientes.', mods: ['minhas'] },
+  ];
+  /** Blocos com os módulos que o usuário pode abrir: [{grupo, mods: [[chave, módulo]]}] (sem blocos vazios). */
+  function gruposDoUsuario(u) {
+    const tem = function (k) { return !!(u && u.modulos && u.modulos[k]) && !!MODULOS[k]; };
+    const usados = {};
+    const out = GRUPOS.map(function (g) {
+      const mods = g.mods.filter(tem).map(function (k) { usados[k] = 1; return [k, MODULOS[k]]; });
+      return { grupo: g, mods: mods };
+    });
+    const resto = Object.keys(MODULOS).filter(function (k) { return tem(k) && !usados[k]; }).map(function (k) { return [k, MODULOS[k]]; });
+    if (resto.length) out.push({ grupo: { k: 'outros', nome: 'Outros', sub: '' }, mods: resto });
+    return out.filter(function (x) { return x.mods.length; });
+  }
   const NIVEIS = { leitor: 'Leitor', editor: 'Editor', admin: 'Administrador' };
 
   function ler() {
@@ -111,19 +131,88 @@
     const confirmar = api('eu', {}).then(function (j) {
       const atual = ler(); atual.usuario = j.usuario; gravar(atual);
       if (!temAcesso(j.usuario)) location.replace(RAIZ + '?semAcesso=' + encodeURIComponent(modulo));
-      Portal.usuario = j.usuario;
+      Portal.usuario = j.usuario; menuModulos(modulo, j.usuario);
       if (Portal.aoAtualizarUsuario) Portal.aoAtualizarUsuario(j.usuario);
       return j.usuario;
     });
     if (s.usuario && temAcesso(s.usuario)) {
       confirmar.catch(function () {}); // sem internet: segue com o último usuário conhecido
-      Portal.usuario = s.usuario;
+      Portal.usuario = s.usuario; menuModulos(modulo, s.usuario);
       return Promise.resolve(s.usuario);
     }
     return confirmar.catch(function (e) {
       if (e && e.erro === 'nao_autenticado') return new Promise(function () {});
       throw e;
     });
+  }
+
+  /* ---------- menu "Módulos" no cabeçalho: troca de módulo sem voltar ao painel ---------- */
+  const COR_MOD = { solicitacoes: 'sol', programacao: 'prog', destinacao: 'dest', ambiental: 'amb', faturamento: 'fat', dp: 'dp', mapa: 'mapa', frota: 'frota', pessoas: 'pes', minhas: 'min' };
+  function cssMenu() {
+    if (document.getElementById('gvc-mm-css')) return;
+    const claro = '--mm-dest:#2a78d6;--mm-mapa:#0f9e78;--mm-frota:#b4690e;--mm-sol:#6a4fc4;--mm-fat:#c0396b;--mm-prog:#0e7c86;--mm-dp:#7a5a12;--mm-min:#3b6fd4;--mm-pes:#9a4a2e;--mm-amb:#3f7d2c;' +
+      '--mm-bg:var(--surface,#fff);--mm-line:var(--line,var(--border,#d8dfda));--mm-ink:var(--ink,var(--text,#14211b));--mm-ink3:var(--ink-3,var(--text-muted,#77857d));--mm-hover:var(--sunken,var(--surface2,#edf1ee))';
+    const escuro = '--mm-dest:#5a9cf0;--mm-mapa:#3cc79c;--mm-frota:#e8a43a;--mm-sol:#a28cf0;--mm-fat:#ef7aa5;--mm-prog:#3fbfca;--mm-dp:#d9b45a;--mm-min:#7aa4f2;--mm-pes:#e0906e;--mm-amb:#7fc46a';
+    const st = document.createElement('style'); st.id = 'gvc-mm-css';
+    st.textContent =
+      '.gvc-mm{position:relative;display:inline-flex;' + claro + '}' +
+      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .gvc-mm{' + escuro + '}}' +
+      ':root[data-theme="dark"] .gvc-mm{' + escuro + '}' +
+      '.gvc-mm>button{white-space:nowrap}' +
+      '.gvc-mm>button .gvc-mm-ic{font-size:15px;line-height:1}' +
+      '.gvc-mm-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:1000;min-width:250px;max-width:calc(100vw - 24px);max-height:calc(100vh - 90px);overflow:auto;' +
+        'background:var(--mm-bg);color:var(--mm-ink);border:1px solid var(--mm-line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px;font-size:14px;text-align:left}' +
+      '.gvc-mm-pop[hidden]{display:none!important}' +
+      '.gvc-mm-pop a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;color:inherit;text-decoration:none;font-weight:500;line-height:1.25}' +
+      '.gvc-mm-pop a:hover,.gvc-mm-pop a:focus-visible{background:var(--mm-hover);outline:none}' +
+      '.gvc-mm-pop a[aria-current]{font-weight:700}' +
+      '.gvc-mm-pop a[aria-current]::after{content:"aqui";margin-left:auto;font-size:11px;font-weight:600;color:var(--mm-ink3)}' +
+      '.gvc-mm-pop i{width:9px;height:9px;border-radius:50%;flex:none;background:var(--c,var(--mm-ink3))}' +
+      '.gvc-mm-pop .gvc-mm-g{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--mm-ink3);font-weight:600;padding:10px 10px 3px}' +
+      '.gvc-mm-pop .gvc-mm-ini{border-bottom:1px solid var(--mm-line);border-radius:7px 7px 0 0;margin-bottom:2px}' +
+      '@media (max-width:640px){.gvc-mm>button .gvc-mm-tx{display:none}.gvc-mm+a[title="Voltar ao portal"]{display:none!important}.gvc-mm-pop{position:fixed;left:12px;right:12px;min-width:0;max-width:none;max-height:calc(100vh - 120px)}}';
+    document.head.appendChild(st);
+  }
+  function menuModulos(atual, u) {
+    if (!atual) return;
+    const montar = function () {
+      const portalLink = Array.prototype.find.call(document.querySelectorAll('a[href="../"]'), function (a) { return /Portal/.test(a.textContent); });
+      if (!portalLink) return;
+      const antigo = document.getElementById('gvc-mm'); if (antigo) antigo.remove();
+      const grupos = gruposDoUsuario(u); const total = grupos.reduce(function (n, g) { return n + g.mods.length; }, 0);
+      if (total < 2) return; // só um módulo: o ⌂ Portal basta
+      cssMenu();
+      const box = document.createElement('span'); box.className = 'gvc-mm'; box.id = 'gvc-mm';
+      box.innerHTML = '<button type="button" class="' + escH(portalLink.className) + '" aria-haspopup="true" aria-expanded="false" aria-controls="gvc-mm-pop" title="Ir para outro módulo">' +
+        '<span class="gvc-mm-ic" aria-hidden="true">☰</span><span class="gvc-mm-tx">Módulos</span></button>' +
+        '<div class="gvc-mm-pop" id="gvc-mm-pop" role="menu" hidden>' +
+        '<a role="menuitem" class="gvc-mm-ini" href="' + escH(RAIZ) + '">⌂ Painel do portal</a>' +
+        grupos.map(function (g) {
+          return '<div class="gvc-mm-g">' + escH(g.grupo.nome) + '</div>' + g.mods.map(function (x) {
+            return '<a role="menuitem" href="' + escH(RAIZ + x[1].caminho) + '"' + (x[0] === atual ? ' aria-current="page"' : '') +
+              ' style="--c:var(--mm-' + (COR_MOD[x[0]] || 'ink3') + ')"><i></i>' + escH(x[1].nome) + '</a>';
+          }).join('');
+        }).join('') + '</div>';
+      portalLink.parentNode.insertBefore(box, portalLink);
+      const bt = box.querySelector('button'), pop = box.querySelector('.gvc-mm-pop');
+      const fechar = function (foco) { pop.hidden = true; bt.setAttribute('aria-expanded', 'false'); if (foco) bt.focus(); };
+      bt.addEventListener('click', function (e) {
+        e.stopPropagation(); const abrir = pop.hidden; pop.hidden = !abrir; bt.setAttribute('aria-expanded', String(abrir));
+        if (abrir) {
+          pop.style.top = window.innerWidth <= 640 ? Math.round(bt.getBoundingClientRect().bottom + 6) + 'px' : '';
+          const a = pop.querySelector('[aria-current]') || pop.querySelector('a'); if (a) a.focus();
+        }
+      });
+      document.addEventListener('click', function (e) { if (!pop.hidden && !box.contains(e.target)) fechar(false); });
+      box.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !pop.hidden) { e.preventDefault(); fechar(true); return; }
+        if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !pop.hidden) {
+          e.preventDefault(); const itens = Array.prototype.slice.call(pop.querySelectorAll('a')); const i = itens.indexOf(document.activeElement);
+          const n = itens[(i + (e.key === 'ArrowDown' ? 1 : -1) + itens.length) % itens.length]; if (n) n.focus();
+        }
+      });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montar); else montar();
   }
 
   async function sair() {
@@ -231,7 +320,7 @@
   }
 
   window.Portal = {
-    RAIZ: RAIZ, MODULOS: MODULOS, NIVEIS: NIVEIS,
+    RAIZ: RAIZ, MODULOS: MODULOS, GRUPOS: GRUPOS, NIVEIS: NIVEIS, gruposDoUsuario: gruposDoUsuario,
     api: api, exigir: exigir, sair: sair, nivel: nivel, podeEditar: podeEditar,
     sessao: ler, gravarSessao: gravar, irParaLogin: irParaLogin,
     mostrarHistorico: mostrarHistorico, confirmarInativar: confirmarInativar, auditoriaHTML: auditoriaHTML, dataHora: dataHora,

@@ -97,6 +97,19 @@ a.mod:hover{border-color:var(--c);box-shadow:0 8px 24px rgba(0,0,0,.07);transfor
 .mod .ico svg{width:26px;height:26px}
 .mod h3{font-family:var(--f-display);font-stretch:85%;font-weight:800;font-size:20px;margin:0}
 .mod p{margin:0;color:var(--ink-2);flex:1}
+.grupo{margin-top:26px}
+.grupo-h{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.grupo-h h2{font-family:var(--f-display);font-stretch:85%;font-weight:800;font-size:15px;letter-spacing:.06em;text-transform:uppercase;margin:0;color:var(--ink-2)}
+.grupo-h .sub{margin:0;font-size:13px}
+.grupo .mods{margin-top:14px}
+.mods.mini{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.mod.mini{flex-direction:row;align-items:center;gap:12px;padding:14px 16px;border-radius:12px}
+.mod.mini::before{inset:0 auto 0 0;width:4px;height:auto}
+.mod.mini .ico{width:38px;height:38px;border-radius:10px;flex:none}
+.mod.mini .ico svg{width:21px;height:21px}
+.mod.mini h3{font-size:16px}
+.mod.mini p{font-size:13px;margin-top:2px}
+@media (max-width:560px){.mods,.mods.mini{grid-template-columns:1fr}.grupo{margin-top:20px}}
 
 /* usuários */
 .tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px}
@@ -114,7 +127,7 @@ tr.inativo td{opacity:.55}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--ink-3);font-size:12px;margin-top:10px}
 </style>
 <script src="config.js"></script>
-<script src="portal.js?v=20261107"></script>
+<script src="portal.js?v=20261114"></script>
 <script src="tabela.js?v=20261107"></script>
 </head>
 <body>
@@ -250,16 +263,29 @@ tr.inativo td{opacity:.55}
 
   /* ---------- módulos ---------- */
   function renderHome(msg, tipo) {
-    const mods = Object.entries(Portal.MODULOS);
-    const disp = mods.filter(([k]) => (usuario.modulos || {})[k]);
+    const grupos = Portal.gruposDoUsuario(usuario);
     const primeiro = String(usuario.nome || '').split(' ')[0];
-    $('#main').innerHTML = `${aviso(msg, tipo)}
-      <div class="hello"><h1>Olá, ${esc(primeiro)}</h1><p class="sub">${disp.length ? 'Escolha um módulo para abrir.' : 'Você ainda não tem acesso a nenhum módulo. Fale com um administrador do portal.'}</p></div>
-      ${disp.length ? `<div class="mods">${disp.map(([k, m]) => `<a class="mod" style="--c:${CORES[k] || 'var(--accent)'}" href="${esc(m.caminho)}">
+    const cartao = ([k, m], compacto) => compacto
+      ? `<a class="mod mini" style="--c:${CORES[k] || 'var(--accent)'}" href="${esc(m.caminho)}" title="${esc(m.desc)}">
+          <div class="ico">${ICONES[k] || ''}</div>
+          <div><h3>${esc(m.nome)}</h3><p>${esc(m.curta || m.desc)}</p></div>
+        </a>`
+      : `<a class="mod" style="--c:${CORES[k] || 'var(--accent)'}" href="${esc(m.caminho)}">
           <div class="ico">${ICONES[k] || ''}</div>
           <h3>${esc(m.nome)}</h3>
           <p>${esc(m.desc)}</p>
-        </a>`).join('')}</div>` : ''}<div id="ct-alertas"></div>`;
+        </a>`;
+    // Com um bloco só (ex.: consultor), sem títulos: os cartões aparecem sozinhos, em tamanho cheio.
+    const comTitulos = grupos.length > 1;
+    $('#main').innerHTML = `${aviso(msg, tipo)}
+      <div class="hello"><h1>Olá, ${esc(primeiro)}</h1><p class="sub">${grupos.length ? 'Escolha um módulo para abrir.' : 'Você ainda não tem acesso a nenhum módulo. Fale com um administrador do portal.'}</p></div>
+      ${grupos.map(g => {
+        const compacto = comTitulos && g.grupo.compacto;
+        return `<section class="grupo" data-grupo="${esc(g.grupo.k)}">
+          ${comTitulos ? `<div class="grupo-h"><h2>${esc(g.grupo.nome)}</h2>${g.grupo.sub ? `<p class="sub">${esc(g.grupo.sub)}</p>` : ''}</div>` : ''}
+          <div class="mods${compacto ? ' mini' : ''}">${g.mods.map(x => cartao(x, compacto)).join('')}</div>
+        </section>`;
+      }).join('')}<div id="ct-alertas"></div>`;
     if (usuario.alertaContratos) carregarAlertasContratos();
   }
   // contratos de clientes vencendo (30 dias) ou vencidos — só para quem recebe o alerta
