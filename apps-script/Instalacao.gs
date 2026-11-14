@@ -216,7 +216,8 @@ function backupSemanal() {
   const arqs = []; const it = pasta.getFiles();
   while (it.hasNext()) arqs.push(it.next());
   arqs.sort(function (a, b) { return b.getDateCreated() - a.getDateCreated(); });
-  arqs.slice(12).forEach(function (f) { f.setTrashed(true); });
+  // as cópias marcadas MANTER (ex.: antes da limpeza do movimento) não entram na rotação
+  arqs.filter(function (f) { return !/MANTER/.test(f.getName()); }).slice(12).forEach(function (f) { f.setTrashed(true); });
   return nome;
 }
 function criarGatilhoBackup_() {
